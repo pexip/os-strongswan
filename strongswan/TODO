@@ -1,0 +1,51 @@
+                 -------------------------
+                  strongSwan - Roadmap
+                 -------------------------
+
+These notes mostly belong to charon, the new IKEv2 daemon. The plan is to
+migrate IKEv1 into charon. It's hard to say how much effort is needed to
+do that, and how much code we can reuse from pluto. But a port IS necessary to
+gain hassle-free configuration, version negotiation and maintainability.
+
+Roadmap
+=======
+
+ Dec  ! - complete modular credential framework
+      !
+
+TODO-List
+=========
+
+A set of TODOs. This is only a list of things I write down to not forget them.
+Watch out for TODOs in the code.
+
+Build options
+-------------
+- Allow static build using libtool dlopen wrapper
+
+Certificate support
+-------------------
+- proper handling of multiple certificate payloads (import order)
+- synchronized CRL fetcher
+- Smartcard interface
+- Attribute certificates
+
+Stroke interface
+----------------
+- add a Rekey-Counter for SAs in "statusall"
+- ipsec statusall bytecount
+
+Misc
+----
+- Address pool/backend for virtual IP assignement
+- replace iterator by enumerator
+
+libstrongswan stuff
+-------------------
+- Header installation support (#include <strongswan/strongswan.h>?)
+- move __constructor__/__destructor__ to a library init function
+- object style for leak detective, include an API
+- Cleanup/Refactor PEM/ASN1 stuff
+- replace file reads through chunk_read
+- rewrite lexparser in object-oriented style
+
