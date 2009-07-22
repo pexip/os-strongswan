@@ -151,6 +151,14 @@ asn1_length(chunk_t *blob)
     u_char n;
     size_t len;
 
+    if (blob->len < 2)
+    {
+	DBG(DBG_PARSING,
+	    DBG_log("insufficient number of octets to parse ASN.1 length")
+	)
+	return ASN1_INVALID_LENGTH;
+    }
+
     /* advance from tag field on to length field */
     blob->ptr++;
     blob->len--;
@@ -159,16 +167,25 @@ asn1_length(chunk_t *blob)
     n = *blob->ptr++;
     blob->len--;
 
-    if ((n & 0x80) == 0) /* single length octet */
+    if ((n & 0x80) == 0) 
+    {	/* single length octet */
+	if (n > blob->len)
+	{
+	    DBG(DBG_PARSING,
+		DBG_log("length is larger than remaining blob size")
+	    )
+	    return ASN1_INVALID_LENGTH;
+	}
 	return n;
+    }
 
     /* composite length, determine number of length octets */
     n &= 0x7f;
 
-    if (n > blob->len)
+    if (n == 0 || n > blob->len)
     {
 	DBG(DBG_PARSING,
-	    DBG_log("number of length octets is larger than ASN.1 object")
+	    DBG_log("number of length octets invalid")
 	)
 	return ASN1_INVALID_LENGTH;
     }
@@ -188,6 +205,13 @@ asn1_length(chunk_t *blob)
     {
 	len = 256*len + *blob->ptr++;
 	blob->len--;
+    }
+    if (len > blob->len)
+    {
+	DBG(DBG_PARSING,
+	    DBG_log("length is larger than remaining blob size")
+	)
+	return ASN1_INVALID_LENGTH;
     }
     return len;
 }
@@ -364,14 +388,20 @@ asn1totime(const chunk_t *utctime, asn1_t type)
     {
 	int tz_hour, tz_min;
 
-	sscanf(eot+1, "%2d%2d", &tz_hour, &tz_min);
+	if (sscanf(eot+1, "%2d%2d", &tz_hour, &tz_min) != 2)
+	{
+	    return 0; /* error in positive timezone offset format */
+	}
 	tz_offset = 3600*tz_hour + 60*tz_min;  /* positive time zone offset */
     }
     else if ((eot = memchr(utctime->ptr, '-', utctime->len)) != NULL)
     {
 	int tz_hour, tz_min;
 
-	sscanf(eot+1, "%2d%2d", &tz_hour, &tz_min);
+	if (sscanf(eot+1, "%2d%2d", &tz_hour, &tz_min) != 2)
+	{
+	    return 0; /* error in negative timezone offset format */
+	}
 	tz_offset = -3600*tz_hour - 60*tz_min;  /* negative time zone offset */
     }
     else
@@ -383,14 +413,20 @@ asn1totime(const chunk_t *utctime, asn1_t type)
 	const char* format = (type == ASN1_UTCTIME)? "%2d%2d%2d%2d%2d":
 						     "%4d%2d%2d%2d%2d";
 
-	sscanf(utctime->ptr, format, &t.tm_year, &t.tm_mon, &t.tm_mday,
-				     &t.tm_hour, &t.tm_min);
+	if (sscanf(utctime->ptr, format, &t.tm_year, &t.tm_mon, &t.tm_mday,
+					 &t.tm_hour, &t.tm_min) != 5)
+	{
+	    return 0; /* error in time st [yy]yymmddhhmm time format */
+	}
     }
 
     /* is there a seconds field? */
     if ((eot - utctime->ptr) == ((type == ASN1_UTCTIME)?12:14))
     {
-	sscanf(eot-2, "%2d", &t.tm_sec);
+	if (sscanf(eot-2, "%2d", &t.tm_sec) != 1)
+	{
+	    return 0; /* error in ss seconds field format */
+	}
     }
     else
     {
@@ -585,7 +621,7 @@ extract_object(asn1Object_t const *objects,
 
     blob1->len = asn1_length(blob);
 
-    if (blob1->len == ASN1_INVALID_LENGTH || blob->len < blob1->len)
+    if (blob1->len == ASN1_INVALID_LENGTH)
     {
 	DBG(DBG_PARSING,
 	    DBG_log("L%d - %s:  length of ASN.1 object invalid or too large",

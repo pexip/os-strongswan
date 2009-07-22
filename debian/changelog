@@ -1,3 +1,23 @@
+strongswan (2.8.0+dfsg-1+etch2) oldstable-security; urgency=low
+
+  Applied ASN.1 security fixes from strongswan upstream:
+  * strongswan-2.x.x_asn1_length.patch: The RDN parser vulnerability 
+    discovered by Orange Labs research team was not completely fixed 
+    in version 2.8.10. Some more modifications had to be applied to the 
+    asn1_length() function.
+  * strongswan-2.x.x_asn1_rdn.patch: Applying their fuzzing tool, the 
+    Orange Labs vulnerability research team found a Denial-of-Service 
+    vulnerability in the parsing of ASN.1 Relative Distinguished Names 
+    (RDNs). Malformed X.509 certificate RDNs can cause the pluto IKE daemon 
+    to crash and restart.
+  * strongswan-2.x.x_asn1_time.patch: Applying their fuzzing tool, the 
+    Orange Labs vulnerability research team found a Denial-of-Service 
+    vulnerability in the parsing of ASN.1 UTCTIME and GENERALIZEDTIME strings. 
+    Malformed X.509 certificate time strings can cause the pluto IKE daemon 
+    to crash and restart.
+
+ -- Rene Mayrhofer <rmayr@debian.org>  Wed, 22 Jul 2009 12:04:11 +0200
+
 strongswan (2.8.0+dfsg-1+etch1) oldstable-security; urgency=high
 
   * Non-maintainer upload by the security team
