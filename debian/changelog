@@ -1,3 +1,9 @@
+strongswan (4.2.4-5+lenny2) stable-security; urgency=low
+
+  Applied ASN.1 and other security fixes from upstream:
+
+ -- Rene Mayrhofer <rmayr@debian.org>  Wed, 22 Jul 2009 12:45:08 +0200
+
 strongswan (4.2.4-5+lenny1) stable-security; urgency=high
 
   * Non-maintainer upload by the security team

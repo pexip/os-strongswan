@@ -1,2 +1,9 @@
 01-fix-potential-DoS.dpatch
 02-CVE-2009-0790.dpatch
+03-strongswan-4.2.x_null_mpz_export.dpatch
+03-strongswan-4.x.x_asn1_length.dpatch
+03-strongswan-4.x.x_asn1_rdn.dpatch
+03-strongswan-4.x.x_asn1_time.dpatch
+03-strongswan-4.x.x_dpd_null_state.dpatch
+03-strongswan-4.x.x_invalid_ike_state.dpatch
+03-strongswan-4.x.x._swapped_ts_check.dpatch

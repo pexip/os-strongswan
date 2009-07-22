@@ -1,0 +1,5 @@
+The RDN parser vulnerability discovered by Orange Labs research team
+was not completely fixed in version 4.2.16. Some more modifications
+had to be applied to the asn1_length() function.
+
+Apply to strongSwan releases 4.1.0 to 4.2.16 

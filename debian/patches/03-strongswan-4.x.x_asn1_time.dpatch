@@ -1,0 +1,108 @@
+#! /bin/sh /usr/share/dpatch/dpatch-run
+
+@DPATCH@
+diff -ur strongswan-lenny/src/libstrongswan/asn1/asn1.c strongswan-tmp/src/libstrongswan/asn1/asn1.c
+--- strongswan-lenny/src/libstrongswan/asn1/asn1.c	2008-06-20 22:17:15.000000000 +0200
++++ strongswan-tmp/src/libstrongswan/asn1/asn1.c	2009-07-22 12:36:46.000000000 +0200
+@@ -281,14 +281,20 @@
+ 	{
+ 		int tz_hour, tz_min;
+ 	
+-		sscanf(eot+1, "%2d%2d", &tz_hour, &tz_min);
++		if (sscanf(eot+1, "%2d%2d", &tz_hour, &tz_min) != 2)
++		{
++			return 0; /* error in positive timezone offset format */
++		}
+ 		tz_offset = 3600*tz_hour + 60*tz_min;  /* positive time zone offset */
+ 	}
+ 	else if ((eot = memchr(utctime->ptr, '-', utctime->len)) != NULL)
+ 	{
+ 		int tz_hour, tz_min;
+ 	
+-		sscanf(eot+1, "%2d%2d", &tz_hour, &tz_min);
++		if (sscanf(eot+1, "%2d%2d", &tz_hour, &tz_min) != 2)
++		{
++			return 0; /* error in negative timezone offset format */
++		}
+ 		tz_offset = -3600*tz_hour - 60*tz_min;  /* negative time zone offset */
+ 	}
+ 	else
+@@ -297,17 +303,23 @@
+ 	}
+ 	
+ 	{
+-	const char* format = (type == ASN1_UTCTIME)? "%2d%2d%2d%2d%2d":
++		const char* format = (type == ASN1_UTCTIME)? "%2d%2d%2d%2d%2d":
+ 			"%4d%2d%2d%2d%2d";
+ 	
+-	sscanf(utctime->ptr, format, &t.tm_year, &t.tm_mon, &t.tm_mday,
+-		   &t.tm_hour, &t.tm_min);
++		if (sscanf(utctime->ptr, format, &t.tm_year, &t.tm_mon, &t.tm_mday,
++								 	&t.tm_hour, &t.tm_min) != 5)
++		{
++			return 0; /* error in time st [yy]yymmddhhmm time format */
++		}
+ 	}
+ 	
+ 	/* is there a seconds field? */
+ 	if ((eot - utctime->ptr) == ((type == ASN1_UTCTIME)?12:14))
+ 	{
+-		sscanf(eot-2, "%2d", &t.tm_sec);
++		if (sscanf(eot-2, "%2d", &t.tm_sec) != 1)
++		{
++			return 0; /* error in ss seconds field format */
++		}
+ 	}
+ 	else
+ 	{
+diff -ur strongswan-lenny/src/pluto/asn1.c strongswan-tmp/src/pluto/asn1.c
+--- strongswan-lenny/src/pluto/asn1.c	2008-06-20 22:17:17.000000000 +0200
++++ strongswan-tmp/src/pluto/asn1.c	2009-07-22 12:34:08.000000000 +0200
+@@ -364,14 +364,20 @@
+     {
+ 	int tz_hour, tz_min;
+ 
+-	sscanf(eot+1, "%2d%2d", &tz_hour, &tz_min);
++	if (sscanf(eot+1, "%2d%2d", &tz_hour, &tz_min) != 2)
++	{
++	    return 0; /* error in positive timezone offset format */
++	}
+ 	tz_offset = 3600*tz_hour + 60*tz_min;  /* positive time zone offset */
+     }
+     else if ((eot = memchr(utctime->ptr, '-', utctime->len)) != NULL)
+     {
+ 	int tz_hour, tz_min;
+ 
+-	sscanf(eot+1, "%2d%2d", &tz_hour, &tz_min);
++	if (sscanf(eot+1, "%2d%2d", &tz_hour, &tz_min) != 2)
++	{
++	    return 0; /* error in negative timezone offset format */
++	}
+ 	tz_offset = -3600*tz_hour - 60*tz_min;  /* negative time zone offset */
+     }
+     else
+@@ -383,14 +389,20 @@
+ 	const char* format = (type == ASN1_UTCTIME)? "%2d%2d%2d%2d%2d":
+ 						     "%4d%2d%2d%2d%2d";
+ 
+-	sscanf(utctime->ptr, format, &t.tm_year, &t.tm_mon, &t.tm_mday,
+-				     &t.tm_hour, &t.tm_min);
+-    }
++	if (sscanf(utctime->ptr, format, &t.tm_year, &t.tm_mon, &t.tm_mday,
++					 &t.tm_hour, &t.tm_min) != 5)
++	{
++	    return 0; /* error in time st [yy]yymmddhhmm time format */
++	}
++   }
+ 
+     /* is there a seconds field? */
+     if ((eot - utctime->ptr) == ((type == ASN1_UTCTIME)?12:14))
+     {
+-	sscanf(eot-2, "%2d", &t.tm_sec);
++	if (sscanf(eot-2, "%2d", &t.tm_sec) != 1)
++	{
++	    return 0; /* error in ss seconds field format */
++	}
+     }
+     else
+     {

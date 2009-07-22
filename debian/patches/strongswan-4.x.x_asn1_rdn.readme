@@ -1,0 +1,6 @@
+Applying their fuzzing tool, the Orange Labs vulnerability research team
+found a Denial-of-Service vulnerability in the parsing of ASN.1 Relative
+Distinguished Names (RDNs). Malformed X.509 certificate RDNs can cause
+the pluto and charon IKE daemons to crash and restart.
+
+Apply to strongSwan releases 4.0.0 to 4.2.15

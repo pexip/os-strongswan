@@ -1,0 +1,6 @@
+Fixes a Denial-of-Service vulnerability where a DPD R_U_THERE or R_U_THERE_ACK NOTIFY
+message (RFC 3706, Dead Peer Detection) received on UDP port 500 or 4500 and not
+related to an existing ISAKMP Security Association causes an immediate crash of the
+IKEv1 pluto daemon while dereferencing a NULL state pointer.
+
+Apply to strongSwan releases 4.0.0 to 4.2.13
