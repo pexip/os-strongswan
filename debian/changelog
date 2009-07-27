@@ -21,10 +21,6 @@ strongswan (4.2.4-5+lenny2) stable-security; urgency=high
     IKE_SA_INIT request leaves an incomplete state which causes a crash of 
     the IKEv2 charon while dereferencing a NULL pointer if a subsequent 
     CREATE_CHILD_SA is received.
-  * Fixes a Denial-of-Service vulnerability where an IKE_SA_INIT message with
-    a KE payload containing zeroes only can cause a crash of the IKEv2 charon
-    daemon due to a NULL pointer returned by the mpz_export() function of the
-    GNU Multi Precision (GMP) library.
 
  -- Rene Mayrhofer <rmayr@debian.org>  Wed, 22 Jul 2009 12:45:08 +0200
 

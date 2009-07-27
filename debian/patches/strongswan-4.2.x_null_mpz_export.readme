@@ -1,6 +1,0 @@
-Fixes a Denial-of-Service vulnerability where an IKE_SA_INIT message with
-a KE payload containing zeroes only can cause a crash of the IKEv2 charon
-daemon due to a NULL pointer returned by the mpz_export() function of the
-GNU Multi Precision (GMP) library.
-
-Apply to strongSwan releases 4.2.0 to 4.2.6
