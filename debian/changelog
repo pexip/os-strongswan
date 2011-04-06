@@ -1,3 +1,10 @@
+strongswan (4.4.1-6ubuntu1) maverick; urgency=low
+
+  * Fix mode config in combination with XAUTH by applying upstream patch
+    from later version
+
+ -- René Mayrhofer <rene@earth>  Wed, 06 Apr 2011 21:25:27 +0200
+
 strongswan (4.4.1-6) unstable; urgency=low
 
   * Enable NAT-T transport mode support again for L2TP/IPsec clients
