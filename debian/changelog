@@ -1,9 +1,9 @@
-strongswan (4.4.1-6ubuntu1) maverick; urgency=low
+strongswan (4.4.1-7) stable; urgency=low
 
   * Fix mode config in combination with XAUTH by applying upstream patch
     from later version
 
- -- René Mayrhofer <rene@earth>  Wed, 06 Apr 2011 21:25:27 +0200
+ -- Rene Mayrhofer <rmayr@debian.org>  Wed, 06 Apr 2011 21:25:27 +0200
 
 strongswan (4.4.1-6) unstable; urgency=low
 
