@@ -53,7 +53,7 @@ endif
 # to do backports where the network-manager libs can not be installed, and 
 # thus to just ignore build-deps).
 ifeq ($(shell test -d /usr/include/libnm-glib/ && echo yes),yes)
-  CONFIGUREARS += --enable-nm
+  CONFIGUREARGS += --enable-nm
 endif
 
 build: build-stamp
