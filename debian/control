@@ -1,12 +1,13 @@
 Source: strongswan
 Section: net
 Priority: optional
-Maintainer: Rene Mayrhofer <rmayr@debian.org>
-Uploaders: Yves-Alexis Perez <corsac@debian.org>
+Maintainer: Pexip AS <packaging@pexip.com>
+XBCS-Original-Maintainer: Rene Mayrhofer <rmayr@debian.org>
+XBCS-Original-Uploaders: Yves-Alexis Perez <corsac@debian.org>
 Standards-Version: 3.9.3
 Vcs-Browser: http://anonscm.debian.org/gitweb/?p=pkg-swan/strongswan.git;a=summary
 Vcs-Git: git://anonscm.debian.org/pkg-swan/strongswan.git
-Build-Depends: debhelper (>= 9), dpkg-dev (>= 1.16.2), libtool, libgmp3-dev, 
+Build-Depends: debhelper (>= 9), dpkg-dev (>= 1.16.1), libtool, libgmp3-dev, 
   libssl-dev (>= 0.9.8), libcurl4-openssl-dev | libcurl3-dev | libcurl2-dev,
   libldap2-dev, libpam0g-dev, libkrb5-dev, bison, flex, bzip2, po-debconf,
   hardening-wrapper, libfcgi-dev, clearsilver-dev,
