@@ -1,3 +1,11 @@
+strongswan (4.6.4-6pexip1) precise; urgency=low
+
+  * debian/control:
+      - relax dpkg-dev dependency for precise
+      - update maintainer info
+
+ -- John-Mark Bell <jmb@pexip.com>  Fri, 01 Feb 2013 15:07:28 +0000
+
 strongswan (4.6.4-6) unstable; urgency=low
 
   * debian/rules:
