@@ -37,8 +37,7 @@ ifeq ($(DEB_BUILD_ARCH_OS),linux)
 	# some plugins are linux-only too
 	CONFIGUREARGS += --enable-nm \
 		--with-capabilities=libcap \
-		--enable-farp \
-		--enable-dhcp
+		--enable-farp
 endif
 
 ifeq ($(DEB_BUILD_ARCH_OS),kfreebsd)
@@ -74,7 +73,6 @@ override_dh_install:
 	# first special cases
 ifeq ($(DEB_BUILD_ARCH_OS),linux)
 	# handle Linux-only plugins
-	dh_install -p libstrongswan usr/lib/ipsec/plugins/libstrongswan-dhcp.so
 	dh_install -p libstrongswan usr/lib/ipsec/plugins/libstrongswan-farp.so
 	dh_install -p libstrongswan usr/lib/ipsec/plugins/libstrongswan-xauth.so
 	dh_install -p libstrongswan usr/lib/ipsec/plugins/libstrongswan-kernel-netlink.so
@@ -96,7 +94,6 @@ endif
 		-X\.la -X\.a \
 		-Xmedsrv -Xman3 \
 		-Xlibstrongswan-kernel \
-		-Xlibstrongswan-dhcp.so \
 		-Xlibstrongswan-farp.so \
 		-Xlibstrongswan-xauth.so \
 	 	-Xlibstrongswan-padlock.so
