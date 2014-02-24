@@ -16,12 +16,12 @@
 
 #include <openssl/opensslconf.h>
 
-#ifndef OPENSSL_NO_EC
+#ifndef OPENSSL_NO_ECDSA
 
 #include "openssl_ec_public_key.h"
 #include "openssl_util.h"
 
-#include <debug.h>
+#include <utils/debug.h>
 
 #include <openssl/evp.h>
 #include <openssl/ecdsa.h>
@@ -124,7 +124,7 @@ static bool verify_der_signature(private_openssl_ec_public_key_t *this,
 	if (openssl_hash_chunk(nid_hash, data, &hash))
 	{
 		valid = ECDSA_verify(0, hash.ptr, hash.len,
-							 signature.ptr, signature.len, this->ec);
+							 signature.ptr, signature.len, this->ec) == 1;
 		free(hash.ptr);
 	}
 	return valid;
@@ -221,13 +221,13 @@ bool openssl_ec_fingerprint(EC_KEY *ec, cred_encoding_type_t type, chunk_t *fp)
 			return FALSE;
 	}
 	hasher = lib->crypto->create_hasher(lib->crypto, HASH_SHA1);
-	if (!hasher)
+	if (!hasher || !hasher->allocate_hash(hasher, key, fp))
 	{
 		DBG1(DBG_LIB, "SHA1 hash algorithm not supported, fingerprinting failed");
+		DESTROY_IF(hasher);
 		free(key.ptr);
 		return FALSE;
 	}
-	hasher->allocate_hash(hasher, key, fp);
 	hasher->destroy(hasher);
 	free(key.ptr);
 	lib->encoding->cache(lib->encoding, type, ec, *fp);
@@ -245,33 +245,23 @@ METHOD(public_key_t, get_encoding, bool,
 	private_openssl_ec_public_key_t *this, cred_encoding_type_t type,
 	chunk_t *encoding)
 {
+	bool success = TRUE;
 	u_char *p;
 
-	switch (type)
+	*encoding = chunk_alloc(i2d_EC_PUBKEY(this->ec, NULL));
+	p = encoding->ptr;
+	i2d_EC_PUBKEY(this->ec, &p);
+
+	if (type != PUBKEY_SPKI_ASN1_DER)
 	{
-		case PUBKEY_SPKI_ASN1_DER:
-		case PUBKEY_PEM:
-		{
-			bool success = TRUE;
+		chunk_t asn1_encoding = *encoding;
 
-			*encoding = chunk_alloc(i2d_EC_PUBKEY(this->ec, NULL));
-			p = encoding->ptr;
-			i2d_EC_PUBKEY(this->ec, &p);
-
-			if (type == PUBKEY_PEM)
-			{
-				chunk_t asn1_encoding = *encoding;
-
-				success = lib->encoding->encode(lib->encoding, PUBKEY_PEM,
-								NULL, encoding, CRED_PART_ECDSA_PUB_ASN1_DER,
-								asn1_encoding, CRED_PART_END);
-				chunk_clear(&asn1_encoding);
-			}
-			return success;
-		}
-		default:
-			return FALSE;
+		success = lib->encoding->encode(lib->encoding, type,
+						NULL, encoding, CRED_PART_ECDSA_PUB_ASN1_DER,
+						asn1_encoding, CRED_PART_END);
+		chunk_clear(&asn1_encoding);
 	}
+	return success;
 }
 
 METHOD(public_key_t, get_ref, public_key_t*,
@@ -360,5 +350,5 @@ openssl_ec_public_key_t *openssl_ec_public_key_load(key_type_t type,
 	}
 	return &this->public;
 }
-#endif /* OPENSSL_NO_EC */
+#endif /* OPENSSL_NO_ECDSA */
 

@@ -17,8 +17,8 @@
 
 #include "pki.h"
 
-#include <debug.h>
-#include <utils/linked_list.h>
+#include <utils/debug.h>
+#include <collections/linked_list.h>
 #include <credentials/certificates/certificate.h>
 #include <credentials/certificates/x509.h>
 #include <credentials/certificates/crl.h>
@@ -141,8 +141,8 @@ static int sign_crl()
 			case 'h':
 				goto usage;
 			case 'g':
-				digest = get_digest(arg);
-				if (digest == HASH_UNKNOWN)
+				digest = enum_from_name(hash_algorithm_short_names, arg);
+				if (digest == -1)
 				{
 					error = "invalid --digest type";
 					goto usage;
@@ -429,13 +429,13 @@ static void __attribute__ ((constructor))reg()
 	command_register((command_t) {
 		sign_crl, 'c', "signcrl",
 		"issue a CRL using a CA certificate and key",
-		{"--cacert file --cakey file | --cakeyid hex --lifetime days",
-		 "[--lastcrl crl] [--basecrl crl] [--crluri uri ]+",
-		 "[  [--reason key-compromise|ca-compromise|affiliation-changed|",
+		{"--cacert file --cakey file|--cakeyid hex [--lifetime days]",
+		 "  [--lastcrl crl] [--basecrl crl] [--crluri uri]+",
+		 "  [[--reason key-compromise|ca-compromise|affiliation-changed|",
 		 "             superseded|cessation-of-operation|certificate-hold]",
-		 "   [--date timestamp]",
-		 "    --cert file | --serial hex ]*",
-		 "[--digest md5|sha1|sha224|sha256|sha384|sha512] [--outform der|pem]"},
+		 "   [--date timestamp] --cert file|--serial hex]*",
+		 "  [--digest md5|sha1|sha224|sha256|sha384|sha512]",
+		 "  [--outform der|pem]"},
 		{
 			{"help",		'h', 0, "show usage information"},
 			{"cacert",		'c', 1, "CA certificate file"},

@@ -54,7 +54,7 @@ METHOD(kernel_ipsec_t, add_sa, status_t,
 	u_int32_t spi, u_int8_t protocol, u_int32_t reqid, mark_t mark,
 	u_int32_t tfc, lifetime_cfg_t *lifetime, u_int16_t enc_alg, chunk_t enc_key,
 	u_int16_t int_alg, chunk_t int_key, ipsec_mode_t mode, u_int16_t ipcomp,
-	u_int16_t cpi, bool encap, bool esn, bool inbound,
+	u_int16_t cpi, bool initiator, bool encap, bool esn, bool inbound,
 	traffic_selector_t *src_ts, traffic_selector_t *dst_ts)
 {
 	return SUCCESS;
@@ -70,7 +70,8 @@ METHOD(kernel_ipsec_t, update_sa, status_t,
 
 METHOD(kernel_ipsec_t, query_sa, status_t,
 	private_load_tester_ipsec_t *this, host_t *src, host_t *dst,
-	u_int32_t spi, u_int8_t protocol, mark_t mark, u_int64_t *bytes)
+	u_int32_t spi, u_int8_t protocol, mark_t mark,
+	u_int64_t *bytes, u_int64_t *packets, time_t *time)
 {
 	return NOT_SUPPORTED;
 }
@@ -94,7 +95,7 @@ METHOD(kernel_ipsec_t, add_policy, status_t,
 METHOD(kernel_ipsec_t, query_policy, status_t,
 	private_load_tester_ipsec_t *this, traffic_selector_t *src_ts,
 	traffic_selector_t *dst_ts, policy_dir_t direction, mark_t mark,
-	u_int32_t *use_time)
+	time_t *use_time)
 {
 	*use_time = 1;
 	return SUCCESS;
@@ -106,12 +107,6 @@ METHOD(kernel_ipsec_t, del_policy, status_t,
 	mark_t mark, policy_priority_t priority)
 {
 	return SUCCESS;
-}
-
-METHOD(kernel_ipsec_t, bypass_socket, bool,
-	private_load_tester_ipsec_t *this, int fd, int family)
-{
-	return TRUE;
 }
 
 METHOD(kernel_ipsec_t, destroy, void,
@@ -141,7 +136,8 @@ load_tester_ipsec_t *load_tester_ipsec_create()
 				.query_policy = _query_policy,
 				.del_policy = _del_policy,
 				.flush_policies = (void*)return_failed,
-				.bypass_socket = _bypass_socket,
+				.bypass_socket = (void*)return_true,
+				.enable_udp_decap = (void*)return_true,
 				.destroy = _destroy,
 			},
 		},
@@ -150,4 +146,3 @@ load_tester_ipsec_t *load_tester_ipsec_create()
 
 	return &this->public;
 }
-

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Tobias Brunner
+ * Copyright (C) 2011-2013 Tobias Brunner
  * Copyright (C) 2009 Martin Willi
  * Hochschule fuer Technik Rapperswil
  *
@@ -19,7 +19,8 @@
 #include <hydra.h>
 #include <daemon.h>
 #include <threading/rwlock.h>
-#include <utils/linked_list.h>
+#include <threading/thread_value.h>
+#include <collections/linked_list.h>
 
 
 typedef struct private_trap_manager_t private_trap_manager_t;
@@ -62,6 +63,11 @@ struct private_trap_manager_t {
 	rwlock_t *lock;
 
 	/**
+	 * track if the current thread is installing a trap policy
+	 */
+	thread_value_t *installing;
+
+	/**
 	 * listener to track acquiring IKE_SAs
 	 */
 	trap_listener_t listener;
@@ -92,50 +98,30 @@ static void destroy_entry(entry_t *entry)
 }
 
 METHOD(trap_manager_t, install, u_int32_t,
-	private_trap_manager_t *this, peer_cfg_t *peer, child_cfg_t *child)
+	private_trap_manager_t *this, peer_cfg_t *peer, child_cfg_t *child,
+	u_int32_t reqid)
 {
-	entry_t *entry;
+	entry_t *entry, *found = NULL;
 	ike_cfg_t *ike_cfg;
 	child_sa_t *child_sa;
 	host_t *me, *other;
-	linked_list_t *my_ts, *other_ts;
+	linked_list_t *my_ts, *other_ts, *list;
 	enumerator_t *enumerator;
-	bool found = FALSE;
 	status_t status;
-	u_int32_t reqid;
-
-	/* check if not already done */
-	this->lock->read_lock(this->lock);
-	enumerator = this->traps->create_enumerator(this->traps);
-	while (enumerator->enumerate(enumerator, &entry))
-	{
-		if (streq(entry->child_sa->get_name(entry->child_sa),
-				  child->get_name(child)))
-		{
-			found = TRUE;
-			break;
-		}
-	}
-	enumerator->destroy(enumerator);
-	this->lock->unlock(this->lock);
-	if (found)
-	{
-		DBG1(DBG_CFG, "CHILD_SA named '%s' already routed",
-			 child->get_name(child));
-		return 0;
-	}
+	linked_list_t *proposals;
+	proposal_t *proposal;
+	protocol_id_t proto = PROTO_ESP;
 
 	/* try to resolve addresses */
 	ike_cfg = peer->get_ike_cfg(peer);
-	other = host_create_from_dns(ike_cfg->get_other_addr(ike_cfg),
-								 0, ike_cfg->get_other_port(ike_cfg));
+	other = ike_cfg->resolve_other(ike_cfg, AF_UNSPEC);
 	if (!other || other->is_anyaddr(other))
 	{
+		DESTROY_IF(other);
 		DBG1(DBG_CFG, "installing trap failed, remote address unknown");
 		return 0;
 	}
-	me = host_create_from_dns(ike_cfg->get_my_addr(ike_cfg),
-					other->get_family(other), ike_cfg->get_my_port(ike_cfg));
+	me = ike_cfg->resolve_me(ike_cfg, other->get_family(other));
 	if (!me || me->is_anyaddr(me))
 	{
 		DESTROY_IF(me);
@@ -150,38 +136,78 @@ METHOD(trap_manager_t, install, u_int32_t,
 		me->set_port(me, ike_cfg->get_my_port(ike_cfg));
 	}
 
-	/* create and route CHILD_SA */
-	child_sa = child_sa_create(me, other, child, 0, FALSE);
-	my_ts = child->get_traffic_selectors(child, TRUE, NULL, me);
-	other_ts = child->get_traffic_selectors(child, FALSE, NULL, other);
-	me->destroy(me);
-	other->destroy(other);
+	this->lock->write_lock(this->lock);
+	this->installing->set(this->installing, this);
+	enumerator = this->traps->create_enumerator(this->traps);
+	while (enumerator->enumerate(enumerator, &entry))
+	{
+		if (streq(entry->child_sa->get_name(entry->child_sa),
+				  child->get_name(child)))
+		{
+			this->traps->remove_at(this->traps, enumerator);
+			found = entry;
+			break;
+		}
+	}
+	enumerator->destroy(enumerator);
 
-	/* while we don't know the finally negotiated protocol (ESP|AH), we
-	 * could iterate all proposals for a best guess (TODO). But as we
-	 * support ESP only for now, we set it here. */
-	child_sa->set_protocol(child_sa, PROTO_ESP);
+	if (found)
+	{	/* config might have changed so update everything */
+		DBG1(DBG_CFG, "updating already routed CHILD_SA '%s'",
+			 child->get_name(child));
+		reqid = found->child_sa->get_reqid(found->child_sa);
+	}
+
+	/* create and route CHILD_SA */
+	child_sa = child_sa_create(me, other, child, reqid, FALSE);
+
+	list = linked_list_create_with_items(me, NULL);
+	my_ts = child->get_traffic_selectors(child, TRUE, NULL, list);
+	list->destroy_offset(list, offsetof(host_t, destroy));
+
+	list = linked_list_create_with_items(other, NULL);
+	other_ts = child->get_traffic_selectors(child, FALSE, NULL, list);
+	list->destroy_offset(list, offsetof(host_t, destroy));
+
+	/* We don't know the finally negotiated protocol (ESP|AH), we install
+	 * the SA with the protocol of the first proposal */
+	proposals = child->get_proposals(child, TRUE);
+	if (proposals->get_first(proposals, (void**)&proposal) == SUCCESS)
+	{
+		proto = proposal->get_protocol(proposal);
+	}
+	proposals->destroy_offset(proposals, offsetof(proposal_t, destroy));
+	child_sa->set_protocol(child_sa, proto);
 	child_sa->set_mode(child_sa, child->get_mode(child));
 	status = child_sa->add_policies(child_sa, my_ts, other_ts);
 	my_ts->destroy_offset(my_ts, offsetof(traffic_selector_t, destroy));
 	other_ts->destroy_offset(other_ts, offsetof(traffic_selector_t, destroy));
 	if (status != SUCCESS)
 	{
-		child_sa->destroy(child_sa);
 		DBG1(DBG_CFG, "installing trap failed");
-		return 0;
+		reqid = 0;
+		/* hold off destroying the CHILD_SA until we released the lock */
 	}
-
-	reqid = child_sa->get_reqid(child_sa);
-	INIT(entry,
-		.child_sa = child_sa,
-		.peer_cfg = peer->get_ref(peer),
-	);
-
-	this->lock->write_lock(this->lock);
-	this->traps->insert_last(this->traps, entry);
+	else
+	{
+		INIT(entry,
+			.child_sa = child_sa,
+			.peer_cfg = peer->get_ref(peer),
+		);
+		this->traps->insert_last(this->traps, entry);
+		reqid = child_sa->get_reqid(child_sa);
+	}
+	this->installing->set(this->installing, NULL);
 	this->lock->unlock(this->lock);
 
+	if (status != SUCCESS)
+	{
+		child_sa->destroy(child_sa);
+	}
+	if (found)
+	{
+		destroy_entry(found);
+	}
 	return reqid;
 }
 
@@ -241,6 +267,35 @@ METHOD(trap_manager_t, create_enumerator, enumerator_t*,
 									(void*)this->lock->unlock);
 }
 
+METHOD(trap_manager_t, find_reqid, u_int32_t,
+	private_trap_manager_t *this, child_cfg_t *child)
+{
+	enumerator_t *enumerator;
+	child_cfg_t *current;
+	entry_t *entry;
+	u_int32_t reqid = 0;
+
+	if (this->installing->get(this->installing))
+	{	/* current thread holds the lock */
+		return reqid;
+	}
+	this->lock->read_lock(this->lock);
+	enumerator = this->traps->create_enumerator(this->traps);
+	while (enumerator->enumerate(enumerator, &entry))
+	{
+		current = entry->child_sa->get_config(entry->child_sa);
+		if (streq(current->get_name(current), child->get_name(child)))
+		{
+			reqid = entry->child_sa->get_reqid(entry->child_sa);
+			break;
+		}
+	}
+	enumerator->destroy(enumerator);
+	this->lock->unlock(this->lock);
+
+	return reqid;
+}
+
 METHOD(trap_manager_t, acquire, void,
 	private_trap_manager_t *this, u_int32_t reqid,
 	traffic_selector_t *src, traffic_selector_t *dst)
@@ -284,26 +339,33 @@ METHOD(trap_manager_t, acquire, void,
 
 	ike_sa = charon->ike_sa_manager->checkout_by_config(
 											charon->ike_sa_manager, peer);
-	if (ike_sa->get_peer_cfg(ike_sa) == NULL)
+	if (ike_sa)
 	{
-		ike_sa->set_peer_cfg(ike_sa, peer);
-	}
-	if (ike_sa->initiate(ike_sa, child, reqid, src, dst) != DESTROY_ME)
-	{
-		/* make sure the entry is still there */
-		this->lock->read_lock(this->lock);
-		if (this->traps->find_first(this->traps, NULL,
-									(void**)&found) == SUCCESS)
+		if (ike_sa->get_peer_cfg(ike_sa) == NULL)
 		{
-			found->ike_sa = ike_sa;
+			ike_sa->set_peer_cfg(ike_sa, peer);
 		}
-		this->lock->unlock(this->lock);
-		charon->ike_sa_manager->checkin(charon->ike_sa_manager, ike_sa);
-	}
-	else
-	{
-		charon->ike_sa_manager->checkin_and_destroy(
-											charon->ike_sa_manager, ike_sa);
+		if (ike_sa->get_version(ike_sa) == IKEV1)
+		{	/* in IKEv1, don't prepend the acquiring packet TS, as we only
+			 * have a single TS that we can establish in a Quick Mode. */
+			src = dst = NULL;
+		}
+		if (ike_sa->initiate(ike_sa, child, reqid, src, dst) != DESTROY_ME)
+		{
+			/* make sure the entry is still there */
+			this->lock->read_lock(this->lock);
+			if (this->traps->find_first(this->traps, NULL,
+										(void**)&found) == SUCCESS)
+			{
+				found->ike_sa = ike_sa;
+			}
+			this->lock->unlock(this->lock);
+			charon->ike_sa_manager->checkin(charon->ike_sa_manager, ike_sa);
+		}
+		else
+		{
+			ike_sa->destroy(ike_sa);
+		}
 	}
 	peer->destroy(peer);
 }
@@ -383,6 +445,7 @@ METHOD(trap_manager_t, destroy, void,
 {
 	charon->bus->remove_listener(charon->bus, &this->listener.listener);
 	this->traps->destroy_function(this->traps, (void*)destroy_entry);
+	this->installing->destroy(this->installing);
 	this->lock->destroy(this->lock);
 	free(this);
 }
@@ -399,6 +462,7 @@ trap_manager_t *trap_manager_create(void)
 			.install = _install,
 			.uninstall = _uninstall,
 			.create_enumerator = _create_enumerator,
+			.find_reqid = _find_reqid,
 			.acquire = _acquire,
 			.flush = _flush,
 			.destroy = _destroy,
@@ -412,9 +476,9 @@ trap_manager_t *trap_manager_create(void)
 		},
 		.traps = linked_list_create(),
 		.lock = rwlock_create(RWLOCK_TYPE_DEFAULT),
+		.installing = thread_value_create(NULL),
 	);
 	charon->bus->add_listener(charon->bus, &this->listener.listener);
 
 	return &this->public;
 }
-

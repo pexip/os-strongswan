@@ -17,7 +17,7 @@
 
 #include "pki.h"
 
-#include <utils/linked_list.h>
+#include <collections/linked_list.h>
 #include <credentials/certificates/certificate.h>
 #include <credentials/certificates/x509.h>
 #include <asn1/asn1.h>
@@ -94,8 +94,8 @@ static int self()
 				}
 				continue;
 			case 'g':
-				digest = get_digest(arg);
-				if (digest == HASH_UNKNOWN)
+				digest = enum_from_name(hash_algorithm_short_names, arg);
+				if (digest == -1)
 				{
 					error = "invalid --digest type";
 					goto usage;
@@ -212,6 +212,10 @@ static int self()
 				{
 					flags |= X509_CLIENT_AUTH;
 				}
+				else if (streq(arg, "ikeIntermediate"))
+				{
+					flags |= X509_IKE_INTERMEDIATE;
+				}
 				else if (streq(arg, "crlSign"))
 				{
 					flags |= X509_CRL_SIGN;
@@ -267,8 +271,12 @@ static int self()
 	}
 	else
 	{
+		chunk_t chunk;
+
+		chunk = chunk_from_fd(0);
 		private = lib->creds->create(lib->creds, CRED_PRIVATE_KEY, type,
-									 BUILD_FROM_FD, 0, BUILD_END);
+									 BUILD_BLOB, chunk, BUILD_END);
+		free(chunk.ptr);
 	}
 	if (!private)
 	{
@@ -294,11 +302,11 @@ static int self()
 			error = "no random number generator found";
 			goto end;
 		}
-		rng->allocate_bytes(rng, 8, &serial);
-		while (*serial.ptr == 0x00)
+		if (!rng_allocate_bytes_not_zero(rng, 8, &serial, FALSE))
 		{
-			/* we don't accept a serial number with leading zeroes */
-			rng->get_bytes(rng, 1, serial.ptr);
+			error = "failed to generate serial number";
+			rng->destroy(rng);
+			goto end;
 		}
 		rng->destroy(rng);
 	}
@@ -374,14 +382,14 @@ static void __attribute__ ((constructor))reg()
 	command_register((command_t) {
 		self, 's', "self",
 		"create a self signed certificate",
-		{"[--in file | --keyid hex] [--type rsa|ecdsa]",
+		{" [--in file|--keyid hex] [--type rsa|ecdsa]",
 		 " --dn distinguished-name [--san subjectAltName]+",
 		 "[--lifetime days] [--serial hex] [--ca] [--ocsp uri]+",
 		 "[--flag serverAuth|clientAuth|crlSign|ocspSigning]+",
 		 "[--nc-permitted name] [--nc-excluded name]",
-		 "[--cert-policy oid [--cps-uri uri] [--user-notice text] ]+",
 		 "[--policy-map issuer-oid:subject-oid]",
 		 "[--policy-explicit len] [--policy-inhibit len] [--policy-any len]",
+		 "[--cert-policy oid [--cps-uri uri] [--user-notice text]]+",
 		 "[--digest md5|sha1|sha224|sha256|sha384|sha512] [--outform der|pem]"},
 		{
 			{"help",			'h', 0, "show usage information"},

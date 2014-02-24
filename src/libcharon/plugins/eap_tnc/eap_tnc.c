@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Andreas Steffen
+ * Copyright (C) 2010-2013 Andreas Steffen
  * HSR Hochschule fuer Technik Rapperswil
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -18,7 +18,21 @@
 #include <tnc/tnc.h>
 #include <tnc/tnccs/tnccs_manager.h>
 #include <tls_eap.h>
-#include <debug.h>
+#include <utils/debug.h>
+#include <daemon.h>
+
+#include <tncifimv.h>
+#include <tncif_names.h>
+
+/**
+ * Maximum size of an EAP-TNC message
+ */
+#define EAP_TNC_MAX_MESSAGE_LEN 65535
+
+/**
+ * Maximum number of EAP-TNC messages allowed
+ */
+#define EAP_TNC_MAX_MESSAGE_COUNT 10
 
 typedef struct private_eap_tnc_t private_eap_tnc_t;
 
@@ -33,21 +47,107 @@ struct private_eap_tnc_t {
 	eap_tnc_t public;
 
 	/**
+	 * Outer EAP authentication type
+	 */
+	eap_type_t auth_type;
+
+	/**
 	 * TLS stack, wrapped by EAP helper
 	 */
 	tls_eap_t *tls_eap;
+
+	/**
+	 * TNCCS instance running over EAP-TNC
+	 */
+	tnccs_t *tnccs;
+
 };
 
+/**
+ * Callback function to get recommendation from TNCCS connection
+ */
+static bool enforce_recommendation(TNC_IMV_Action_Recommendation rec,
+								   TNC_IMV_Evaluation_Result eval)
+{
+	char *group;
+	identification_t *id;
+	ike_sa_t *ike_sa;
+	auth_cfg_t *auth;
+	bool no_access = FALSE;
 
-/** Maximum number of EAP-TNC messages/fragments allowed */
-#define MAX_MESSAGE_COUNT 10 
-/** Default size of a EAP-TNC fragment */
-#define MAX_FRAGMENT_LEN 50000
+	DBG1(DBG_TNC, "final recommendation is '%N' and evaluation is '%N'",
+		 TNC_IMV_Action_Recommendation_names, rec,
+		 TNC_IMV_Evaluation_Result_names, eval);
+
+	switch (rec)
+	{
+		case TNC_IMV_ACTION_RECOMMENDATION_ALLOW:
+			group = "allow";
+			break;
+		case TNC_IMV_ACTION_RECOMMENDATION_ISOLATE:
+			group = "isolate";
+			break;
+		case TNC_IMV_ACTION_RECOMMENDATION_NO_ACCESS:
+		case TNC_IMV_ACTION_RECOMMENDATION_NO_RECOMMENDATION:
+		default:
+			group = "no access";
+			no_access = TRUE;
+			break;
+	}
+
+	ike_sa = charon->bus->get_sa(charon->bus);
+	if (!ike_sa)
+	{
+		DBG1(DBG_TNC, "policy enforcement point did not find IKE_SA");
+		return FALSE;
+	}
+
+	id = ike_sa->get_other_id(ike_sa);
+	DBG0(DBG_TNC, "policy enforced on peer '%Y' is '%s'", id, group);
+
+	if (no_access)
+	{
+		return FALSE;
+	}
+	else
+	{
+		auth = ike_sa->get_auth_cfg(ike_sa, FALSE);
+		id = identification_create_from_string(group);
+		auth->add(auth, AUTH_RULE_GROUP, id);
+		DBG1(DBG_TNC, "policy enforcement point added group membership '%s'",
+			 group);
+	}
+	return TRUE;
+}
 
 METHOD(eap_method_t, initiate, status_t,
 	private_eap_tnc_t *this, eap_payload_t **out)
 {
 	chunk_t data;
+	u_int32_t auth_type;
+
+	/* Determine TNC Client Authentication Type */
+	switch (this->auth_type)
+	{
+		case EAP_TLS:
+		case EAP_TTLS:
+		case EAP_PEAP:
+			auth_type = TNC_AUTH_X509_CERT;
+			break;
+		case EAP_MD5:
+		case EAP_MSCHAPV2:
+		case EAP_GTC:
+		case EAP_OTP:
+			auth_type = TNC_AUTH_PASSWORD;
+			break;
+		case EAP_SIM:
+		case EAP_AKA:
+			auth_type = TNC_AUTH_SIM;
+			break;
+		default:
+			auth_type = TNC_AUTH_UNKNOWN;
+	}
+	this->tnccs->set_auth_type(this->tnccs, auth_type);
 
 	if (this->tls_eap->initiate(this->tls_eap, &data) == NEED_MORE)
 	{
@@ -113,8 +213,32 @@ METHOD(eap_method_t, is_mutual, bool,
 METHOD(eap_method_t, destroy, void,
 	private_eap_tnc_t *this)
 {
+	chunk_t pdp_server;
+	u_int16_t pdp_port;
+	tls_t *tls;
+
+	pdp_server = this->tnccs->get_pdp_server(this->tnccs, &pdp_port);
+	if (pdp_server.len)
+	{
+		DBG2(DBG_TNC, "TODO: setup PT-TLS connection to %.*s:%u",
+			 pdp_server.len, pdp_server.ptr, pdp_port);
+	}
+	tls = &this->tnccs->tls;
+	tls->destroy(tls);
 	this->tls_eap->destroy(this->tls_eap);
 	free(this);
+}
+
+METHOD(eap_inner_method_t, get_auth_type, eap_type_t,
+	private_eap_tnc_t *this)
+{
+	return this->auth_type;
+}
+
+METHOD(eap_inner_method_t, set_auth_type, void,
+	private_eap_tnc_t *this, eap_type_t type)
+{
+	this->auth_type = type;
 }
 
 /**
@@ -124,36 +248,35 @@ static eap_tnc_t *eap_tnc_create(identification_t *server,
 								 identification_t *peer, bool is_server)
 {
 	private_eap_tnc_t *this;
-	size_t frag_size;
 	int max_msg_count;
-	bool include_length;
 	char* protocol;
-	tnccs_type_t type;
 	tnccs_t *tnccs;
+	tnccs_type_t type;
 
 	INIT(this,
 		.public = {
-			.eap_method = {
-				.initiate = _initiate,
-				.process = _process,
-				.get_type = _get_type,
-				.is_mutual = _is_mutual,
-				.get_msk = _get_msk,
-				.get_identifier = _get_identifier,
-				.set_identifier = _set_identifier,
-				.destroy = _destroy,
+			.eap_inner_method = {
+				.eap_method = {
+					.initiate = _initiate,
+					.process = _process,
+					.get_type = _get_type,
+					.is_mutual = _is_mutual,
+					.get_msk = _get_msk,
+					.get_identifier = _get_identifier,
+					.set_identifier = _set_identifier,
+					.destroy = _destroy,
+				},
+				.get_auth_type = _get_auth_type,
+				.set_auth_type = _set_auth_type,
 			},
 		},
 	);
 
-	frag_size = lib->settings->get_int(lib->settings,
-					"charon.plugins.eap-tnc.fragment_size", MAX_FRAGMENT_LEN);
 	max_msg_count = lib->settings->get_int(lib->settings,
-					"charon.plugins.eap-tnc.max_message_count", MAX_MESSAGE_COUNT);
-	include_length = lib->settings->get_bool(lib->settings,
-					"charon.plugins.eap-tnc.include_length", TRUE);
- 	protocol = lib->settings->get_str(lib->settings,
-					"charon.plugins.eap-tnc.protocol", "tnccs-1.1");
+					"%s.plugins.eap-tnc.max_message_count",
+					EAP_TNC_MAX_MESSAGE_COUNT, charon->name);
+	protocol = lib->settings->get_str(lib->settings,
+					"%s.plugins.eap-tnc.protocol", "tnccs-1.1", charon->name);
 	if (strcaseeq(protocol, "tnccs-2.0"))
 	{
 		type = TNCCS_2_0;
@@ -172,9 +295,19 @@ static eap_tnc_t *eap_tnc_create(identification_t *server,
 		free(this);
 		return NULL;
 	}
-	tnccs = tnc->tnccs->create_instance(tnc->tnccs, type, is_server);
-	this->tls_eap = tls_eap_create(EAP_TNC, (tls_t*)tnccs, frag_size,
-											 max_msg_count, include_length);
+	tnccs = tnc->tnccs->create_instance(tnc->tnccs, type,
+						is_server, server, peer, TNC_IFT_EAP_1_1,
+						is_server ? enforce_recommendation : NULL);
+	if (!tnccs)
+	{
+		DBG1(DBG_TNC, "TNCCS protocol '%s' not enabled", protocol);
+		free(this);
+		return NULL;
+	}
+	this->tnccs = tnccs->get_ref(tnccs);
+	this->tls_eap = tls_eap_create(EAP_TNC, &tnccs->tls,
+								   EAP_TNC_MAX_MESSAGE_LEN,
+								   max_msg_count, FALSE);
 	if (!this->tls_eap)
 	{
 		free(this);
