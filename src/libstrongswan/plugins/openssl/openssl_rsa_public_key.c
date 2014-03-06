@@ -14,9 +14,14 @@
  * for more details.
  */
 
-#include "openssl_rsa_public_key.h"
+#include <openssl/opensslconf.h>
 
-#include <debug.h>
+#ifndef OPENSSL_NO_RSA
+
+#include "openssl_rsa_public_key.h"
+#include "openssl_util.h"
+
+#include <utils/debug.h>
 
 #include <openssl/evp.h>
 #include <openssl/rsa.h>
@@ -44,8 +49,6 @@ struct private_openssl_rsa_public_key_t {
 	refcount_t ref;
 };
 
-
-
 /**
  * Verification of an EMPSA PKCS1 signature described in PKCS#1
  */
@@ -63,12 +66,17 @@ static bool verify_emsa_pkcs1_signature(private_openssl_rsa_public_key_t *this,
 
 	if (type == NID_undef)
 	{
-		chunk_t hash = chunk_alloc(rsa_size);
+		char *buf;
+		int len;
 
-		hash.len = RSA_public_decrypt(signature.len, signature.ptr, hash.ptr,
-									  this->rsa, RSA_PKCS1_PADDING);
-		valid = chunk_equals(data, hash);
-		free(hash.ptr);
+		buf = malloc(rsa_size);
+		len = RSA_public_decrypt(signature.len, signature.ptr, buf, this->rsa,
+								 RSA_PKCS1_PADDING);
+		if (len != -1)
+		{
+			valid = chunk_equals(data, chunk_create(buf, len));
+		}
+		free(buf);
 	}
 	else
 	{
@@ -217,13 +225,13 @@ bool openssl_rsa_fingerprint(RSA *rsa, cred_encoding_type_t type, chunk_t *fp)
 			return FALSE;
 	}
 	hasher = lib->crypto->create_hasher(lib->crypto, HASH_SHA1);
-	if (!hasher)
+	if (!hasher || !hasher->allocate_hash(hasher, key, fp))
 	{
 		DBG1(DBG_LIB, "SHA1 hash algorithm not supported, fingerprinting failed");
+		DESTROY_IF(hasher);
 		free(key.ptr);
 		return FALSE;
 	}
-	hasher->allocate_hash(hasher, key, fp);
 	free(key.ptr);
 	hasher->destroy(hasher);
 	lib->encoding->cache(lib->encoding, type, rsa, *fp);
@@ -241,6 +249,7 @@ METHOD(public_key_t, get_encoding, bool,
 	private_openssl_rsa_public_key_t *this, cred_encoding_type_t type,
 	chunk_t *encoding)
 {
+	bool success = FALSE;
 	u_char *p;
 
 	switch (type)
@@ -248,11 +257,10 @@ METHOD(public_key_t, get_encoding, bool,
 		case PUBKEY_SPKI_ASN1_DER:
 		case PUBKEY_PEM:
 		{
-			bool success = TRUE;
-
 			*encoding = chunk_alloc(i2d_RSA_PUBKEY(this->rsa, NULL));
 			p = encoding->ptr;
 			i2d_RSA_PUBKEY(this->rsa, &p);
+			success = TRUE;
 
 			if (type == PUBKEY_PEM)
 			{
@@ -273,7 +281,20 @@ METHOD(public_key_t, get_encoding, bool,
 			return TRUE;
 		}
 		default:
-			return FALSE;
+		{
+			chunk_t n = chunk_empty, e = chunk_empty;
+
+			if (openssl_bn2chunk(this->rsa->n, &n) &&
+				openssl_bn2chunk(this->rsa->e, &e))
+			{
+				success = lib->encoding->encode(lib->encoding, type, NULL,
+									encoding, CRED_PART_RSA_MODULUS, n,
+									CRED_PART_RSA_PUB_EXP, e, CRED_PART_END);
+			}
+			chunk_free(&n);
+			chunk_free(&e);
+			return success;
+		}
 	}
 }
 
@@ -388,3 +409,5 @@ openssl_rsa_public_key_t *openssl_rsa_public_key_load(key_type_t type,
 	destroy(this);
 	return NULL;
 }
+
+#endif /* OPENSSL_NO_RSA */

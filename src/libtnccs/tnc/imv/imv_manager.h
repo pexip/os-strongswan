@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Andreas Steffen
+ * Copyright (C) 2010-2013 Andreas Steffen
  * HSR Hochschule fuer Technik Rapperswil
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -56,8 +56,31 @@ struct imv_manager_t {
 	 * @param path				path of the IMV dynamic library file
 	 * @return					TRUE if loading succeeded
 	 */
-	 bool (*load)(imv_manager_t *this, char *name, char *path);
+	bool (*load)(imv_manager_t *this, char *name, char *path);
 
+	/**
+	 * Load and initialize an IMV from a set of TNC IMC functions.
+	 *
+	 * @param name						name of the IMV
+	 * @param initialize				TNC_IMV_InitializePointer
+	 * @param notify_connection_change	TNC_IMV_NotifyConnectionChangePointer
+	 * @param receive_message			TNC_IMV_ReceiveMessagePointer
+	 * @param receive_message_long		TNC_IMV_ReceiveMessageLongPointer
+	 * @param solicit_recommendation	TNC_IMV_SolicitRecommendationPointer
+	 * @param batch_ending				TNC_IMV_BatchEndingPointer
+	 * @param terminate					TNC_IMV_TerminatePointer
+	 * @param provide_bind_function		TNC_IMV_ProvideBindFunctionPointer
+	 * @return							TRUE if loading succeeded
+	 */
+	bool (*load_from_functions)(imv_manager_t *this, char *name,
+				TNC_IMV_InitializePointer initialize,
+				TNC_IMV_NotifyConnectionChangePointer notify_connection_change,
+				TNC_IMV_ReceiveMessagePointer receive_message,
+				TNC_IMV_ReceiveMessageLongPointer receive_message_long,
+				TNC_IMV_SolicitRecommendationPointer solicit_recommendation,
+				TNC_IMV_BatchEndingPointer batch_ending,
+				TNC_IMV_TerminatePointer terminate,
+				TNC_IMV_ProvideBindFunctionPointer provide_bind_function);
 
 	/**
 	 * Check if an IMV with a given ID is registered with the IMV manager
@@ -89,18 +112,6 @@ struct imv_manager_t {
 	 * @return					instance of a recommendations_t list
 	 */
 	recommendations_t* (*create_recommendations)(imv_manager_t *this);
-
-	/**
-	 * Enforce the TNC recommendation on the IKE_SA by either inserting an
-	 * allow|isolate group membership rule (TRUE) or by blocking access (FALSE)
-	 *
-	 * @param rec				TNC action recommendation
-	 * @param eval				TNC evaluation result
-	 * @return					TRUE for allow|isolate, FALSE for none
-	 */
-	bool (*enforce_recommendation)(imv_manager_t *this,
-								   TNC_IMV_Action_Recommendation rec,
-								   TNC_IMV_Evaluation_Result eval);
 
 	/**
 	 * Notify all IMV instances

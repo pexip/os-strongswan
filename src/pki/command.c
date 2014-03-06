@@ -23,7 +23,7 @@
 #include <stdio.h>
 
 #include <library.h>
-#include <debug.h>
+#include <utils/debug.h>
 #include <utils/optionsfrom.h>
 
 /**
@@ -144,7 +144,7 @@ void command_register(command_t command)
 	/* append default options, but not to --help */
 	if (!active)
 	{
-		for (i = 0; i < countof(cmds[registered].options); i++)
+		for (i = 0; i < countof(cmds[registered].options) - 1; i++)
 		{
 			if (cmds[registered].options[i].name)
 			{
@@ -258,6 +258,6 @@ int command_dispatch(int c, char *v[])
 			return cmds[i].call();
 		}
 	}
-	return command_usage("invalid operation");
+	return command_usage(c > 1 ? "invalid operation" : NULL);
 }
 
