@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2013 Tobias Brunner
  * Copyright (C) 2008 Martin Willi
  * Hochschule fuer Technik Rapperswil
  *
@@ -15,9 +16,9 @@
 
 #include "crypto_factory.h"
 
-#include <debug.h>
+#include <utils/debug.h>
 #include <threading/rwlock.h>
-#include <utils/linked_list.h>
+#include <collections/linked_list.h>
 #include <crypto/crypto_tester.h>
 
 const char *default_plugin_name = "default";
@@ -50,6 +51,7 @@ struct entry_t {
 		hasher_constructor_t create_hasher;
 		prf_constructor_t create_prf;
 		rng_constructor_t create_rng;
+		nonce_gen_constructor_t create_nonce_gen;
 		dh_constructor_t create_dh;
 		void *create;
 	};
@@ -98,6 +100,11 @@ struct private_crypto_factory_t {
 	linked_list_t *rngs;
 
 	/**
+	 * registered nonce generators, as entry_t
+	 */
+	linked_list_t *nonce_gens;
+
+	/**
 	 * registered diffie hellman, as entry_t
 	 */
 	linked_list_t *dhs;
@@ -121,6 +128,11 @@ struct private_crypto_factory_t {
 	 * run algorithm benchmark during registration
 	 */
 	bool bench;
+
+	/**
+	 * Number of failed test vectors during "add".
+	 */
+	u_int test_failures;
 
 	/**
 	 * rwlock to lock access to modules
@@ -223,7 +235,6 @@ METHOD(crypto_factory_t, create_signer, signer_t*,
 	}
 	enumerator->destroy(enumerator);
 	this->lock->unlock(this->lock);
-
 	return signer;
 }
 
@@ -238,9 +249,9 @@ METHOD(crypto_factory_t, create_hasher, hasher_t*,
 	enumerator = this->hashers->create_enumerator(this->hashers);
 	while (enumerator->enumerate(enumerator, &entry))
 	{
-		if (algo == HASH_PREFERRED || entry->algo == algo)
+		if (entry->algo == algo)
 		{
-			if (this->test_on_create && algo != HASH_PREFERRED &&
+			if (this->test_on_create &&
 				!this->tester->test_hasher(this->tester, algo,
 										   entry->create_hasher, NULL,
 										   default_plugin_name))
@@ -296,14 +307,13 @@ METHOD(crypto_factory_t, create_rng, rng_t*,
 {
 	enumerator_t *enumerator;
 	entry_t *entry;
-	u_int diff = ~0;
-	rng_constructor_t constr = NULL;
+	rng_t *rng = NULL;
 
 	this->lock->read_lock(this->lock);
 	enumerator = this->rngs->create_enumerator(this->rngs);
 	while (enumerator->enumerate(enumerator, &entry))
 	{	/* find the best matching quality, but at least as good as requested */
-		if (entry->algo >= quality && diff > entry->algo - quality)
+		if (entry->algo >= quality)
 		{
 			if (this->test_on_create &&
 				!this->tester->test_rng(this->tester, quality,
@@ -312,21 +322,35 @@ METHOD(crypto_factory_t, create_rng, rng_t*,
 			{
 				continue;
 			}
-			diff = entry->algo - quality;
-			constr = entry->create_rng;
-			if (diff == 0)
-			{	/* perfect match, won't get better */
+			rng = entry->create_rng(quality);
+			if (rng)
+			{
 				break;
 			}
 		}
 	}
 	enumerator->destroy(enumerator);
 	this->lock->unlock(this->lock);
-	if (constr)
+	return rng;
+}
+
+METHOD(crypto_factory_t, create_nonce_gen, nonce_gen_t*,
+	private_crypto_factory_t *this)
+{
+	enumerator_t *enumerator;
+	entry_t *entry;
+	nonce_gen_t *nonce_gen = NULL;
+
+	this->lock->read_lock(this->lock);
+	enumerator = this->nonce_gens->create_enumerator(this->nonce_gens);
+	while (enumerator->enumerate(enumerator, &entry))
 	{
-		return constr(quality);
+		nonce_gen = entry->create_nonce_gen();
 	}
-	return NULL;
+	enumerator->destroy(enumerator);
+	this->lock->unlock(this->lock);
+
+	return nonce_gen;
 }
 
 METHOD(crypto_factory_t, create_dh, diffie_hellman_t*,
@@ -334,7 +358,17 @@ METHOD(crypto_factory_t, create_dh, diffie_hellman_t*,
 {
 	enumerator_t *enumerator;
 	entry_t *entry;
+	va_list args;
+	chunk_t g = chunk_empty, p = chunk_empty;
 	diffie_hellman_t *diffie_hellman = NULL;
+
+	if (group == MODP_CUSTOM)
+	{
+		va_start(args, group);
+		g = va_arg(args, chunk_t);
+		p = va_arg(args, chunk_t);
+		va_end(args);
+	}
 
 	this->lock->read_lock(this->lock);
 	enumerator = this->dhs->create_enumerator(this->dhs);
@@ -342,21 +376,7 @@ METHOD(crypto_factory_t, create_dh, diffie_hellman_t*,
 	{
 		if (entry->algo == group)
 		{
-			if (group == MODP_CUSTOM)
-			{
-				va_list args;
-				chunk_t g, p;
-
-				va_start(args, group);
-				g = va_arg(args, chunk_t);
-				p = va_arg(args, chunk_t);
-				va_end(args);
-				diffie_hellman = entry->create_dh(MODP_CUSTOM, g, p);
-			}
-			else
-			{
-				diffie_hellman = entry->create_dh(group);
-			}
+			diffie_hellman = entry->create_dh(group, g, p);
 			if (diffie_hellman)
 			{
 				break;
@@ -370,14 +390,18 @@ METHOD(crypto_factory_t, create_dh, diffie_hellman_t*,
 
 /**
  * Insert an algorithm entry to a list
+ *
+ * Entries are sorted by algorithm identifier (which is important for RNGs)
+ * while maintaining the order in which algorithms were added, unless they were
+ * benchmarked and speed is provided, which then is used to order entries of
+ * the same algorithm.
  */
 static void add_entry(private_crypto_factory_t *this, linked_list_t *list,
 					  int algo, const char *plugin_name,
 					  u_int speed, void *create)
 {
+	enumerator_t *enumerator;
 	entry_t *entry, *current;
-	linked_list_t *tmp;
-	bool inserted = FALSE;
 
 	INIT(entry,
 		.algo = algo,
@@ -387,35 +411,26 @@ static void add_entry(private_crypto_factory_t *this, linked_list_t *list,
 	entry->create = create;
 
 	this->lock->write_lock(this->lock);
-	if (speed)
-	{	/* insert sorted by speed using a temporary list */
-		tmp = linked_list_create();
-		while (list->remove_first(list, (void**)&current) == SUCCESS)
-		{
-			tmp->insert_last(tmp, current);
-		}
-		while (tmp->remove_first(tmp, (void**)&current) == SUCCESS)
-		{
-			if (!inserted &&
-				current->algo == algo &&
-				current->speed < speed)
-			{
-				list->insert_last(list, entry);
-				inserted = TRUE;
-			}
-			list->insert_last(list, current);
-		}
-		tmp->destroy(tmp);
-	}
-	if (!inserted)
+	enumerator = list->create_enumerator(list);
+	while (enumerator->enumerate(enumerator, &current))
 	{
-		list->insert_last(list, entry);
+		if (current->algo > algo)
+		{
+			break;
+		}
+		else if (current->algo == algo && speed &&
+				 current->speed < speed)
+		{
+			break;
+		}
 	}
+	list->insert_before(list, enumerator, entry);
+	enumerator->destroy(enumerator);
 	this->lock->unlock(this->lock);
 }
 
-METHOD(crypto_factory_t, add_crypter, void,
-	private_crypto_factory_t *this,	encryption_algorithm_t algo,
+METHOD(crypto_factory_t, add_crypter, bool,
+	private_crypto_factory_t *this, encryption_algorithm_t algo,
 	const char *plugin_name, crypter_constructor_t create)
 {
 	u_int speed = 0;
@@ -425,7 +440,10 @@ METHOD(crypto_factory_t, add_crypter, void,
 								   this->bench ? &speed : NULL,	plugin_name))
 	{
 		add_entry(this, this->crypters, algo, plugin_name, speed, create);
+		return TRUE;
 	}
+	this->test_failures++;
+	return FALSE;
 }
 
 METHOD(crypto_factory_t, remove_crypter, void,
@@ -448,8 +466,8 @@ METHOD(crypto_factory_t, remove_crypter, void,
 	this->lock->unlock(this->lock);
 }
 
-METHOD(crypto_factory_t, add_aead, void,
-	private_crypto_factory_t *this,	encryption_algorithm_t algo,
+METHOD(crypto_factory_t, add_aead, bool,
+	private_crypto_factory_t *this, encryption_algorithm_t algo,
 	const char *plugin_name, aead_constructor_t create)
 {
 	u_int speed = 0;
@@ -459,7 +477,10 @@ METHOD(crypto_factory_t, add_aead, void,
 								this->bench ? &speed : NULL, plugin_name))
 	{
 		add_entry(this, this->aeads, algo, plugin_name, speed, create);
+		return TRUE;
 	}
+	this->test_failures++;
+	return FALSE;
 }
 
 METHOD(crypto_factory_t, remove_aead, void,
@@ -482,8 +503,8 @@ METHOD(crypto_factory_t, remove_aead, void,
 	this->lock->unlock(this->lock);
 }
 
-METHOD(crypto_factory_t, add_signer, void,
-	private_crypto_factory_t *this,	integrity_algorithm_t algo,
+METHOD(crypto_factory_t, add_signer, bool,
+	private_crypto_factory_t *this, integrity_algorithm_t algo,
 	const char *plugin_name, signer_constructor_t create)
 {
 	u_int speed = 0;
@@ -493,7 +514,10 @@ METHOD(crypto_factory_t, add_signer, void,
 								  this->bench ? &speed : NULL, plugin_name))
 	{
 		add_entry(this, this->signers, algo, plugin_name, speed, create);
+		return TRUE;
 	}
+	this->test_failures++;
+	return FALSE;
 }
 
 METHOD(crypto_factory_t, remove_signer, void,
@@ -516,8 +540,8 @@ METHOD(crypto_factory_t, remove_signer, void,
 	this->lock->unlock(this->lock);
 }
 
-METHOD(crypto_factory_t, add_hasher, void,
-	private_crypto_factory_t *this,	hash_algorithm_t algo,
+METHOD(crypto_factory_t, add_hasher, bool,
+	private_crypto_factory_t *this, hash_algorithm_t algo,
 	const char *plugin_name, hasher_constructor_t create)
 {
 	u_int speed = 0;
@@ -527,7 +551,10 @@ METHOD(crypto_factory_t, add_hasher, void,
 								  this->bench ? &speed : NULL, plugin_name))
 	{
 		add_entry(this, this->hashers, algo, plugin_name, speed, create);
+		return TRUE;
 	}
+	this->test_failures++;
+	return FALSE;
 }
 
 METHOD(crypto_factory_t, remove_hasher, void,
@@ -550,8 +577,8 @@ METHOD(crypto_factory_t, remove_hasher, void,
 	this->lock->unlock(this->lock);
 }
 
-METHOD(crypto_factory_t, add_prf, void,
-	private_crypto_factory_t *this,	pseudo_random_function_t algo,
+METHOD(crypto_factory_t, add_prf, bool,
+	private_crypto_factory_t *this, pseudo_random_function_t algo,
 	const char *plugin_name, prf_constructor_t create)
 {
 	u_int speed = 0;
@@ -561,7 +588,10 @@ METHOD(crypto_factory_t, add_prf, void,
 							   this->bench ? &speed : NULL, plugin_name))
 	{
 		add_entry(this, this->prfs, algo, plugin_name, speed, create);
+		return TRUE;
 	}
+	this->test_failures++;
+	return FALSE;
 }
 
 METHOD(crypto_factory_t, remove_prf, void,
@@ -584,7 +614,7 @@ METHOD(crypto_factory_t, remove_prf, void,
 	this->lock->unlock(this->lock);
 }
 
-METHOD(crypto_factory_t, add_rng, void,
+METHOD(crypto_factory_t, add_rng, bool,
 	private_crypto_factory_t *this, rng_quality_t quality,
 	const char *plugin_name, rng_constructor_t create)
 {
@@ -595,7 +625,10 @@ METHOD(crypto_factory_t, add_rng, void,
 							   this->bench ? &speed : NULL, plugin_name))
 	{
 		add_entry(this, this->rngs, quality, plugin_name, speed, create);
+		return TRUE;
 	}
+	this->test_failures++;
+	return FALSE;
 }
 
 METHOD(crypto_factory_t, remove_rng, void,
@@ -618,11 +651,40 @@ METHOD(crypto_factory_t, remove_rng, void,
 	this->lock->unlock(this->lock);
 }
 
-METHOD(crypto_factory_t, add_dh, void,
-	private_crypto_factory_t *this,	diffie_hellman_group_t group,
-	 const char *plugin_name, dh_constructor_t create)
+METHOD(crypto_factory_t, add_nonce_gen, bool,
+	private_crypto_factory_t *this, const char *plugin_name,
+	nonce_gen_constructor_t create)
+{
+	add_entry(this, this->nonce_gens, 0, plugin_name, 0, create);
+	return TRUE;
+}
+
+METHOD(crypto_factory_t, remove_nonce_gen, void,
+	private_crypto_factory_t *this, nonce_gen_constructor_t create)
+{
+	entry_t *entry;
+	enumerator_t *enumerator;
+
+	this->lock->write_lock(this->lock);
+	enumerator = this->nonce_gens->create_enumerator(this->nonce_gens);
+	while (enumerator->enumerate(enumerator, &entry))
+	{
+		if (entry->create_nonce_gen == create)
+		{
+			this->nonce_gens->remove_at(this->nonce_gens, enumerator);
+			free(entry);
+		}
+	}
+	enumerator->destroy(enumerator);
+	this->lock->unlock(this->lock);
+}
+
+METHOD(crypto_factory_t, add_dh, bool,
+	private_crypto_factory_t *this, diffie_hellman_group_t group,
+	const char *plugin_name, dh_constructor_t create)
 {
 	add_entry(this, this->dhs, group, plugin_name, 0, create);
+	return TRUE;
 }
 
 METHOD(crypto_factory_t, remove_dh, void,
@@ -756,7 +818,7 @@ METHOD(crypto_factory_t, create_prf_enumerator, enumerator_t*,
 }
 
 /**
- * Filter function to enumerate algorithm, not entry
+ * Filter function to enumerate group, not entry
  */
 static bool dh_filter(void *n, entry_t **entry, diffie_hellman_group_t *group,
 					  void *i2, const char **plugin_name)
@@ -773,7 +835,7 @@ METHOD(crypto_factory_t, create_dh_enumerator, enumerator_t*,
 }
 
 /**
- * Filter function to enumerate algorithm, not entry
+ * Filter function to enumerate strength, not entry
  */
 static bool rng_filter(void *n, entry_t **entry, rng_quality_t *quality,
 					   void *i2, const char **plugin_name)
@@ -788,6 +850,22 @@ METHOD(crypto_factory_t, create_rng_enumerator, enumerator_t*,
 {
 	return create_enumerator(this, this->rngs, rng_filter);
 }
+
+/**
+ * Filter function to enumerate plugin name, not entry
+ */
+static bool nonce_gen_filter(void *n, entry_t **entry, const char **plugin_name)
+{
+	*plugin_name = (*entry)->plugin_name;
+	return TRUE;
+}
+
+METHOD(crypto_factory_t, create_nonce_gen_enumerator, enumerator_t*,
+	private_crypto_factory_t *this)
+{
+	return create_enumerator(this, this->nonce_gens, nonce_gen_filter);
+}
+
 METHOD(crypto_factory_t, add_test_vector, void,
 	private_crypto_factory_t *this, transform_type_t type, void *vector)
 {
@@ -811,6 +889,12 @@ METHOD(crypto_factory_t, add_test_vector, void,
 	}
 }
 
+METHOD(crypto_factory_t, get_test_vector_failures, u_int,
+	private_crypto_factory_t *this)
+{
+	return this->test_failures;
+}
+
 METHOD(crypto_factory_t, destroy, void,
 	private_crypto_factory_t *this)
 {
@@ -820,6 +904,7 @@ METHOD(crypto_factory_t, destroy, void,
 	this->hashers->destroy(this->hashers);
 	this->prfs->destroy(this->prfs);
 	this->rngs->destroy(this->rngs);
+	this->nonce_gens->destroy(this->nonce_gens);
 	this->dhs->destroy(this->dhs);
 	this->tester->destroy(this->tester);
 	this->lock->destroy(this->lock);
@@ -841,6 +926,7 @@ crypto_factory_t *crypto_factory_create()
 			.create_hasher = _create_hasher,
 			.create_prf = _create_prf,
 			.create_rng = _create_rng,
+			.create_nonce_gen = _create_nonce_gen,
 			.create_dh = _create_dh,
 			.add_crypter = _add_crypter,
 			.remove_crypter = _remove_crypter,
@@ -854,6 +940,8 @@ crypto_factory_t *crypto_factory_create()
 			.remove_prf = _remove_prf,
 			.add_rng = _add_rng,
 			.remove_rng = _remove_rng,
+			.add_nonce_gen = _add_nonce_gen,
+			.remove_nonce_gen = _remove_nonce_gen,
 			.add_dh = _add_dh,
 			.remove_dh = _remove_dh,
 			.create_crypter_enumerator = _create_crypter_enumerator,
@@ -863,7 +951,9 @@ crypto_factory_t *crypto_factory_create()
 			.create_prf_enumerator = _create_prf_enumerator,
 			.create_dh_enumerator = _create_dh_enumerator,
 			.create_rng_enumerator = _create_rng_enumerator,
+			.create_nonce_gen_enumerator = _create_nonce_gen_enumerator,
 			.add_test_vector = _add_test_vector,
+			.get_test_vector_failures = _get_test_vector_failures,
 			.destroy = _destroy,
 		},
 		.crypters = linked_list_create(),
@@ -872,6 +962,7 @@ crypto_factory_t *crypto_factory_create()
 		.hashers = linked_list_create(),
 		.prfs = linked_list_create(),
 		.rngs = linked_list_create(),
+		.nonce_gens = linked_list_create(),
 		.dhs = linked_list_create(),
 		.lock = rwlock_create(RWLOCK_TYPE_DEFAULT),
 		.tester = crypto_tester_create(),
@@ -885,4 +976,3 @@ crypto_factory_t *crypto_factory_create()
 
 	return &this->public;
 }
-

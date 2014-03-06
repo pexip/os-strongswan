@@ -18,7 +18,7 @@
 #include <sys/types.h>
 
 #include <daemon.h>
-#include <utils/linked_list.h>
+#include <collections/linked_list.h>
 #include <threading/rwlock.h>
 
 
@@ -49,10 +49,16 @@ struct private_backend_manager_t {
  * match of an ike_cfg
  */
 typedef enum ike_cfg_match_t {
-	MATCH_NONE  = 0x00,
-	MATCH_ANY   = 0x01,
-	MATCH_ME	= 0x04,
-	MATCH_OTHER = 0x08,
+	/* doesn't match at all */
+	MATCH_NONE		= 0x00,
+	/* match for a %any host. For both hosts, hence skip 0x02 */
+	MATCH_ANY		= 0x01,
+	/* IKE version matches exactly (config is not for any version) */
+	MATCH_VERSION	= 0x04,
+	/* local identity matches */
+	MATCH_ME		= 0x08,
+	/* remote identity matches */
+	MATCH_OTHER		= 0x10,
 } ike_cfg_match_t;
 
 /**
@@ -75,33 +81,26 @@ static enumerator_t *ike_enum_create(backend_t *backend, ike_data_t *data)
 /**
  * get a match of a candidate ike_cfg for two hosts
  */
-static ike_cfg_match_t get_ike_match(ike_cfg_t *cand, host_t *me, host_t *other)
+static ike_cfg_match_t get_ike_match(ike_cfg_t *cand, host_t *me, host_t *other,
+									 ike_version_t version)
 {
-	host_t *me_cand, *other_cand;
 	ike_cfg_match_t match = MATCH_NONE;
+	int quality;
+
+	if (cand->get_version(cand) != IKE_ANY &&
+		version != cand->get_version(cand))
+	{
+		return MATCH_NONE;
+	}
 
 	if (me)
 	{
-		me_cand = host_create_from_dns(cand->get_my_addr(cand),
-									   me->get_family(me), 0);
-		if (!me_cand)
+		quality = cand->match_me(cand, me);
+		if (!quality)
 		{
 			return MATCH_NONE;
 		}
-		if (me_cand->ip_equals(me_cand, me))
-		{
-			match += MATCH_ME;
-		}
-		else if (me_cand->is_anyaddr(me_cand))
-		{
-			match += MATCH_ANY;
-		}
-		else
-		{
-			me_cand->destroy(me_cand);
-			return MATCH_NONE;
-		}
-		me_cand->destroy(me_cand);
+		match += quality * MATCH_ME;
 	}
 	else
 	{
@@ -110,46 +109,41 @@ static ike_cfg_match_t get_ike_match(ike_cfg_t *cand, host_t *me, host_t *other)
 
 	if (other)
 	{
-		other_cand = host_create_from_dns(cand->get_other_addr(cand),
-										  other->get_family(other), 0);
-		if (!other_cand)
+		quality = cand->match_other(cand, other);
+		if (!quality)
 		{
 			return MATCH_NONE;
 		}
-		if (other_cand->ip_equals(other_cand, other))
-		{
-			match += MATCH_OTHER;
-		}
-		else if (other_cand->is_anyaddr(other_cand))
-		{
-			match += MATCH_ANY;
-		}
-		else
-		{
-			other_cand->destroy(other_cand);
-			return MATCH_NONE;
-		}
-		other_cand->destroy(other_cand);
+		match += quality * MATCH_OTHER;
 	}
 	else
 	{
 		match += MATCH_ANY;
 	}
+
+	if (match != MATCH_NONE &&
+		cand->get_version(cand) != IKE_ANY)
+	{	/* if we have a match, improve it if candidate version specified */
+		match += MATCH_VERSION;
+	}
 	return match;
 }
 
 METHOD(backend_manager_t, get_ike_cfg, ike_cfg_t*,
-	private_backend_manager_t *this, host_t *me, host_t *other)
+	private_backend_manager_t *this, host_t *me, host_t *other,
+	ike_version_t version)
 {
 	ike_cfg_t *current, *found = NULL;
+	char *my_addr, *other_addr;
 	enumerator_t *enumerator;
 	ike_cfg_match_t match, best = MATCH_ANY;
 	ike_data_t *data;
 
-	data = malloc_thing(ike_data_t);
-	data->this = this;
-	data->me = me;
-	data->other = other;
+	INIT(data,
+		.this = this,
+		.me = me,
+		.other = other,
+	);
 
 	DBG2(DBG_CFG, "looking for an ike config for %H...%H", me, other);
 
@@ -159,13 +153,15 @@ METHOD(backend_manager_t, get_ike_cfg, ike_cfg_t*,
 						(void*)ike_enum_create, data, (void*)free);
 	while (enumerator->enumerate(enumerator, (void**)&current))
 	{
-		match = get_ike_match(current, me, other);
-
+		match = get_ike_match(current, me, other, version);
+		DBG3(DBG_CFG, "ike config match: %d (%H %H %N)",
+			 match, me, other, ike_version_names, version);
 		if (match)
 		{
+			my_addr = current->get_my_addr(current);
+			other_addr = current->get_other_addr(current);
 			DBG2(DBG_CFG, "  candidate: %s...%s, prio %d",
-				 current->get_my_addr(current),
-				 current->get_other_addr(current), match);
+				 my_addr, other_addr, match);
 			if (match > best)
 			{
 				DESTROY_IF(found);
@@ -179,8 +175,10 @@ METHOD(backend_manager_t, get_ike_cfg, ike_cfg_t*,
 	this->lock->unlock(this->lock);
 	if (found)
 	{
+		my_addr = found->get_my_addr(found);
+		other_addr = found->get_other_addr(found);
 		DBG2(DBG_CFG, "found matching ike config: %s...%s with prio %d",
-			 found->get_my_addr(found), found->get_other_addr(found), best);
+			 my_addr, other_addr, best);
 	}
 	return found;
 }
@@ -195,9 +193,13 @@ static id_match_t get_peer_match(identification_t *id,
 	auth_cfg_t *auth;
 	identification_t *candidate;
 	id_match_t match = ID_MATCH_NONE;
+	char *where = local ? "local" : "remote";
+	chunk_t data;
 
 	if (!id)
 	{
+		DBG3(DBG_CFG, "peer config match %s: %d (%N)",
+			 where, ID_MATCH_ANY, id_type_names, ID_ANY);
 		return ID_MATCH_ANY;
 	}
 
@@ -221,6 +223,10 @@ static id_match_t get_peer_match(identification_t *id,
 		}
 	}
 	enumerator->destroy(enumerator);
+
+	data = id->get_encoding(id);
+	DBG3(DBG_CFG, "peer config match %s: %d (%N -> %#B)",
+		 where, match, id_type_names, id->get_type(id), &data);
 	return match;
 }
 
@@ -317,17 +323,18 @@ static void insert_sorted(match_entry_t *entry, linked_list_t *list,
 
 METHOD(backend_manager_t, create_peer_cfg_enumerator, enumerator_t*,
 	private_backend_manager_t *this, host_t *me, host_t *other,
-	identification_t *my_id, identification_t *other_id)
+	identification_t *my_id, identification_t *other_id, ike_version_t version)
 {
 	enumerator_t *enumerator;
 	peer_data_t *data;
 	peer_cfg_t *cfg;
 	linked_list_t *configs, *helper;
 
-	data = malloc_thing(peer_data_t);
-	data->lock = this->lock;
-	data->me = my_id;
-	data->other = other_id;
+	INIT(data,
+		.lock = this->lock,
+		.me = my_id,
+		.other = other_id,
+	);
 
 	/* create a sorted list with all matches */
 	this->lock->read_lock(this->lock);
@@ -340,9 +347,6 @@ METHOD(backend_manager_t, create_peer_cfg_enumerator, enumerator_t*,
 		return enumerator;
 	}
 
-	DBG1(DBG_CFG, "looking for peer configs matching %H[%Y]...%H[%Y]",
-		 me, my_id, other, other_id);
-
 	configs = linked_list_create();
 	/* only once allocated helper list for sorting */
 	helper = linked_list_create();
@@ -351,28 +355,23 @@ METHOD(backend_manager_t, create_peer_cfg_enumerator, enumerator_t*,
 		id_match_t match_peer_me, match_peer_other;
 		ike_cfg_match_t match_ike;
 		match_entry_t *entry;
-		chunk_t data;
 
 		match_peer_me = get_peer_match(my_id, cfg, TRUE);
-		data = my_id->get_encoding(my_id);
-		DBG3(DBG_CFG, "match_peer_me: %d (%N -> %#B)", match_peer_me,
-			 id_type_names, my_id->get_type(my_id), &data);
 		match_peer_other = get_peer_match(other_id, cfg, FALSE);
-		data = other_id->get_encoding(other_id);
-		DBG3(DBG_CFG, "match_peer_other: %d (%N -> %#B)", match_peer_other,
-			 id_type_names, other_id->get_type(other_id), &data);
-		match_ike = get_ike_match(cfg->get_ike_cfg(cfg), me, other);
-		DBG3(DBG_CFG, "match_ike: %d (%H %H)", match_ike, me, other);
+		match_ike = get_ike_match(cfg->get_ike_cfg(cfg), me, other, version);
+		DBG3(DBG_CFG, "ike config match: %d (%H %H %N)",
+			 match_ike, me, other, ike_version_names, version);
 
 		if (match_peer_me && match_peer_other && match_ike)
 		{
 			DBG2(DBG_CFG, "  candidate \"%s\", match: %d/%d/%d (me/other/ike)",
 				 cfg->get_name(cfg), match_peer_me, match_peer_other, match_ike);
 
-			entry = malloc_thing(match_entry_t);
-			entry->match_peer = match_peer_me + match_peer_other;
-			entry->match_ike = match_ike;
-			entry->cfg = cfg->get_ref(cfg);
+			INIT(entry,
+				.match_peer = match_peer_me + match_peer_other,
+				.match_ike = match_ike,
+				.cfg = cfg->get_ref(cfg),
+			);
 			insert_sorted(entry, configs, helper);
 		}
 	}
@@ -449,4 +448,3 @@ backend_manager_t *backend_manager_create()
 
 	return &this->public;
 }
-

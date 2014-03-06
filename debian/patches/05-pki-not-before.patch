@@ -26,7 +26,7 @@ index 20163ed..627fb7c 100644
  			case 's':
  				hex = arg;
  				continue;
-@@ -431,7 +439,6 @@ static int issue()
+@@ -443,7 +451,6 @@ static int issue()
  										chunk_from_chars(ASN1_SEQUENCE, 0));
  	}
  
@@ -34,16 +34,16 @@ index 20163ed..627fb7c 100644
  	not_after = not_before + lifetime * 24 * 60 * 60;
  
  	cert = lib->creds->create(lib->creds, CRED_CERTIFICATE, CERT_X509,
-@@ -518,7 +525,7 @@ static void __attribute__ ((constructor))reg()
- 		 "[--cert-policy oid [--cps-uri uri] [--user-notice text] ]+",
- 		 "[--policy-map issuer-oid:subject-oid]",
+@@ -530,7 +537,7 @@ static void __attribute__ ((constructor))reg()
+ 		 "[--nc-excluded name] [--policy-mapping issuer-oid:subject-oid]",
  		 "[--policy-explicit len] [--policy-inhibit len] [--policy-any len]",
+ 		 "[--cert-policy oid [--cps-uri uri] [--user-notice text]]+",
 -		 "[--digest md5|sha1|sha224|sha256|sha384|sha512] [--outform der|pem]"},
 +		 "[--digest md5|sha1|sha224|sha256|sha384|sha512] [--outform der|pem] [--not-before seconds-since-epoch]"},
  		{
  			{"help",			'h', 0, "show usage information"},
  			{"in",				'i', 1, "public key/request file to issue, default: stdin"},
-@@ -547,6 +554,7 @@ static void __attribute__ ((constructor))reg()
+@@ -559,6 +566,7 @@ static void __attribute__ ((constructor))reg()
  			{"ocsp",			'o', 1, "OCSP AuthorityInfoAccess URI to include"},
  			{"digest",			'g', 1, "digest for signature creation, default: sha1"},
  			{"outform",			'f', 1, "encoding of generated cert, default: der"},
@@ -79,7 +79,7 @@ index c4508a6..46fa6cf 100644
  			case 's':
  				hex = arg;
  				continue;
-@@ -302,7 +310,6 @@ static int self()
+@@ -310,7 +318,6 @@ static int self()
  		}
  		rng->destroy(rng);
  	}
@@ -87,16 +87,16 @@ index c4508a6..46fa6cf 100644
  	not_after = not_before + lifetime * 24 * 60 * 60;
  	cert = lib->creds->create(lib->creds, CRED_CERTIFICATE, CERT_X509,
  						BUILD_SIGNING_KEY, private, BUILD_PUBLIC_KEY, public,
-@@ -382,7 +389,7 @@ static void __attribute__ ((constructor))reg()
- 		 "[--cert-policy oid [--cps-uri uri] [--user-notice text] ]+",
+@@ -390,7 +397,7 @@ static void __attribute__ ((constructor))reg()
  		 "[--policy-map issuer-oid:subject-oid]",
  		 "[--policy-explicit len] [--policy-inhibit len] [--policy-any len]",
+ 		 "[--cert-policy oid [--cps-uri uri] [--user-notice text]]+",
 -		 "[--digest md5|sha1|sha224|sha256|sha384|sha512] [--outform der|pem]"},
 +		 "[--digest md5|sha1|sha224|sha256|sha384|sha512] [--outform der|pem] [--not-before seconds-since-epoch]"},
  		{
  			{"help",			'h', 0, "show usage information"},
  			{"in",				'i', 1, "private key input file, default: stdin"},
-@@ -407,6 +414,7 @@ static void __attribute__ ((constructor))reg()
+@@ -415,6 +421,7 @@ static void __attribute__ ((constructor))reg()
  			{"ocsp",			'o', 1, "OCSP AuthorityInfoAccess URI to include"},
  			{"digest",			'g', 1, "digest for signature creation, default: sha1"},
  			{"outform",			'f', 1, "encoding of generated cert, default: der"},
