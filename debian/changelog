@@ -1,6 +1,9 @@
 strongswan (5.1.1-2pexip1) pexip; urgency=medium
 
   * Prepare Pexip packaging
+  * debian/patches:
+    - 06-ipsec-stop-with-old-pidfile added.
+      Fixes stop of old StrongSwan during upgrade.
 
  -- John-Mark Bell <jmb@pexip.com>  Thu, 06 Mar 2014 16:52:34 +0000
 

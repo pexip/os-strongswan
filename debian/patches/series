@@ -1,3 +1,4 @@
 01_fix-manpages.patch
 02_include-strongswan.conf.d.patch
 05-pki-not-before.patch
+06-ipsec-stop-with-old-pidfile.patch
