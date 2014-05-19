@@ -18,7 +18,7 @@ credentials/keys/public_key.c credentials/keys/shared_key.c \
 credentials/certificates/certificate.c credentials/certificates/crl.c \
 credentials/certificates/ocsp_response.c \
 credentials/containers/container.c credentials/containers/pkcs12.c \
-credentials/ietf_attributes/ietf_attributes.c credentials/credential_manager.c \
+credentials/credential_manager.c \
 credentials/sets/auth_cfg_wrapper.c credentials/sets/ocsp_response_wrapper.c \
 credentials/sets/cert_cache.c credentials/sets/mem_cred.c \
 credentials/sets/callback_cred.c credentials/auth_cfg.c database/database.c \
@@ -34,7 +34,8 @@ selectors/traffic_selector.c threading/thread.c threading/thread_value.c \
 threading/mutex.c threading/semaphore.c threading/rwlock.c threading/spinlock.c \
 utils/utils.c utils/chunk.c utils/debug.c utils/enum.c utils/identification.c \
 utils/lexparser.c utils/optionsfrom.c utils/capabilities.c utils/backtrace.c \
-utils/settings.c
+utils/settings.c utils/test.c \
+utils/utils/strerror.c
 
 if USE_DEV_HEADERS
 strongswan_includedir = ${dev_headers}
@@ -60,7 +61,6 @@ credentials/certificates/ocsp_response.h \
 credentials/certificates/pgp_certificate.h \
 credentials/containers/container.h credentials/containers/pkcs7.h \
 credentials/containers/pkcs12.h \
-credentials/ietf_attributes/ietf_attributes.h \
 credentials/credential_manager.h credentials/sets/auth_cfg_wrapper.h \
 credentials/sets/ocsp_response_wrapper.h credentials/sets/cert_cache.h \
 credentials/sets/mem_cred.h credentials/sets/callback_cred.h \
@@ -82,7 +82,8 @@ utils/utils.h utils/chunk.h utils/debug.h utils/enum.h utils/identification.h \
 utils/lexparser.h utils/optionsfrom.h utils/capabilities.h utils/backtrace.h \
 utils/leak_detective.h utils/printf_hook/printf_hook.h \
 utils/printf_hook/printf_hook_vstr.h utils/printf_hook/printf_hook_builtin.h \
-utils/settings.h utils/integrity_checker.h
+utils/settings.h utils/test.h utils/integrity_checker.h \
+utils/utils/strerror.h
 endif
 
 library.lo :	$(top_builddir)/config.status
@@ -306,6 +307,13 @@ if MONOLITHIC
 endif
 endif
 
+if USE_ACERT
+  SUBDIRS += plugins/acert
+if MONOLITHIC
+  libstrongswan_la_LIBADD += plugins/acert/libstrongswan-acert.la
+endif
+endif
+
 if USE_PUBKEY
   SUBDIRS += plugins/pubkey
 if MONOLITHIC
@@ -481,6 +489,13 @@ if MONOLITHIC
 endif
 endif
 
+if USE_NTRU
+  SUBDIRS += plugins/ntru
+if MONOLITHIC
+  libstrongswan_la_LIBADD += plugins/ntru/libstrongswan-ntru.la
+endif
+endif
+
 if USE_TEST_VECTORS
   SUBDIRS += plugins/test_vectors
 if MONOLITHIC
@@ -488,9 +503,7 @@ if MONOLITHIC
 endif
 endif
 
-if UNITTESTS
 if MONOLITHIC
   SUBDIRS += .
 endif
-  SUBDIRS += tests
-endif
+SUBDIRS += tests

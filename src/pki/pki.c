@@ -13,9 +13,11 @@
  * for more details.
  */
 
+#define _GNU_SOURCE
 #include "command.h"
 #include "pki.h"
 
+#include <time.h>
 #include <unistd.h>
 
 #include <utils/debug.h>
@@ -102,6 +104,56 @@ bool get_form(char *form, cred_encoding_type_t *enc, credential_type_t type)
 }
 
 /**
+ * See header
+ */
+bool calculate_lifetime(char *format, char *nbstr, char *nastr, time_t span,
+						time_t *nb, time_t *na)
+{
+	struct tm tm;
+	time_t now;
+	char *end;
+
+	if (!format)
+	{
+		format = "%d.%m.%y %T";
+	}
+
+	now = time(NULL);
+
+	localtime_r(&now, &tm);
+	if (nbstr)
+	{
+		end = strptime(nbstr, format, &tm);
+		if (end == NULL || *end != '\0')
+		{
+			return FALSE;
+		}
+	}
+	*nb = mktime(&tm);
+
+	localtime_r(&now, &tm);
+	if (nastr)
+	{
+		end = strptime(nastr, format, &tm);
+		if (end == NULL || *end != '\0')
+		{
+			return FALSE;
+		}
+	}
+	*na = mktime(&tm);
+
+	if (!nbstr && nastr)
+	{
+		*nb = *na - span;
+	}
+	else if (!nastr)
+	{
+		*na = *nb + span;
+	}
+	return TRUE;
+}
+
+/**
  * Callback credential set pki uses
  */
 static callback_cred_t *cb_set;
@@ -168,7 +220,7 @@ static void remove_callback()
 int main(int argc, char *argv[])
 {
 	atexit(library_deinit);
-	if (!library_init(NULL))
+	if (!library_init(NULL, "pki"))
 	{
 		exit(SS_RC_LIBSTRONGSWAN_INTEGRITY);
 	}
@@ -188,4 +240,3 @@ int main(int argc, char *argv[])
 	atexit(remove_callback);
 	return command_dispatch(argc, argv);
 }
-

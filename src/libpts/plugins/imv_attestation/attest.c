@@ -266,23 +266,26 @@ static void do_args(int argc, char *argv[])
 				continue;
 			case 'F':
 			{
-				char *path = strdup(optarg);
-				char *dir = dirname(path);
-				char *file = basename(optarg);
+				char *dir = path_dirname(optarg);
+				char *file = path_basename(optarg);
 
 				if (*dir != '.')
 				{
 					if (!attest->set_directory(attest, dir, op == OP_ADD))
 					{
-						free(path);
+						free(file);
+						free(dir);
 						exit(EXIT_FAILURE);
 					}
 				}
-				free(path);
+				free(dir);
+
 				if (!attest->set_file(attest, file, op == OP_ADD))
 				{
+					free(file);
 					exit(EXIT_FAILURE);
 				}
+				free(file);
 				continue;
 			}
 			case 'G':
@@ -439,7 +442,7 @@ int main(int argc, char *argv[])
 	atexit(library_deinit);
 
 	/* initialize library */
-	if (!library_init(NULL))
+	if (!library_init(NULL, "attest"))
 	{
 		exit(SS_RC_LIBSTRONGSWAN_INTEGRITY);
 	}

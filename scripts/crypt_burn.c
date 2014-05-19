@@ -26,7 +26,7 @@ int main(int argc, char *argv[])
 	int i = 0, limit = 0;
 
 
-	library_init(NULL);
+	library_init(NULL, "crypt_burn");
 	lib->plugins->load(lib->plugins, PLUGINS);
 	atexit(library_deinit);
 
@@ -61,7 +61,7 @@ int main(int argc, char *argv[])
 	if (encryption_algorithm_is_aead(token->algorithm))
 	{
 		aead = lib->crypto->create_aead(lib->crypto,
-										token->algorithm, token->keysize / 8);
+									token->algorithm, token->keysize / 8, 0);
 		if (!aead)
 		{
 			fprintf(stderr, "aead '%s' not supported!\n", argv[1]);

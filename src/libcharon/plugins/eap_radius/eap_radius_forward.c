@@ -74,22 +74,6 @@ typedef struct {
 static private_eap_radius_forward_t *singleton = NULL;
 
 /**
- * Hashtable hash function
- */
-static u_int hash(uintptr_t key)
-{
-	return key;
-}
-
-/**
- * Hashtable equals function
- */
-static bool equals(uintptr_t a, uintptr_t b)
-{
-	return a == b;
-}
-
-/**
  * Free a queue entry
  */
 static void free_attribute(chunk_t *chunk)
@@ -438,14 +422,12 @@ eap_radius_forward_t *eap_radius_forward_create()
 		},
 		.from_attr = parse_selector(lib->settings->get_str(lib->settings,
 							"%s.plugins.eap-radius.forward.ike_to_radius", "",
-							charon->name)),
+							lib->ns)),
 		.to_attr = parse_selector(lib->settings->get_str(lib->settings,
 							"%s.plugins.eap-radius.forward.radius_to_ike", "",
-							charon->name)),
-		.from = hashtable_create((hashtable_hash_t)hash,
-						(hashtable_equals_t)equals, 8),
-		.to = hashtable_create((hashtable_hash_t)hash,
-						(hashtable_equals_t)equals, 8),
+							lib->ns)),
+		.from = hashtable_create(hashtable_hash_ptr, hashtable_equals_ptr, 8),
+		.to = hashtable_create(hashtable_hash_ptr, hashtable_equals_ptr, 8),
 		.mutex = mutex_create(MUTEX_TYPE_DEFAULT),
 	);
 

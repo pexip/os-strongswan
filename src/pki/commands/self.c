@@ -14,6 +14,7 @@
  */
 
 #include <time.h>
+#include <errno.h>
 
 #include "pki.h"
 
@@ -59,8 +60,8 @@ static int self()
 	int inhibit_mapping = X509_NO_CONSTRAINT, require_explicit = X509_NO_CONSTRAINT;
 	chunk_t serial = chunk_empty;
 	chunk_t encoding = chunk_empty;
-	time_t lifetime = 1095;
-	time_t not_before, not_after;
+	time_t not_before, not_after, lifetime = 1095 * 24 * 60 * 60;
+	char *datenb = NULL, *datena = NULL, *dateform = NULL;
 	x509_flag_t flags = 0;
 	x509_cert_policy_t *policy = NULL;
 	char *arg;
@@ -114,12 +115,21 @@ static int self()
 				san->insert_last(san, identification_create_from_string(arg));
 				continue;
 			case 'l':
-				lifetime = atoi(arg);
+				lifetime = atoi(arg) * 24 * 60 * 60;
 				if (!lifetime)
 				{
 					error = "invalid --lifetime value";
 					goto usage;
 				}
+				continue;
+			case 'D':
+				dateform = arg;
+				continue;
+			case 'F':
+				datenb = arg;
+				continue;
+			case 'T':
+				datena = arg;
 				continue;
 			case 's':
 				hex = arg;
@@ -224,6 +234,10 @@ static int self()
 				{
 					flags |= X509_OCSP_SIGNER;
 				}
+				else if (streq(arg, "msSmartcardLogon"))
+				{
+					flags |= X509_MS_SMARTCARD_LOGON;
+				}
 				continue;
 			case 'f':
 				if (!get_form(arg, &form, CRED_CERTIFICATE))
@@ -247,6 +261,12 @@ static int self()
 	if (!dn)
 	{
 		error = "--dn is required";
+		goto usage;
+	}
+	if (!calculate_lifetime(dateform, datenb, datena, lifetime,
+							&not_before, &not_after))
+	{
+		error = "invalid --not-before/after datetime";
 		goto usage;
 	}
 	id = identification_create_from_string(dn);
@@ -273,7 +293,12 @@ static int self()
 	{
 		chunk_t chunk;
 
-		chunk = chunk_from_fd(0);
+		if (!chunk_from_fd(0, &chunk))
+		{
+			fprintf(stderr, "%s: ", strerror(errno));
+			error = "reading private key failed";
+			goto end;
+		}
 		private = lib->creds->create(lib->creds, CRED_PRIVATE_KEY, type,
 									 BUILD_BLOB, chunk, BUILD_END);
 		free(chunk.ptr);
@@ -308,10 +333,9 @@ static int self()
 			rng->destroy(rng);
 			goto end;
 		}
+		serial.ptr[0] &= 0x7F;
 		rng->destroy(rng);
 	}
-	not_before = time(NULL);
-	not_after = not_before + lifetime * 24 * 60 * 60;
 	cert = lib->creds->create(lib->creds, CRED_CERTIFICATE, CERT_X509,
 						BUILD_SIGNING_KEY, private, BUILD_PUBLIC_KEY, public,
 						BUILD_SUBJECT, id, BUILD_NOT_BEFORE_TIME, not_before,
@@ -385,7 +409,7 @@ static void __attribute__ ((constructor))reg()
 		{" [--in file|--keyid hex] [--type rsa|ecdsa]",
 		 " --dn distinguished-name [--san subjectAltName]+",
 		 "[--lifetime days] [--serial hex] [--ca] [--ocsp uri]+",
-		 "[--flag serverAuth|clientAuth|crlSign|ocspSigning]+",
+		 "[--flag serverAuth|clientAuth|crlSign|ocspSigning|msSmartcardLogon]+",
 		 "[--nc-permitted name] [--nc-excluded name]",
 		 "[--policy-map issuer-oid:subject-oid]",
 		 "[--policy-explicit len] [--policy-inhibit len] [--policy-any len]",
@@ -399,6 +423,9 @@ static void __attribute__ ((constructor))reg()
 			{"dn",				'd', 1, "subject and issuer distinguished name"},
 			{"san",				'a', 1, "subjectAltName to include in certificate"},
 			{"lifetime",		'l', 1, "days the certificate is valid, default: 1095"},
+			{"not-before",		'F', 1, "date/time the validity of the cert starts"},
+			{"not-after",		'T', 1, "date/time the validity of the cert ends"},
+			{"dateform",		'D', 1, "strptime(3) input format, default: %d.%m.%y %T"},
 			{"serial",			's', 1, "serial number in hex, default: random"},
 			{"ca",				'b', 0, "include CA basicConstraint, default: no"},
 			{"pathlen",			'p', 1, "set path length constraint"},
