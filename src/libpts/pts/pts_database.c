@@ -15,6 +15,7 @@
 
 #define _GNU_SOURCE
 #include <stdio.h>
+#include <libgen.h>
 
 #include "pts_database.h"
 
@@ -248,16 +249,60 @@ METHOD(pts_database_t, check_file_measurement, status_t,
 	enumerator_t *e;
 	chunk_t hash;
 	status_t status = NOT_FOUND;
+	char *dir, *file;
 
-	e = this->db->query(this->db,
-		"SELECT fh.hash FROM file_hashes AS fh "
-		"JOIN files AS f ON f.id = fh.file "
-		"JOIN products AS p ON p.id = fh.product "
-		"WHERE p.name = ? AND f.path = ? AND fh.algo = ?",
-		DB_TEXT, product, DB_TEXT, filename, DB_INT, algo, DB_BLOB);
+	if (strlen(filename) < 1)
+	{
+		return INVALID_ARG;
+	}
+
+	/* separate filename into directory and basename components */
+	dir = path_dirname(filename);
+	file = path_basename(filename);
+
+	if (*dir == '.')
+	{	/* relative pathname */
+		e = this->db->query(this->db,
+				"SELECT fh.hash FROM file_hashes AS fh "
+				"JOIN files AS f ON f.id = fh.file "
+				"JOIN products AS p ON p.id = fh.product "
+				"WHERE p.name = ? AND f.name = ? AND fh.algo = ?",
+		DB_TEXT, product, DB_TEXT, file, DB_INT, algo, DB_BLOB);
+	}
+	else
+	{	/* absolute pathname */
+		bool dir_found;
+		int did;
+
+		/* find directory entry first */
+		e = this->db->query(this->db,
+				"SELECT id FROM directories WHERE path = ?",
+				DB_TEXT, dir, DB_INT);
+		if (!e)
+		{
+			status = FAILED;
+			goto err;
+		}
+		dir_found = e->enumerate(e, &did);
+		e->destroy(e);
+
+		if (!dir_found)
+		{
+			status = NOT_FOUND;
+			goto err;
+		}
+		e = this->db->query(this->db,
+				"SELECT fh.hash FROM file_hashes AS fh "
+				"JOIN files AS f ON f.id = fh.file "
+				"JOIN products AS p ON p.id = fh.product "
+				"WHERE p.name = ? AND f.dir = ? AND f.name = ? AND fh.algo = ?",
+				DB_TEXT, product, DB_INT, did, DB_TEXT, file, DB_INT, algo,
+				DB_BLOB);
+	}
 	if (!e)
 	{
-		return FAILED;
+		status = FAILED;
+		goto err;
 	}
 	while (e->enumerate(e, &hash))
 	{
@@ -273,6 +318,10 @@ METHOD(pts_database_t, check_file_measurement, status_t,
 		}
 	}
 	e->destroy(e);
+
+err:
+	free(file);
+	free(dir);
 
 	return status;
 }

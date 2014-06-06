@@ -20,7 +20,7 @@ credentials/keys/public_key.c credentials/keys/shared_key.c \
 credentials/certificates/certificate.c credentials/certificates/crl.c \
 credentials/certificates/ocsp_response.c \
 credentials/containers/container.c credentials/containers/pkcs12.c \
-credentials/ietf_attributes/ietf_attributes.c credentials/credential_manager.c \
+credentials/credential_manager.c \
 credentials/sets/auth_cfg_wrapper.c credentials/sets/ocsp_response_wrapper.c \
 credentials/sets/cert_cache.c credentials/sets/mem_cred.c \
 credentials/sets/callback_cred.c credentials/auth_cfg.c database/database.c \
@@ -36,7 +36,8 @@ selectors/traffic_selector.c threading/thread.c threading/thread_value.c \
 threading/mutex.c threading/semaphore.c threading/rwlock.c threading/spinlock.c \
 utils/utils.c utils/chunk.c utils/debug.c utils/enum.c utils/identification.c \
 utils/lexparser.c utils/optionsfrom.c utils/capabilities.c utils/backtrace.c \
-utils/printf_hook/printf_hook_vstr.c utils/settings.c
+utils/printf_hook/printf_hook_builtin.c utils/settings.c utils/test.c \
+utils/utils/strerror.c
 
 # adding the plugin source files
 
@@ -96,9 +97,6 @@ LOCAL_SRC_FILES += $(call add_plugin, xcbc)
 
 # build libstrongswan ----------------------------------------------------------
 
-LOCAL_C_INCLUDES += \
-	$(libvstr_PATH)
-
 LOCAL_CFLAGS := $(strongswan_CFLAGS) \
 	-include $(LOCAL_PATH)/AndroidConfigLocal.h
 
@@ -110,6 +108,6 @@ LOCAL_ARM_MODE := arm
 
 LOCAL_PRELINK_MODULE := false
 
-LOCAL_SHARED_LIBRARIES += libdl libvstr
+LOCAL_SHARED_LIBRARIES += libdl
 
 include $(BUILD_SHARED_LIBRARY)

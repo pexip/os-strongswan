@@ -14,12 +14,12 @@
  * for more details.
  */
 
-#include "ike_cfg.h"
-
+#define _GNU_SOURCE /* for stdndup() */
 #include <string.h>
 
-#include <daemon.h>
+#include "ike_cfg.h"
 
+#include <daemon.h>
 
 ENUM(ike_version_names, IKE_ANY, IKEV2,
 	"IKEv1/2",
@@ -385,7 +385,7 @@ METHOD(ike_cfg_t, equals, bool,
 		return FALSE;
 	}
 	e1 = this->proposals->create_enumerator(this->proposals);
-	e2 = this->proposals->create_enumerator(this->proposals);
+	e2 = other->proposals->create_enumerator(other->proposals);
 	while (e1->enumerate(e1, &p1) && e2->enumerate(e2, &p2))
 	{
 		if (!p1->equals(p1, p2))
