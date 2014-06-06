@@ -73,7 +73,7 @@ if USE_UPDOWN
 endif
 
 if USE_TOOLS
-  SUBDIRS += openac scepclient pki
+  SUBDIRS += scepclient pki
 endif
 
 if USE_CONFTEST
@@ -96,12 +96,12 @@ if USE_MEDSRV
   SUBDIRS += medsrv
 endif
 
-if USE_INTEGRITY_TEST
-  SUBDIRS += checksum
-endif
-
 if USE_ATTR_SQL
   SUBDIRS += pool
+else
+if USE_SQL
+  SUBDIRS += pool
+endif
 endif
 
 if USE_TKM
@@ -116,8 +116,6 @@ if USE_LIBPTTLS
   SUBDIRS += pt-tls-client
 endif
 
-EXTRA_DIST = strongswan.conf
-
-install-exec-local :
-		test -e "$(DESTDIR)${sysconfdir}" || $(INSTALL) -d "$(DESTDIR)$(sysconfdir)"
-		test -e "$(DESTDIR)$(sysconfdir)/strongswan.conf" || $(INSTALL) -m 640 $(srcdir)/strongswan.conf $(DESTDIR)$(sysconfdir)/strongswan.conf || true
+if USE_INTEGRITY_TEST
+  SUBDIRS += checksum
+endif

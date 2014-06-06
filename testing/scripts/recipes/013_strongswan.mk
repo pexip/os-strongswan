@@ -76,10 +76,13 @@ CONFIG_OPTS = \
 	--enable-unbound \
 	--enable-ipseckey \
 	--enable-dnscert \
+	--enable-acert \
 	--enable-cmd \
 	--enable-libipsec \
 	--enable-kernel-libipsec \
-	--enable-tkm
+	--enable-tkm \
+	--enable-ntru \
+	--enable-lookip
 
 export ADA_PROJECT_PATH=/usr/local/ada/lib/gnat
 

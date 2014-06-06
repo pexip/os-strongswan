@@ -377,7 +377,7 @@ static void load_aik_blob(private_pts_t *this)
 	u_int32_t aikBlobLen;
 
 	blob_path = lib->settings->get_str(lib->settings,
-						"libimcv.plugins.imc-attestation.aik_blob", NULL);
+						"%s.plugins.imc-attestation.aik_blob", NULL, lib->ns);
 
 	if (blob_path)
 	{
@@ -393,7 +393,7 @@ static void load_aik_blob(private_pts_t *this)
 		fseek(fp, 0L, SEEK_SET);
 
 		this->aik_blob = chunk_alloc(aikBlobLen);
-		if (fread(this->aik_blob.ptr, 1, aikBlobLen, fp))
+		if (fread(this->aik_blob.ptr, 1, aikBlobLen, fp) == aikBlobLen)
 		{
 			DBG2(DBG_PTS, "loaded AIK Blob from '%s'", blob_path);
 			DBG3(DBG_PTS, "AIK Blob: %B", &this->aik_blob);
@@ -401,6 +401,7 @@ static void load_aik_blob(private_pts_t *this)
 		else
 		{
 			DBG1(DBG_PTS, "unable to read AIK Blob file '%s'", blob_path);
+			chunk_free(&this->aik_blob);
 		}
 		fclose(fp);
 		return;
@@ -418,9 +419,9 @@ static void load_aik(private_pts_t *this)
 	char *cert_path, *key_path;
 
 	cert_path = lib->settings->get_str(lib->settings,
-						"libimcv.plugins.imc-attestation.aik_cert", NULL);
+						"%s.plugins.imc-attestation.aik_cert", NULL, lib->ns);
 	key_path = lib->settings->get_str(lib->settings,
-						"libimcv.plugins.imc-attestation.aik_key", NULL);
+						"%s.plugins.imc-attestation.aik_key", NULL, lib->ns);
 
 	if (cert_path)
 	{
@@ -627,7 +628,7 @@ METHOD(pts_t, get_metadata, pts_file_meta_t*,
 			metadata->destroy(metadata);
 			return NULL;
 		}
-		entry->filename = strdup(basename(pathname));
+		entry->filename = path_basename(pathname);
 		metadata->add(metadata, entry);
 	}
 

@@ -1,4 +1,5 @@
 01_fix-manpages.patch
-02_include-strongswan.conf.d.patch
+02_disable-libtls-tests.patch
+03_pfkey-Always-include-stdint.h.patch
 05-pki-not-before.patch
 06-ipsec-stop-with-old-pidfile.patch
