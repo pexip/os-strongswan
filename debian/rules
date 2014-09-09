@@ -106,8 +106,6 @@ ifeq ($(DEB_BUILD_ARCH_OS),linux)
 	dh_install -p libstrongswan-extra-plugins usr/lib/ipsec/plugins/libstrongswan-af-alg.so
 	dh_install -p libstrongswan-extra-plugins usr/share/strongswan/templates/config/plugins/af-alg.conf
 	dh_install -p libstrongswan-extra-plugins etc/strongswan.d/charon/af-alg.conf
-	# the systemd service file only gets generated on Linux
-	dh_install -p strongswan-starter lib/systemd/system/strongswan.service
 endif
 
 ifeq ($(DEB_BUILD_ARCH_OS),kfreebsd)
@@ -146,8 +144,7 @@ endif
 		-Xlibstrongswan-farp.so -X farp.conf \
 		-Xlibstrongswan-padlock.so -X padlock.conf \
 		-Xlibstrongswan-rdrand.so -X rdrand.conf \
-		-Xlibstrongswan-af-alg.so -X af-alg.conf \
-		-Xstrongswan.service
+		-Xlibstrongswan-af-alg.so -X af-alg.conf 
 
 	# add additional files not covered by upstream makefile...
 	install --mode=0600 $(CURDIR)/debian/ipsec.secrets.proto $(CURDIR)/debian/strongswan-starter/etc/ipsec.secrets
@@ -193,4 +190,4 @@ override_dh_installlogcheck:
 	dh_installlogcheck --name strongswan
 
 %:
-	dh $@ --parallel --with autoreconf,systemd
+	dh $@ --parallel --with autoreconf

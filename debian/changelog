@@ -1,6 +1,7 @@
 strongswan (5.2.0-2pexip1) pexip; urgency=medium
 
   * New upstream release.
+  * debian/control, debian/rules: Disable systemd support.
 
  -- John-Mark Bell <jmb@pexip.com>  Tue, 09 Sep 2014 15:59:37 +0100
 

@@ -16,7 +16,6 @@ Build-Depends: debhelper (>= 9), dpkg-dev (>= 1.16.1), libtool, libgmp3-dev,
   libxml2-dev, libsqlite3-dev, network-manager-dev (>= 0.7) [linux-any], 
   libnm-glib-vpn-dev (>= 0.7) [linux-any], libnm-util-dev (>= 0.7) [linux-any], 
   gperf, libcap-dev [linux-any], dh-autoreconf, pkg-config,
-  systemd [linux-any], dh-systemd (>= 1.5)
 Homepage: http://www.strongswan.org
 XS-Pexip-Upstream: http://ftp.debian.org/debian/ jessie
 
