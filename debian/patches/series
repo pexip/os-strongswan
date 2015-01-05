@@ -1,4 +1,5 @@
 01_fix-manpages.patch
-02_disable-libtls-tests.patch
+02_chunk-endianness.patch
 03_systemd-service.patch
+04_disable-libtls-tests.patch
 06-ipsec-stop-with-old-pidfile.patch
