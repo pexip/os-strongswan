@@ -1,3 +1,17 @@
+strongswan (5.2.1-5pexip1) pexip; urgency=medium
+
+  * New upstream release.
+
+ -- John-Mark Bell <jmb@pexip.com>  Mon, 05 Jan 2015 16:52:47 +0000
+
+strongswan (5.2.1-5) unstable; urgency=high
+
+  * debian/patches:
+    - debian/patches/CVE-2014-9221_modp_custom added, fix unauthenticated
+    denial of service in IKEv2 when using custom MODP value.
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Mon, 05 Jan 2015 13:11:51 +0100
+
 strongswan (5.2.1-4pexip1) pexip; urgency=medium
 
   * New upstream release.
