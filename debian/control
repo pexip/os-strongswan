@@ -33,7 +33,7 @@ Package: libstrongswan
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Conflicts: strongswan (<< 4.2.12-1)
-Breaks: strongswan-ikev2 (<< 4.6.4)
+Breaks: strongswan-ikev2 (<< 4.6.4), strongswan-starter (<< ${binary:Version})
 Replaces: strongswan-ikev2 (<< 4.6.4)
 Recommends: libstrongswan-standard-plugins
 Suggests: libstrongswan-extra-plugins
@@ -82,7 +82,7 @@ Description: strongSwan utility and crypto library
 Package: libstrongswan-standard-plugins
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, libstrongswan (= ${binary:Version})
-Breaks: libstrongswan (<= 5.1.1-1), strongswan-ike (<= 5.1.1-1)
+Breaks: libstrongswan (<= 5.1.1-1), strongswan-ike (<= 5.1.1-1), strongswan-starter (<< ${binary:Version})
 Replaces: libstrongswan (<= 5.1.1-1),strongswan-ike (<= 5.1.1-1)
 Description: strongSwan utility and crypto library (standard plugins)
  The strongSwan VPN suite uses the native IPsec stack in the standard
@@ -100,7 +100,7 @@ Description: strongSwan utility and crypto library (standard plugins)
 Package: libstrongswan-extra-plugins
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, libstrongswan (= ${binary:Version})
-Breaks: libstrongswan (<= 5.1.1-1), strongswan-ike (<= 5.1.1-1)
+Breaks: libstrongswan (<= 5.1.1-1), strongswan-ike (<= 5.1.1-1), strongswan-starter (<< ${binary:Version})
 Replaces: libstrongswan (<= 5.1.1-1),strongswan-ike (<= 5.1.1-1)
 Description: strongSwan utility and crypto library (extra plugins)
  The strongSwan VPN suite uses the native IPsec stack in the standard
@@ -128,7 +128,7 @@ Description: strongSwan utility and crypto library (extra plugins)
 Package: libcharon-extra-plugins
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, libstrongswan (= ${binary:Version})
-Breaks: libstrongswan (<= 5.1.1-1), strongswan-ike (<= 5.1.1-1)
+Breaks: libstrongswan (<= 5.1.1-1), strongswan-ike (<= 5.1.1-1), strongswan-starter (<< ${binary:Version})
 Replaces: libstrongswan (<= 5.1.1-1),strongswan-ike (<= 5.1.1-1)
 Description: strongSwan charon library (extra plugins)
  The strongSwan VPN suite uses the native IPsec stack in the standard
@@ -192,7 +192,7 @@ Package: strongswan-libcharon
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, libstrongswan (= ${binary:Version})
 Suggests: libcharon-extra-plugins
-Breaks: libstrongswan (<= 5.1.1-1)
+Breaks: libstrongswan (<= 5.1.1-1), strongswan-starter (<< ${binary:Version})
 Replaces: strongswan-ike, libstrongswan (<= 5.1.1-1)
 Description: strongSwan charon library
  The strongSwan VPN suite uses the native IPsec stack in the standard
@@ -208,7 +208,7 @@ Depends: ${shlibs:Depends}, ${misc:Depends},
  libstrongswan (= ${binary:Version}), strongswan-starter,
  iproute2 [linux-any] | iproute [linux-any]
 Provides: ike-server
-Breaks: libstrongswan (<= 5.1.1-1), strongswan-ike (<= 5.1.1-1)
+Breaks: libstrongswan (<= 5.1.1-1), strongswan-ike (<= 5.1.1-1), strongswan-starter (<< ${binary:Version})
 Replaces: strongswan-ikev1, strongswan-ikev2, libstrongswan (<= 5.1.1-1), strongswan-ike (<= 5.1.1-1)
 Description: strongSwan Internet Key Exchange daemon
  The strongSwan VPN suite uses the native IPsec stack in the standard
