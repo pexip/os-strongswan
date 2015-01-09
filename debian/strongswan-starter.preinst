@@ -4,7 +4,9 @@ set -e
 
 case "$1" in
     upgrade)
-        invoke-rc.d ipsec stop || true
+        if dpkg --compare-versions "$2" 'lt' '5.2.1-5pexip1'; then
+            invoke-rc.d ipsec stop || true
+        fi
         ;;
     install|abort-upgrade)
         ;;

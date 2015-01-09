@@ -16,9 +16,7 @@ set -e
 # for details, see /usr/share/doc/packaging-manual/
 
 case "$1" in
-    upgrade)
-        ;;
-    remove|deconfigure)
+    upgrade|remove|deconfigure)
         invoke-rc.d ipsec stop || true
 #       install-info --quiet --remove /usr/info/strongswan.info.gz
         ;;
