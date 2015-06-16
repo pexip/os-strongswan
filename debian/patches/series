@@ -4,3 +4,4 @@
 04_disable-libtls-tests.patch
 CVE-2014-9221_modp_custom.patch
 06-ipsec-stop-with-old-pidfile.patch
+07-follow-openssl-api-change.patch

@@ -1,3 +1,11 @@
+strongswan (5.2.1-5pexip2) pexip; urgency=medium
+
+  * debian/patches/07-follow-openssl-api-change.patch: backport
+    upstream fix to OpenSSL HMAC API usage following a change in
+    the HMAC_Init_ex API semantics in OpenSSL 1.0.1n or later.
+
+ -- John-Mark Bell <jmb@pexip.com>  Tue, 16 Jun 2015 18:57:35 +0100
+
 strongswan (5.2.1-5pexip1) pexip; urgency=medium
 
   * New upstream release.

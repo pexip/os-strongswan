@@ -1,0 +1,75 @@
+From c2906c8f21af7555e0f786b6474cf4c7dc0c7651 Mon Sep 17 00:00:00 2001
+From: Martin Willi <martin@revosec.ch>
+Date: Mon, 30 Mar 2015 10:25:41 +0200
+Subject: [PATCH 1/1] openssl: Don't pre-initialize OpenSSL HMAC with an empty
+ key
+
+With OpenSSL commit 929b0d70c19f60227f89fac63f22a21f21950823 setting an empty
+key fails if no previous key has been set on that HMAC.
+
+In 9138f49e we explicitly added the check we remove now, as HMAC_Update()
+might crash if HMAC_Init_ex() has not been called yet. To avoid that, we
+set and check a flag locally to let any get_mac() call fail if set_key() has
+not yet been called.
+---
+ src/libstrongswan/plugins/openssl/openssl_hmac.c |   22 ++++++++++++++++------
+ 1 file changed, 16 insertions(+), 6 deletions(-)
+
+diff --git a/src/libstrongswan/plugins/openssl/openssl_hmac.c b/src/libstrongswan/plugins/openssl/openssl_hmac.c
+index 4f0bcc7..065187a 100644
+--- a/src/libstrongswan/plugins/openssl/openssl_hmac.c
++++ b/src/libstrongswan/plugins/openssl/openssl_hmac.c
+@@ -69,15 +69,26 @@ struct private_mac_t {
+ 	 * Current HMAC context
+ 	 */
+ 	HMAC_CTX hmac;
++
++	/**
++	 * Key set on HMAC_CTX?
++	 */
++	bool key_set;
+ };
+ 
+ METHOD(mac_t, set_key, bool,
+ 	private_mac_t *this, chunk_t key)
+ {
+ #if OPENSSL_VERSION_NUMBER >= 0x10000000L
+-	return HMAC_Init_ex(&this->hmac, key.ptr, key.len, this->hasher, NULL);
++	if (HMAC_Init_ex(&this->hmac, key.ptr, key.len, this->hasher, NULL))
++	{
++		this->key_set = TRUE;
++		return TRUE;
++	}
++	return FALSE;
+ #else /* OPENSSL_VERSION_NUMBER < 1.0 */
+ 	HMAC_Init_ex(&this->hmac, key.ptr, key.len, this->hasher, NULL);
++	this->key_set = TRUE;
+ 	return TRUE;
+ #endif
+ }
+@@ -85,6 +96,10 @@ METHOD(mac_t, set_key, bool,
+ METHOD(mac_t, get_mac, bool,
+ 	private_mac_t *this, chunk_t data, u_int8_t *out)
+ {
++	if (!this->key_set)
++	{
++		return FALSE;
++	}
+ #if OPENSSL_VERSION_NUMBER >= 0x10000000L
+ 	if (!HMAC_Update(&this->hmac, data.ptr, data.len))
+ 	{
+@@ -153,11 +168,6 @@ static mac_t *hmac_create(hash_algorithm_t algo)
+ 	}
+ 
+ 	HMAC_CTX_init(&this->hmac);
+-	if (!set_key(this, chunk_empty))
+-	{
+-		destroy(this);
+-		return NULL;
+-	}
+ 
+ 	return &this->public;
+ }
+-- 
+1.7.9.5
+
