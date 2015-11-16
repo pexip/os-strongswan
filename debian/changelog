@@ -1,3 +1,30 @@
+strongswan (5.2.1-6+deb8u2) jessie-security; urgency=medium
+
+  * debian/patches:
+    - CVE-2015-8023_eap_mschapv2_state added, fix authentication bypass when
+    using EAP MSCHAPv2.
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Mon, 16 Nov 2015 12:13:54 +0100
+
+strongswan (5.2.1-6+deb8u1) jessie-security; urgency=high
+
+  * debian/patches:
+    - CVE-2015-4171_enforce_remote_auth added, fix potential leak of
+    authentication credential to rogue server when using PSK or EAP. This is
+    CVE-2015-4171.
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Thu, 04 Jun 2015 19:24:59 +0200
+
+strongswan (5.2.1-6) unstable; urgency=medium
+
+  * Ship /lib/systemd/system/ipsec.service as a symlink to
+    strongswan.service in strongswan-starter instead of using Alias= in
+    the service file. This makes the ipsec name available to invoke-rc.d
+    before the service gets actually enabled, which avoids some confusion
+    (closes: #781209).
+
+ -- Romain Francoise <rfrancoise@debian.org>  Sat, 04 Apr 2015 17:55:38 +0200
+
 strongswan (5.2.1-5) unstable; urgency=high
 
   * debian/patches:
