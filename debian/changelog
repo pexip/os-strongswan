@@ -1,3 +1,9 @@
+strongswan (5.2.1-5pexip3) pexip; urgency=medium
+
+  * Rebuild against libssl1.0.2
+
+ -- John-Mark Bell <jmb@pexip.com>  Tue, 11 Oct 2016 22:35:29 +0100
+
 strongswan (5.2.1-5pexip2) pexip; urgency=medium
 
   * debian/patches/07-follow-openssl-api-change.patch: backport
