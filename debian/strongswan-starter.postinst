@@ -220,19 +220,8 @@ case "$1" in
 	    db_set strongswan/install_x509_certificate false
 	fi
 
-	# lets see if we are already using dependency based booting or the correct runlevel parameters
-	if ! ( [ "`find /etc/init.d/ -name '.depend.*'`" ] || [ "$runlevels" = "0K841K842S163S164S165S166K84" ] ); then
-	    db_fset strongswan/runlevel_changes seen false
-	    db_input high strongswan/runlevel_changes || true
-	    db_go
-
-	    # if the admin did not change the runlevels which got installed by older packages we can modify them
-	    if [ "$runlevels" = "0K346K34SS41" ] || [ "$runlevels" = "0K301K302S153S154S155S156K30" ] || [ "$runlevels" = "0K191K192S213S214S215S216K19" ]; then
-		update-rc.d -f ipsec remove
-	    fi
-
-	    update-rc.d ipsec defaults 16 84 > /dev/null
-	fi
+	update-rc.d -f ipsec remove
+	update-rc.d ipsec defaults > /dev/null
 
         db_get strongswan/enable-oe
         if [ "$RET" != "true" ]; then

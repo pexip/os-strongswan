@@ -1,6 +1,7 @@
 strongswan (5.2.1-6+deb8u2pexip1) pexip; urgency=medium
 
   * New upstream release.
+  * debian/strongswan-starter.postinst: force rc*.d links
 
  -- John-Mark Bell <jmb@pexip.com>  Tue, 18 Apr 2017 09:35:11 +0100
 
