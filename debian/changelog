@@ -1,3 +1,29 @@
+strongswan (5.2.1-6+deb8u4) jessie-security; urgency=medium
+
+  * debian/rules:
+    - revert disabling of vectors test
+  * debian/patches:
+    - 0001-openssl-Don-t-pre-initialize-OpenSSL-HMAC-with-an-em added,
+    backported from upstream, fix HMAC initialization with recent OpenSSL.
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Tue, 30 May 2017 10:07:29 +0200
+
+strongswan (5.2.1-6+deb8u3) jessie-security; urgency=medium
+
+  * debian/patches:
+    - CVE-2017-9022_insufficient_input_validation_gmp_plugin added, fix
+    insufficient input validation in gmp plugin which could lead to denial of
+    service (CVE-2017-9022).
+    - CVE-2017-9023_incorrect_handling_of_choice_types_in_asn1_parser added,
+    fix incorrect handling of CHOICE types in ASN.1 parser and x509 plugin
+    whch could lead to an infinite loop and a denial of service
+    (CVE-2017-9023).
+  * debian/rules:
+    - disable the vectors test which is failing right now for unknown reason
+    (maybe due to an OpenSSL regression)
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Mon, 29 May 2017 21:22:54 +0200
+
 strongswan (5.2.1-6+deb8u2) jessie-security; urgency=medium
 
   * debian/patches:
