@@ -1,6 +1,7 @@
 strongswan (5.2.1-6+deb8u4pexip1) pexip; urgency=medium
 
   * New upstream release.
+  * debian/patches/07-follow-openssl-api-change.patch: Drop; merged upstream
 
  -- John-Mark Bell <jmb@pexip.com>  Mon, 05 Jun 2017 19:42:36 +0100
 
