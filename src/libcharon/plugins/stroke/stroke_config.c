@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Tobias Brunner
+ * Copyright (C) 2012-2014 Tobias Brunner
  * Copyright (C) 2008 Martin Willi
  * Hochschule fuer Technik Rapperswil
  *
@@ -16,7 +16,6 @@
 
 #include "stroke_config.h"
 
-#include <hydra.h>
 #include <daemon.h>
 #include <threading/mutex.h>
 #include <utils/lexparser.h>
@@ -184,19 +183,16 @@ static void add_proposals(private_stroke_config_t *this, char *string,
 }
 
 /**
- * Build an IKE config from a stroke message
+ * Check if any addresses in the given string are local
  */
-static ike_cfg_t *build_ike_cfg(private_stroke_config_t *this, stroke_msg_t *msg)
+static bool is_local(char *address, bool any_allowed)
 {
 	enumerator_t *enumerator;
-	stroke_end_t tmp_end;
-	ike_cfg_t *ike_cfg;
 	host_t *host;
-	u_int16_t ikeport;
-	char me[256], other[256], *token;
-	bool swapped = FALSE;;
+	char *token;
+	bool found = FALSE;
 
-	enumerator = enumerator_create_token(msg->add_conn.other.address, ",", " ");
+	enumerator = enumerator_create_token(address, ",", " ");
 	while (enumerator->enumerate(enumerator, &token))
 	{
 		if (!strchr(token, '/'))
@@ -204,43 +200,62 @@ static ike_cfg_t *build_ike_cfg(private_stroke_config_t *this, stroke_msg_t *msg
 			host = host_create_from_dns(token, 0, 0);
 			if (host)
 			{
-				if (hydra->kernel_interface->get_interface(
-										hydra->kernel_interface, host, NULL))
+				if (charon->kernel->get_interface(charon->kernel, host, NULL))
 				{
-					DBG2(DBG_CFG, "left is other host, swapping ends");
-					tmp_end = msg->add_conn.me;
-					msg->add_conn.me = msg->add_conn.other;
-					msg->add_conn.other = tmp_end;
-					swapped = TRUE;
+					found = TRUE;
+				}
+				else if (any_allowed && host->is_anyaddr(host))
+				{
+					found = TRUE;
 				}
 				host->destroy(host);
+				if (found)
+				{
+					break;
+				}
 			}
 		}
 	}
 	enumerator->destroy(enumerator);
+	return found;
+}
 
-	if (!swapped)
+/**
+ * Swap ends if indicated by left|right
+ */
+static void swap_ends(stroke_msg_t *msg)
+{
+	if (!lib->settings->get_bool(lib->settings, "%s.plugins.stroke.allow_swap",
+								 TRUE, lib->ns))
 	{
-		enumerator = enumerator_create_token(msg->add_conn.me.address, ",", " ");
-		while (enumerator->enumerate(enumerator, &token))
-		{
-			if (!strchr(token, '/'))
-			{
-				host = host_create_from_dns(token, 0, 0);
-				if (host)
-				{
-					if (!hydra->kernel_interface->get_interface(
-										hydra->kernel_interface, host, NULL))
-					{
-						DBG1(DBG_CFG, "left nor right host is our side, "
-							 "assuming left=local");
-					}
-					host->destroy(host);
-				}
-			}
-		}
-		enumerator->destroy(enumerator);
+		return;
 	}
+
+	if (is_local(msg->add_conn.other.address, FALSE))
+	{
+		stroke_end_t tmp_end;
+
+		DBG2(DBG_CFG, "left is other host, swapping ends");
+		tmp_end = msg->add_conn.me;
+		msg->add_conn.me = msg->add_conn.other;
+		msg->add_conn.other = tmp_end;
+	}
+	else if (!is_local(msg->add_conn.me.address, TRUE))
+	{
+		DBG1(DBG_CFG, "left nor right host is our side, assuming left=local");
+	}
+}
+
+/**
+ * Build an IKE config from a stroke message
+ */
+static ike_cfg_t *build_ike_cfg(private_stroke_config_t *this, stroke_msg_t *msg)
+{
+	ike_cfg_t *ike_cfg;
+	uint16_t ikeport;
+	char me[256], other[256];
+
+	swap_ends(msg);
 
 	if (msg->add_conn.me.allow_any)
 	{
@@ -293,103 +308,6 @@ static void build_crl_policy(auth_cfg_t *cfg, bool local, int policy)
 				break;
 		}
 	}
-}
-
-/**
- * Parse public key / signature strength constraints
- */
-static void parse_pubkey_constraints(char *auth, auth_cfg_t *cfg)
-{
-	enumerator_t *enumerator;
-	bool rsa = FALSE, ecdsa = FALSE, rsa_len = FALSE, ecdsa_len = FALSE;
-	int strength;
-	char *token;
-
-	enumerator = enumerator_create_token(auth, "-", "");
-	while (enumerator->enumerate(enumerator, &token))
-	{
-		bool found = FALSE;
-		int i;
-		struct {
-			char *name;
-			signature_scheme_t scheme;
-			key_type_t key;
-		} schemes[] = {
-			{ "md5",		SIGN_RSA_EMSA_PKCS1_MD5,		KEY_RSA,	},
-			{ "sha1",		SIGN_RSA_EMSA_PKCS1_SHA1,		KEY_RSA,	},
-			{ "sha224",		SIGN_RSA_EMSA_PKCS1_SHA224,		KEY_RSA,	},
-			{ "sha256",		SIGN_RSA_EMSA_PKCS1_SHA256,		KEY_RSA,	},
-			{ "sha384",		SIGN_RSA_EMSA_PKCS1_SHA384,		KEY_RSA,	},
-			{ "sha512",		SIGN_RSA_EMSA_PKCS1_SHA512,		KEY_RSA,	},
-			{ "sha1",		SIGN_ECDSA_WITH_SHA1_DER,		KEY_ECDSA,	},
-			{ "sha256",		SIGN_ECDSA_WITH_SHA256_DER,		KEY_ECDSA,	},
-			{ "sha384",		SIGN_ECDSA_WITH_SHA384_DER,		KEY_ECDSA,	},
-			{ "sha512",		SIGN_ECDSA_WITH_SHA512_DER,		KEY_ECDSA,	},
-			{ "sha256",		SIGN_ECDSA_256,					KEY_ECDSA,	},
-			{ "sha384",		SIGN_ECDSA_384,					KEY_ECDSA,	},
-			{ "sha512",		SIGN_ECDSA_521,					KEY_ECDSA,	},
-		};
-
-		if (rsa_len || ecdsa_len)
-		{	/* expecting a key strength token */
-			strength = atoi(token);
-			if (strength)
-			{
-				if (rsa_len)
-				{
-					cfg->add(cfg, AUTH_RULE_RSA_STRENGTH, (uintptr_t)strength);
-				}
-				else if (ecdsa_len)
-				{
-					cfg->add(cfg, AUTH_RULE_ECDSA_STRENGTH, (uintptr_t)strength);
-				}
-			}
-			rsa_len = ecdsa_len = FALSE;
-			if (strength)
-			{
-				continue;
-			}
-		}
-		if (streq(token, "rsa"))
-		{
-			rsa = rsa_len = TRUE;
-			continue;
-		}
-		if (streq(token, "ecdsa"))
-		{
-			ecdsa = ecdsa_len = TRUE;
-			continue;
-		}
-		if (streq(token, "pubkey"))
-		{
-			continue;
-		}
-
-		for (i = 0; i < countof(schemes); i++)
-		{
-			if (streq(schemes[i].name, token))
-			{
-				/* for each matching string, allow the scheme, if:
-				 * - it is an RSA scheme, and we enforced RSA
-				 * - it is an ECDSA scheme, and we enforced ECDSA
-				 * - it is not a key type specific scheme
-				 */
-				if ((rsa && schemes[i].key == KEY_RSA) ||
-					(ecdsa && schemes[i].key == KEY_ECDSA) ||
-					(!rsa && !ecdsa))
-				{
-					cfg->add(cfg, AUTH_RULE_SIGNATURE_SCHEME,
-							 (uintptr_t)schemes[i].scheme);
-				}
-				found = TRUE;
-			}
-		}
-		if (!found)
-		{
-			DBG1(DBG_CFG, "ignoring invalid auth token: '%s'", token);
-		}
-	}
-	enumerator->destroy(enumerator);
 }
 
 /**
@@ -588,14 +506,15 @@ static auth_cfg_t *build_auth_cfg(private_stroke_config_t *this,
 	}
 
 	/* authentication metod (class, actually) */
-	if (strpfx(auth, "pubkey") ||
+	if (strpfx(auth, "ike:") ||
+		strpfx(auth, "pubkey") ||
 		strpfx(auth, "rsa") ||
-		strpfx(auth, "ecdsa"))
+		strpfx(auth, "ecdsa") ||
+		strpfx(auth, "bliss"))
 	{
 		cfg->add(cfg, AUTH_RULE_AUTH_CLASS, AUTH_CLASS_PUBKEY);
 		build_crl_policy(cfg, local, msg->add_conn.crl_policy);
-
-		parse_pubkey_constraints(auth, cfg);
+		cfg->add_pubkey_constraints(cfg, auth, TRUE);
 	}
 	else if (streq(auth, "psk") || streq(auth, "secret"))
 	{
@@ -620,9 +539,16 @@ static auth_cfg_t *build_auth_cfg(private_stroke_config_t *this,
 	else if (strpfx(auth, "eap"))
 	{
 		eap_vendor_type_t *type;
+		char *pos;
 
 		cfg->add(cfg, AUTH_RULE_AUTH_CLASS, AUTH_CLASS_EAP);
-
+		/* check for public key constraints for EAP-TLS etc. */
+		pos = strchr(auth, ':');
+		if (pos)
+		{
+			*pos = 0;
+			cfg->add_pubkey_constraints(cfg, pos + 1, FALSE);
+		}
 		type = eap_vendor_type_from_string(auth);
 		if (type)
 		{
@@ -667,17 +593,40 @@ static auth_cfg_t *build_auth_cfg(private_stroke_config_t *this,
 }
 
 /**
+ * build a mem_pool_t from an address range
+ */
+static mem_pool_t *create_pool_range(char *str)
+{
+	mem_pool_t *pool;
+	host_t *from, *to;
+
+	if (!host_create_from_range(str, &from, &to))
+	{
+		return NULL;
+	}
+	pool = mem_pool_create_range(str, from, to);
+	from->destroy(from);
+	to->destroy(to);
+	return pool;
+}
+
+/**
  * build a peer_cfg from a stroke msg
  */
 static peer_cfg_t *build_peer_cfg(private_stroke_config_t *this,
 								  stroke_msg_t *msg, ike_cfg_t *ike_cfg)
 {
-	identification_t *peer_id = NULL;
-	peer_cfg_t *mediated_by = NULL;
-	unique_policy_t unique;
-	u_int32_t rekey = 0, reauth = 0, over, jitter;
 	peer_cfg_t *peer_cfg;
 	auth_cfg_t *auth_cfg;
+	peer_cfg_create_t peer = {
+		.cert_policy = msg->add_conn.me.sendcert,
+		.keyingtries = msg->add_conn.rekey.tries,
+		.no_mobike = !msg->add_conn.mobike,
+		.aggressive = msg->add_conn.aggressive,
+		.push_mode = msg->add_conn.pushmode,
+		.dpd = msg->add_conn.dpd.delay,
+		.dpd_timeout = msg->add_conn.dpd.timeout,
+	};
 
 #ifdef ME
 	if (msg->add_conn.ikeme.mediation && msg->add_conn.ikeme.mediated_by)
@@ -689,14 +638,17 @@ static peer_cfg_t *build_peer_cfg(private_stroke_config_t *this,
 
 	if (msg->add_conn.ikeme.mediation)
 	{
+		peer.mediation = TRUE;
 		/* force unique connections for mediation connections */
 		msg->add_conn.unique = 1;
 	}
 
 	if (msg->add_conn.ikeme.mediated_by)
 	{
-		mediated_by = charon->backends->get_peer_cfg_by_name(charon->backends,
-											msg->add_conn.ikeme.mediated_by);
+		peer_cfg_t *mediated_by;
+
+		mediated_by = charon->backends->get_peer_cfg_by_name(
+							charon->backends, msg->add_conn.ikeme.mediated_by);
 		if (!mediated_by)
 		{
 			DBG1(DBG_CFG, "mediation connection '%s' not found, aborting",
@@ -711,58 +663,55 @@ static peer_cfg_t *build_peer_cfg(private_stroke_config_t *this,
 			mediated_by->destroy(mediated_by);
 			return NULL;
 		}
+		peer.mediated_by = mediated_by;
 		if (msg->add_conn.ikeme.peerid)
 		{
-			peer_id = identification_create_from_string(msg->add_conn.ikeme.peerid);
+			peer.peer_id = identification_create_from_string(
+												msg->add_conn.ikeme.peerid);
 		}
 		else if (msg->add_conn.other.id)
 		{
-			peer_id = identification_create_from_string(msg->add_conn.other.id);
+			peer.peer_id = identification_create_from_string(
+												msg->add_conn.other.id);
 		}
 	}
 #endif /* ME */
 
-	jitter = msg->add_conn.rekey.margin * msg->add_conn.rekey.fuzz / 100;
-	over = msg->add_conn.rekey.margin;
+	peer.jitter_time = msg->add_conn.rekey.margin * msg->add_conn.rekey.fuzz / 100;
+	peer.over_time = msg->add_conn.rekey.margin;
 	if (msg->add_conn.rekey.reauth)
 	{
-		reauth = msg->add_conn.rekey.ike_lifetime - over;
+		peer.reauth_time = msg->add_conn.rekey.ike_lifetime - peer.over_time;
 	}
 	else
 	{
-		rekey = msg->add_conn.rekey.ike_lifetime - over;
+		peer.rekey_time = msg->add_conn.rekey.ike_lifetime - peer.over_time;
 	}
 	switch (msg->add_conn.unique)
 	{
 		case 1: /* yes */
 		case 2: /* replace */
-			unique = UNIQUE_REPLACE;
+			peer.unique = UNIQUE_REPLACE;
 			break;
 		case 3: /* keep */
-			unique = UNIQUE_KEEP;
+			peer.unique = UNIQUE_KEEP;
 			break;
 		case 4: /* never */
-			unique = UNIQUE_NEVER;
+			peer.unique = UNIQUE_NEVER;
 			break;
 		default: /* no */
-			unique = UNIQUE_NO;
+			peer.unique = UNIQUE_NO;
 			break;
 	}
 	if (msg->add_conn.dpd.action == 0)
 	{	/* dpdaction=none disables DPD */
-		msg->add_conn.dpd.delay = 0;
+		peer.dpd = 0;
 	}
 
 	/* other.sourceip is managed in stroke_attributes. If it is set, we define
 	 * the pool name as the connection name, which the attribute provider
 	 * uses to serve pool addresses. */
-	peer_cfg = peer_cfg_create(msg->add_conn.name, ike_cfg,
-		msg->add_conn.me.sendcert, unique,
-		msg->add_conn.rekey.tries, rekey, reauth, jitter, over,
-		msg->add_conn.mobike, msg->add_conn.aggressive,
-		msg->add_conn.pushmode == 0,
-		msg->add_conn.dpd.delay, msg->add_conn.dpd.timeout,
-		msg->add_conn.ikeme.mediation, mediated_by, peer_id);
+	peer_cfg = peer_cfg_create(msg->add_conn.name, ike_cfg, &peer);
 
 	if (msg->add_conn.other.sourceip)
 	{
@@ -789,17 +738,25 @@ static peer_cfg_t *build_peer_cfg(private_stroke_config_t *this,
 			}
 			else
 			{
-				/* in-memory pool, named using CIDR notation */
+				/* in-memory pool, using range or CIDR notation */
+				mem_pool_t *pool;
 				host_t *base;
 				int bits;
 
-				base = host_create_from_subnet(token, &bits);
-				if (base)
+				pool = create_pool_range(token);
+				if (!pool)
 				{
-					this->attributes->add_pool(this->attributes,
-										mem_pool_create(token, base, bits));
+					base = host_create_from_subnet(token, &bits);
+					if (base)
+					{
+						pool = mem_pool_create(token, base, bits);
+						base->destroy(base);
+					}
+				}
+				if (pool)
+				{
+					this->attributes->add_pool(this->attributes, pool);
 					peer_cfg->add_pool(peer_cfg, token);
-					base->destroy(base);
 				}
 				else
 				{
@@ -931,8 +888,8 @@ static peer_cfg_t *build_peer_cfg(private_stroke_config_t *this,
 /**
  * Parse a protoport specifier
  */
-static bool parse_protoport(char *token, u_int16_t *from_port,
-							u_int16_t *to_port, u_int8_t *protocol)
+static bool parse_protoport(char *token, uint16_t *from_port,
+							uint16_t *to_port, uint8_t *protocol)
 {
 	char *sep, *port = "", *endptr;
 	struct protoent *proto;
@@ -971,7 +928,7 @@ static bool parse_protoport(char *token, u_int16_t *from_port,
 			{
 				return FALSE;
 			}
-			*protocol = (u_int8_t)p;
+			*protocol = (uint8_t)p;
 		}
 	}
 	if (streq(port, "%any"))
@@ -1050,8 +1007,8 @@ static void add_ts(private_stroke_config_t *this,
 		{
 			enumerator_t *enumerator;
 			char *subnet, *pos;
-			u_int16_t from_port, to_port;
-			u_int8_t proto;
+			uint16_t from_port, to_port;
+			uint8_t proto;
 
 			enumerator = enumerator_create_token(end->subnets, ",", " ");
 			while (enumerator->enumerate(enumerator, &subnet))
@@ -1118,45 +1075,50 @@ static child_cfg_t *build_child_cfg(private_stroke_config_t *this,
 									stroke_msg_t *msg)
 {
 	child_cfg_t *child_cfg;
-	lifetime_cfg_t lifetime = {
-		.time = {
-			.life = msg->add_conn.rekey.ipsec_lifetime,
-			.rekey = msg->add_conn.rekey.ipsec_lifetime - msg->add_conn.rekey.margin,
-			.jitter = msg->add_conn.rekey.margin * msg->add_conn.rekey.fuzz / 100
+	child_cfg_create_t child = {
+		.lifetime = {
+			.time = {
+				.life = msg->add_conn.rekey.ipsec_lifetime,
+				.rekey = msg->add_conn.rekey.ipsec_lifetime - msg->add_conn.rekey.margin,
+				.jitter = msg->add_conn.rekey.margin * msg->add_conn.rekey.fuzz / 100
+			},
+			.bytes = {
+				.life = msg->add_conn.rekey.life_bytes,
+				.rekey = msg->add_conn.rekey.life_bytes - msg->add_conn.rekey.margin_bytes,
+				.jitter = msg->add_conn.rekey.margin_bytes * msg->add_conn.rekey.fuzz / 100
+			},
+			.packets = {
+				.life = msg->add_conn.rekey.life_packets,
+				.rekey = msg->add_conn.rekey.life_packets - msg->add_conn.rekey.margin_packets,
+				.jitter = msg->add_conn.rekey.margin_packets * msg->add_conn.rekey.fuzz / 100
+			},
 		},
-		.bytes = {
-			.life = msg->add_conn.rekey.life_bytes,
-			.rekey = msg->add_conn.rekey.life_bytes - msg->add_conn.rekey.margin_bytes,
-			.jitter = msg->add_conn.rekey.margin_bytes * msg->add_conn.rekey.fuzz / 100
+		.mark_in = {
+			.value = msg->add_conn.mark_in.value,
+			.mask = msg->add_conn.mark_in.mask
 		},
-		.packets = {
-			.life = msg->add_conn.rekey.life_packets,
-			.rekey = msg->add_conn.rekey.life_packets - msg->add_conn.rekey.margin_packets,
-			.jitter = msg->add_conn.rekey.margin_packets * msg->add_conn.rekey.fuzz / 100
-		}
-	};
-	mark_t mark_in = {
-		.value = msg->add_conn.mark_in.value,
-		.mask = msg->add_conn.mark_in.mask
-	};
-	mark_t mark_out = {
-		.value = msg->add_conn.mark_out.value,
-		.mask = msg->add_conn.mark_out.mask
+		.mark_out = {
+			.value = msg->add_conn.mark_out.value,
+			.mask = msg->add_conn.mark_out.mask
+		},
+		.reqid = msg->add_conn.reqid,
+		.mode = msg->add_conn.mode,
+		.proxy_mode = msg->add_conn.proxy_mode,
+		.ipcomp = msg->add_conn.ipcomp,
+		.tfc = msg->add_conn.tfc,
+		.inactivity = msg->add_conn.inactivity,
+		.dpd_action = map_action(msg->add_conn.dpd.action),
+		.close_action = map_action(msg->add_conn.close_action),
+		.updown = msg->add_conn.me.updown,
+		.hostaccess = msg->add_conn.me.hostaccess,
+		.suppress_policies = !msg->add_conn.install_policy,
 	};
 
-	child_cfg = child_cfg_create(
-				msg->add_conn.name, &lifetime, msg->add_conn.me.updown,
-				msg->add_conn.me.hostaccess, msg->add_conn.mode, ACTION_NONE,
-				map_action(msg->add_conn.dpd.action),
-				map_action(msg->add_conn.close_action), msg->add_conn.ipcomp,
-				msg->add_conn.inactivity, msg->add_conn.reqid,
-				&mark_in, &mark_out, msg->add_conn.tfc);
+	child_cfg = child_cfg_create(msg->add_conn.name, &child);
 	if (msg->add_conn.replay_window != -1)
 	{
 		child_cfg->set_replay_window(child_cfg, msg->add_conn.replay_window);
 	}
-	child_cfg->set_mipv6_options(child_cfg, msg->add_conn.proxy_mode,
-											msg->add_conn.install_policy);
 	add_ts(this, &msg->add_conn.me, child_cfg, TRUE);
 	add_ts(this, &msg->add_conn.other, child_cfg, FALSE);
 

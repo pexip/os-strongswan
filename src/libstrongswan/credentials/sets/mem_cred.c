@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2010-2013 Tobias Brunner
- * Hochschule fuer Technik Rapperwsil
+ * Copyright (C) 2010-2016 Tobias Brunner
+ * HSR Hochschule fuer Technik Rapperwsil
+ *
  * Copyright (C) 2010 Martin Willi
  * Copyright (C) 2010 revosec AG
  *
@@ -192,6 +193,24 @@ METHOD(mem_cred_t, add_cert_ref, certificate_t*,
 	return add_cert_internal(this, trusted, cert);
 }
 
+METHOD(mem_cred_t, get_cert_ref, certificate_t*,
+	private_mem_cred_t *this, certificate_t *cert)
+{
+	certificate_t *cached;
+
+	this->lock->read_lock(this->lock);
+	if (this->untrusted->find_first(this->untrusted,
+									(linked_list_match_t)certificate_equals,
+									(void**)&cached, cert) == SUCCESS)
+	{
+		cert->destroy(cert);
+		cert = cached->get_ref(cached);
+	}
+	this->lock->unlock(this->lock);
+
+	return cert;
+}
+
 METHOD(mem_cred_t, add_crl, bool,
 	private_mem_cred_t *this, crl_t *crl)
 {
@@ -205,6 +224,7 @@ METHOD(mem_cred_t, add_crl, bool,
 	{
 		if (current->get_type(current) == CERT_X509_CRL)
 		{
+			chunk_t base;
 			bool found = FALSE;
 			crl_t *crl_c = (crl_t*)current;
 			chunk_t authkey = crl->get_authKeyIdentifier(crl);
@@ -228,16 +248,37 @@ METHOD(mem_cred_t, add_crl, bool,
 			}
 			if (found)
 			{
-				new = crl_is_newer(crl, crl_c);
-				if (new)
+				/* we keep at most one delta CRL for each base CRL */
+				if (crl->is_delta_crl(crl, &base))
 				{
-					this->untrusted->remove_at(this->untrusted, enumerator);
+					if (!crl_c->is_delta_crl(crl_c, NULL))
+					{
+						if (chunk_equals(base, crl_c->get_serial(crl_c)))
+						{	/* keep the added delta and the existing base CRL
+							 * but check if this is the newest delta CRL for
+							 * the same base */
+							continue;
+						}
+					}
 				}
-				else
+				else if (crl_c->is_delta_crl(crl_c, &base))
+				{
+					if (chunk_equals(base, crl->get_serial(crl)))
+					{	/* keep the existing delta and the added base CRL,
+						 * but check if we don't store it already */
+						continue;
+					}
+				}
+				new = crl_is_newer(crl, crl_c);
+				if (!new)
 				{
 					cert->destroy(cert);
+					break;
 				}
-				break;
+				/* we remove the existing older CRL but there might be other
+				 * delta or base CRLs we can replace */
+				this->untrusted->remove_at(this->untrusted, enumerator);
+				current->destroy(current);
 			}
 		}
 	}
@@ -625,6 +666,49 @@ METHOD(credential_set_t, create_cdp_enumerator, enumerator_t*,
 
 }
 
+static void reset_certs(private_mem_cred_t *this)
+{
+	this->trusted->destroy_offset(this->trusted,
+								  offsetof(certificate_t, destroy));
+	this->untrusted->destroy_offset(this->untrusted,
+									offsetof(certificate_t, destroy));
+	this->trusted = linked_list_create();
+	this->untrusted = linked_list_create();
+}
+
+static void copy_certs(linked_list_t *dst, linked_list_t *src, bool clone)
+{
+	enumerator_t *enumerator;
+	certificate_t *cert;
+
+	enumerator = src->create_enumerator(src);
+	while (enumerator->enumerate(enumerator, &cert))
+	{
+		if (clone)
+		{
+			cert = cert->get_ref(cert);
+		}
+		else
+		{
+			src->remove_at(src, enumerator);
+		}
+		dst->insert_last(dst, cert);
+	}
+	enumerator->destroy(enumerator);
+}
+
+METHOD(mem_cred_t, replace_certs, void,
+	private_mem_cred_t *this, mem_cred_t *other_set, bool clone)
+{
+	private_mem_cred_t *other = (private_mem_cred_t*)other_set;
+
+	this->lock->write_lock(this->lock);
+	reset_certs(this);
+	copy_certs(this->untrusted, other->untrusted, clone);
+	copy_certs(this->trusted, other->trusted, clone);
+	this->lock->unlock(this->lock);
+}
+
 static void reset_secrets(private_mem_cred_t *this)
 {
 	this->keys->destroy_offset(this->keys, offsetof(private_key_t, destroy));
@@ -692,17 +776,11 @@ METHOD(mem_cred_t, clear_, void,
 	private_mem_cred_t *this)
 {
 	this->lock->write_lock(this->lock);
-	this->trusted->destroy_offset(this->trusted,
-								  offsetof(certificate_t, destroy));
-	this->untrusted->destroy_offset(this->untrusted,
-									offsetof(certificate_t, destroy));
 	this->cdps->destroy_function(this->cdps, (void*)cdp_destroy);
-	this->trusted = linked_list_create();
-	this->untrusted = linked_list_create();
 	this->cdps = linked_list_create();
+	reset_certs(this);
+	reset_secrets(this);
 	this->lock->unlock(this->lock);
-
-	clear_secrets(this);
 }
 
 METHOD(mem_cred_t, destroy, void,
@@ -736,11 +814,13 @@ mem_cred_t *mem_cred_create()
 			},
 			.add_cert = _add_cert,
 			.add_cert_ref = _add_cert_ref,
+			.get_cert_ref = _get_cert_ref,
 			.add_crl = _add_crl,
 			.add_key = _add_key,
 			.add_shared = _add_shared,
 			.add_shared_list = _add_shared_list,
 			.add_cdp = _add_cdp,
+			.replace_certs = _replace_certs,
 			.replace_secrets = _replace_secrets,
 			.clear = _clear_,
 			.clear_secrets = _clear_secrets,

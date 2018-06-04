@@ -83,9 +83,9 @@ ENUM_END(tls_extension_names, TLS_EXT_RENEGOTIATION_INFO);
  * TLS record
  */
 typedef struct __attribute__((packed)) {
-	u_int8_t type;
-	u_int16_t version;
-	u_int16_t length;
+	uint8_t type;
+	uint16_t version;
+	uint16_t length;
 	char data[];
 } tls_record_t;
 
@@ -415,6 +415,12 @@ METHOD(tls_t, get_eap_msk, chunk_t,
 	return this->crypto->get_eap_msk(this->crypto);
 }
 
+METHOD(tls_t, get_auth, auth_cfg_t*,
+	private_tls_t *this)
+{
+	return this->handshake->get_auth(this->handshake);
+}
+
 METHOD(tls_t, destroy, void,
 	private_tls_t *this)
 {
@@ -465,6 +471,7 @@ tls_t *tls_create(bool is_server, identification_t *server,
 			.get_purpose = _get_purpose,
 			.is_complete = _is_complete,
 			.get_eap_msk = _get_eap_msk,
+			.get_auth = _get_auth,
 			.destroy = _destroy,
 		},
 		.is_server = is_server,
@@ -487,7 +494,7 @@ tls_t *tls_create(bool is_server, identification_t *server,
 										this->alert, peer, server)->handshake;
 	}
 	this->fragmentation = tls_fragmentation_create(this->handshake, this->alert,
-												   this->application);
+												   this->application, purpose);
 	this->compression = tls_compression_create(this->fragmentation, this->alert);
 	this->protection = tls_protection_create(this->compression, this->alert);
 	this->crypto->set_protection(this->crypto, this->protection);

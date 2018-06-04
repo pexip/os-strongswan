@@ -28,15 +28,15 @@ typedef struct rattr_t rattr_t;
  */
 struct rmsg_t {
 	/** message code, radius_message_code_t */
-	u_int8_t code;
+	uint8_t code;
 	/** message identifier */
-	u_int8_t identifier;
+	uint8_t identifier;
 	/** length of Code, Identifier, Length, Authenticator and Attributes */
-	u_int16_t length;
+	uint16_t length;
 	/** message authenticator, MD5 hash */
-	u_int8_t authenticator[HASH_SIZE_MD5];
+	uint8_t authenticator[HASH_SIZE_MD5];
 	/** variable list of packed attributes */
-	u_int8_t attributes[];
+	uint8_t attributes[];
 } __attribute__((packed));
 
 /**
@@ -44,11 +44,11 @@ struct rmsg_t {
  */
 struct rattr_t {
 	/** attribute type, radius_attribute_type_t */
-	u_int8_t type;
+	uint8_t type;
 	/** length of the attriubte, including the Type, Length and Value fields */
-	u_int8_t length;
+	uint8_t length;
 	/** variable length attribute value */
-	u_int8_t value[];
+	uint8_t value[];
 } __attribute__((packed));
 
 /**
@@ -97,7 +97,7 @@ ENUM_NEXT(radius_message_code_names, RMC_DISCONNECT_REQUEST, RMC_COA_NAK, RMC_AC
 	"CoA-NAK");
 ENUM_END(radius_message_code_names, RMC_COA_NAK);
 
-ENUM(radius_attribute_type_names, RAT_USER_NAME, RAT_MIP6_HOME_LINK_PREFIX,
+ENUM_BEGIN(radius_attribute_type_names, RAT_USER_NAME, RAT_MIP6_HOME_LINK_PREFIX,
 	"User-Name",
 	"User-Password",
 	"CHAP-Password",
@@ -223,6 +223,13 @@ ENUM(radius_attribute_type_names, RAT_USER_NAME, RAT_MIP6_HOME_LINK_PREFIX,
 	"Delegated-IPv6-Prefix",
 	"MIP6-Feature-Vector",
 	"MIP6-Home-Link-Prefix");
+ENUM_NEXT(radius_attribute_type_names, RAT_FRAMED_IPV6_ADDRESS, RAT_STATEFUL_IPV6_ADDRESS_POOL, RAT_MIP6_HOME_LINK_PREFIX,
+	"Framed-IPv6-Address",
+	"DNS-Server-IPv6-Address",
+	"Route-IPv6-Information",
+	"Delegated-IPv6-Prefix-Pool",
+	"Stateful-IPv6-Address-Pool");
+ENUM_END(radius_attribute_type_names, RAT_STATEFUL_IPV6_ADDRESS_POOL);
 
 /**
  * Attribute enumerator implementation
@@ -286,7 +293,7 @@ typedef struct {
 	/** inner attribute enumerator */
 	enumerator_t *inner;
 	/** current vendor ID */
-	u_int32_t vendor;
+	uint32_t vendor;
 	/** reader for current vendor ID */
 	bio_reader_t *reader;
 } vendor_enumerator_t;
@@ -296,7 +303,7 @@ METHOD(enumerator_t, vendor_enumerate, bool,
 {
 	chunk_t inner_data;
 	int inner_type;
-	u_int8_t type8, len;
+	uint8_t type8, len;
 
 	while (TRUE)
 	{
@@ -442,7 +449,7 @@ METHOD(radius_message_t, crypt, bool,
 }
 
 METHOD(radius_message_t, sign, bool,
-	private_radius_message_t *this, u_int8_t *req_auth, chunk_t secret,
+	private_radius_message_t *this, uint8_t *req_auth, chunk_t secret,
 	hasher_t *hasher, signer_t *signer, rng_t *rng, bool msg_auth)
 {
 	if (rng)
@@ -509,7 +516,7 @@ METHOD(radius_message_t, sign, bool,
 }
 
 METHOD(radius_message_t, verify, bool,
-	private_radius_message_t *this, u_int8_t *req_auth, chunk_t secret,
+	private_radius_message_t *this, uint8_t *req_auth, chunk_t secret,
 	hasher_t *hasher, signer_t *signer)
 {
 	char buf[HASH_SIZE_MD5], res_auth[HASH_SIZE_MD5];
@@ -536,7 +543,7 @@ METHOD(radius_message_t, verify, bool,
 		/* verify Response-Authenticator */
 		if (!hasher->get_hash(hasher, msg, NULL) ||
 			!hasher->get_hash(hasher, secret, buf) ||
-			!memeq(buf, res_auth, HASH_SIZE_MD5))
+			!memeq_const(buf, res_auth, HASH_SIZE_MD5))
 		{
 			DBG1(DBG_CFG, "RADIUS Response-Authenticator verification failed");
 			return FALSE;
@@ -599,19 +606,19 @@ METHOD(radius_message_t, get_code, radius_message_code_t,
 	return this->msg->code;
 }
 
-METHOD(radius_message_t, get_identifier, u_int8_t,
+METHOD(radius_message_t, get_identifier, uint8_t,
 	private_radius_message_t *this)
 {
 	return this->msg->identifier;
 }
 
 METHOD(radius_message_t, set_identifier, void,
-	private_radius_message_t *this, u_int8_t identifier)
+	private_radius_message_t *this, uint8_t identifier)
 {
 	this->msg->identifier = identifier;
 }
 
-METHOD(radius_message_t, get_authenticator, u_int8_t*,
+METHOD(radius_message_t, get_authenticator, uint8_t*,
 	private_radius_message_t *this)
 {
 	return this->msg->authenticator;

@@ -52,7 +52,7 @@ struct private_traffic_selector_t {
 	/**
 	 * IP protocol (UDP, TCP, ICMP, ...)
 	 */
-	u_int8_t protocol;
+	uint8_t protocol;
 
 	/**
 	 * narrow this traffic selector to hosts external ip
@@ -63,7 +63,7 @@ struct private_traffic_selector_t {
 	/**
 	 * subnet size in CIDR notation, 255 means a non-subnet address range
 	 */
-	u_int8_t netbits;
+	uint8_t netbits;
 
 	/**
 	 * begin of address range, network order
@@ -72,9 +72,9 @@ struct private_traffic_selector_t {
 		/** dummy char for common address manipulation */
 		char from[0];
 		/** IPv4 address */
-		u_int32_t from4[1];
+		uint32_t from4[1];
 		/** IPv6 address */
-		u_int32_t from6[4];
+		uint32_t from6[4];
 	};
 
 	/**
@@ -84,30 +84,30 @@ struct private_traffic_selector_t {
 		/** dummy char for common address manipulation */
 		char to[0];
 		/** IPv4 address */
-		u_int32_t to4[1];
+		uint32_t to4[1];
 		/** IPv6 address */
-		u_int32_t to6[4];
+		uint32_t to6[4];
 	};
 
 	/**
 	 * begin of port range
 	 */
-	u_int16_t from_port;
+	uint16_t from_port;
 
 	/**
 	 * end of port range
 	 */
-	u_int16_t to_port;
+	uint16_t to_port;
 };
 
 /**
  * calculate the "to"-address for the "from" address and a subnet size
  */
-static void calc_range(private_traffic_selector_t *this, u_int8_t netbits)
+static void calc_range(private_traffic_selector_t *this, uint8_t netbits)
 {
 	size_t len;
 	int bytes, bits;
-	u_int8_t mask;
+	uint8_t mask;
 
 	this->netbits = netbits;
 
@@ -126,10 +126,10 @@ static void calc_range(private_traffic_selector_t *this, u_int8_t netbits)
 /**
  * calculate the subnet size from the "to" and "from" addresses
  */
-static u_int8_t calc_netbits(private_traffic_selector_t *this)
+static uint8_t calc_netbits(private_traffic_selector_t *this)
 {
 	int byte, bit;
-	u_int8_t netbits;
+	uint8_t netbits;
 	size_t size = (this->type == TS_IPV4_ADDR_RANGE) ? 4 : 16;
 	bool prefix = TRUE;
 
@@ -144,7 +144,7 @@ static u_int8_t calc_netbits(private_traffic_selector_t *this)
 	{
 		for (bit = 7; bit >= 0; bit--)
 		{
-			u_int8_t bitmask = 1 << bit;
+			uint8_t bitmask = 1 << bit;
 
 			if (prefix)
 			{
@@ -173,8 +173,8 @@ static u_int8_t calc_netbits(private_traffic_selector_t *this)
 /**
  * internal generic constructor
  */
-static private_traffic_selector_t *traffic_selector_create(u_int8_t protocol,
-						ts_type_t type, u_int16_t from_port, u_int16_t to_port);
+static private_traffic_selector_t *traffic_selector_create(uint8_t protocol,
+						ts_type_t type, uint16_t from_port, uint16_t to_port);
 
 /**
  * Check if TS contains "opaque" ports
@@ -195,9 +195,9 @@ static bool is_any(private_traffic_selector_t *this)
 /**
  * Print ICMP/ICMPv6 type and code
  */
-static int print_icmp(printf_hook_data_t *data, u_int16_t port)
+static int print_icmp(printf_hook_data_t *data, uint16_t port)
 {
-	u_int8_t type, code;
+	uint8_t type, code;
 
 	type = traffic_selector_icmp_type(port);
 	code = traffic_selector_icmp_code(port);
@@ -219,11 +219,10 @@ int traffic_selector_printf_hook(printf_hook_data_t *data,
 	enumerator_t *enumerator;
 	char from_str[INET6_ADDRSTRLEN] = "";
 	char to_str[INET6_ADDRSTRLEN] = "";
-	char *serv_proto = NULL;
-	bool has_proto;
-	bool has_ports;
+	char *serv_proto = NULL, *sep = "";
+	bool has_proto, has_ports;
 	size_t written = 0;
-	u_int32_t from[4], to[4];
+	uint32_t from[4], to[4];
 
 	if (this == NULL)
 	{
@@ -235,8 +234,8 @@ int traffic_selector_printf_hook(printf_hook_data_t *data,
 		enumerator = list->create_enumerator(list);
 		while (enumerator->enumerate(enumerator, (void**)&this))
 		{
-			/* call recursivly */
-			written += print_in_hook(data, "%R ", this);
+			written += print_in_hook(data, "%s%R", sep, this);
+			sep = " ";
 		}
 		enumerator->destroy(enumerator);
 		return written;
@@ -362,9 +361,9 @@ METHOD(traffic_selector_t, get_subset, traffic_selector_t*,
 	private_traffic_selector_t *this, traffic_selector_t *other_public)
 {
 	private_traffic_selector_t *other, *subset;
-	u_int16_t from_port, to_port;
+	uint16_t from_port, to_port;
 	u_char *from, *to;
-	u_int8_t protocol;
+	uint8_t protocol;
 	size_t size;
 
 	other = (private_traffic_selector_t*)other_public;
@@ -449,41 +448,9 @@ METHOD(traffic_selector_t, get_subset, traffic_selector_t*,
 }
 
 METHOD(traffic_selector_t, equals, bool,
-	private_traffic_selector_t *this, traffic_selector_t *other_public)
+	private_traffic_selector_t *this, traffic_selector_t *other)
 {
-	private_traffic_selector_t *other;
-
-	other = (private_traffic_selector_t*)other_public;
-	if (this->type != other->type)
-	{
-		return FALSE;
-	}
-	if (!(this->from_port == other->from_port &&
-		  this->to_port == other->to_port &&
-		  this->protocol == other->protocol))
-	{
-		return FALSE;
-	}
-	switch (this->type)
-	{
-		case TS_IPV4_ADDR_RANGE:
-			if (memeq(this->from4, other->from4, sizeof(this->from4)) &&
-				memeq(this->to4, other->to4, sizeof(this->to4)))
-			{
-				return TRUE;
-			}
-			break;
-		case TS_IPV6_ADDR_RANGE:
-			if (memeq(this->from6, other->from6, sizeof(this->from6)) &&
-				memeq(this->to6, other->to6, sizeof(this->to6)))
-			{
-				return TRUE;
-			}
-			break;
-		default:
-			break;
-	}
-	return FALSE;
+	return traffic_selector_cmp(&this->public, other, NULL) == 0;
 }
 
 METHOD(traffic_selector_t, get_from_address, chunk_t,
@@ -514,13 +481,13 @@ METHOD(traffic_selector_t, get_to_address, chunk_t,
 	}
 }
 
-METHOD(traffic_selector_t, get_from_port, u_int16_t,
+METHOD(traffic_selector_t, get_from_port, uint16_t,
 	private_traffic_selector_t *this)
 {
 	return this->from_port;
 }
 
-METHOD(traffic_selector_t, get_to_port, u_int16_t,
+METHOD(traffic_selector_t, get_to_port, uint16_t,
 	private_traffic_selector_t *this)
 {
 	return this->to_port;
@@ -532,7 +499,7 @@ METHOD(traffic_selector_t, get_type, ts_type_t,
 	return this->type;
 }
 
-METHOD(traffic_selector_t, get_protocol, u_int8_t,
+METHOD(traffic_selector_t, get_protocol, uint8_t,
 	private_traffic_selector_t *this)
 {
 	return this->protocol;
@@ -643,14 +610,14 @@ METHOD(traffic_selector_t, includes, bool,
 }
 
 METHOD(traffic_selector_t, to_subnet, bool,
-	private_traffic_selector_t *this, host_t **net, u_int8_t *mask)
+	private_traffic_selector_t *this, host_t **net, uint8_t *mask)
 {
 	/* there is no way to do this cleanly, as the address range may
 	 * be anything else but a subnet. We use from_addr as subnet
 	 * and try to calculate a usable subnet mask.
 	 */
 	int family, non_zero_bytes;
-	u_int16_t port = 0;
+	uint16_t port = 0;
 	chunk_t net_chunk;
 
 	*mask = (this->netbits == NON_SUBNET_ADDRESS_RANGE) ? calc_netbits(this)
@@ -717,19 +684,103 @@ METHOD(traffic_selector_t, clone_, traffic_selector_t*,
 	}
 }
 
+METHOD(traffic_selector_t, hash, u_int,
+	private_traffic_selector_t *this, u_int hash)
+{
+	return chunk_hash_inc(get_from_address(this),
+			chunk_hash_inc(get_to_address(this),
+			 chunk_hash_inc(chunk_from_thing(this->from_port),
+			  chunk_hash_inc(chunk_from_thing(this->to_port),
+			   chunk_hash_inc(chunk_from_thing(this->protocol),
+				hash)))));
+}
+
 METHOD(traffic_selector_t, destroy, void,
 	private_traffic_selector_t *this)
 {
 	free(this);
 }
 
+/**
+ * Compare two integers
+ */
+static int compare_int(int a, int b)
+{
+	return a - b;
+}
+
+/*
+ * See header
+ */
+int traffic_selector_cmp(traffic_selector_t *a_pub, traffic_selector_t *b_pub,
+						 void *opts)
+{
+	private_traffic_selector_t *a, *b;
+	int res;
+
+	a = (private_traffic_selector_t*)a_pub;
+	b = (private_traffic_selector_t*)b_pub;
+
+	/* IPv4 before IPv6 */
+	res = compare_int(a->type, b->type);
+	if (res)
+	{
+		return res;
+	}
+	switch (a->type)
+	{
+		case TS_IPV4_ADDR_RANGE:
+			/* lower starting subnets first */
+			res = memcmp(a->from4, b->from4, sizeof(a->from4));
+			if (res)
+			{
+				return res;
+			}
+			/* larger subnets first */
+			res = memcmp(b->to4, a->to4, sizeof(a->to4));
+			if (res)
+			{
+				return res;
+			}
+			break;
+		case TS_IPV6_ADDR_RANGE:
+			res = memcmp(a->from6, b->from6, sizeof(a->from6));
+			if (res)
+			{
+				return res;
+			}
+			res = memcmp(b->to6, a->to6, sizeof(a->to6));
+			if (res)
+			{
+				return res;
+			}
+			break;
+		default:
+			return 1;
+	}
+	/* lower protocols first */
+	res = compare_int(a->protocol, b->protocol);
+	if (res)
+	{
+		return res;
+	}
+	/* lower starting ports first */
+	res = compare_int(a->from_port, b->from_port);
+	if (res)
+	{
+		return res;
+	}
+	/* larger port ranges first */
+	return compare_int(b->to_port, a->to_port);
+}
+
 /*
  * see header
  */
-traffic_selector_t *traffic_selector_create_from_bytes(u_int8_t protocol,
+traffic_selector_t *traffic_selector_create_from_bytes(uint8_t protocol,
 												ts_type_t type,
-												chunk_t from, u_int16_t from_port,
-												chunk_t to, u_int16_t to_port)
+												chunk_t from, uint16_t from_port,
+												chunk_t to, uint16_t to_port)
 {
 	private_traffic_selector_t *this = traffic_selector_create(protocol, type,
 															from_port, to_port);
@@ -792,13 +843,12 @@ traffic_selector_t *traffic_selector_create_from_rfc3779_format(ts_type_t type,
 	}
 	if (to.len > 1)
 	{
-		u_int8_t mask = to.ptr[0] ? (1 << to.ptr[0]) - 1 : 0;
+		uint8_t mask = to.ptr[0] ? (1 << to.ptr[0]) - 1 : 0;
 
 		memcpy(this->to, to.ptr+1, to.len-1);
 		this->to[to.len-2] |= mask;
 	}
-	this->netbits = chunk_equals(from, to) ? (from.len-1)*8 - from.ptr[0]
-										   : NON_SUBNET_ADDRESS_RANGE;
+	calc_netbits(this);
 	return (&this->public);
 }
 
@@ -806,8 +856,8 @@ traffic_selector_t *traffic_selector_create_from_rfc3779_format(ts_type_t type,
  * see header
  */
 traffic_selector_t *traffic_selector_create_from_subnet(host_t *net,
-							u_int8_t netbits, u_int8_t protocol,
-							u_int16_t from_port, u_int16_t to_port)
+							uint8_t netbits, uint8_t protocol,
+							uint16_t from_port, uint16_t to_port)
 {
 	private_traffic_selector_t *this;
 	chunk_t from;
@@ -840,9 +890,9 @@ traffic_selector_t *traffic_selector_create_from_subnet(host_t *net,
  * see header
  */
 traffic_selector_t *traffic_selector_create_from_string(
-										u_int8_t protocol, ts_type_t type,
-										char *from_addr, u_int16_t from_port,
-										char *to_addr, u_int16_t to_port)
+										uint8_t protocol, ts_type_t type,
+										char *from_addr, uint16_t from_port,
+										char *to_addr, uint16_t to_port)
 {
 	private_traffic_selector_t *this;
 	int family;
@@ -876,8 +926,8 @@ traffic_selector_t *traffic_selector_create_from_string(
  * see header
  */
 traffic_selector_t *traffic_selector_create_from_cidr(
-										char *string, u_int8_t protocol,
-										u_int16_t from_port, u_int16_t to_port)
+										char *string, uint8_t protocol,
+										uint16_t from_port, uint16_t to_port)
 {
 	host_t *net;
 	int bits;
@@ -894,8 +944,8 @@ traffic_selector_t *traffic_selector_create_from_cidr(
 /*
  * see header
  */
-traffic_selector_t *traffic_selector_create_dynamic(u_int8_t protocol,
-									u_int16_t from_port, u_int16_t to_port)
+traffic_selector_t *traffic_selector_create_dynamic(uint8_t protocol,
+									uint16_t from_port, uint16_t to_port)
 {
 	private_traffic_selector_t *this = traffic_selector_create(
 							protocol, TS_IPV4_ADDR_RANGE, from_port, to_port);
@@ -911,8 +961,8 @@ traffic_selector_t *traffic_selector_create_dynamic(u_int8_t protocol,
 /*
  * see declaration
  */
-static private_traffic_selector_t *traffic_selector_create(u_int8_t protocol,
-						ts_type_t type, u_int16_t from_port, u_int16_t to_port)
+static private_traffic_selector_t *traffic_selector_create(uint8_t protocol,
+						ts_type_t type, uint16_t from_port, uint16_t to_port)
 {
 	private_traffic_selector_t *this;
 
@@ -933,6 +983,7 @@ static private_traffic_selector_t *traffic_selector_create(u_int8_t protocol,
 			.set_address = _set_address,
 			.to_subnet = _to_subnet,
 			.clone = _clone_,
+			.hash = _hash,
 			.destroy = _destroy,
 		},
 		.from_port = from_port,

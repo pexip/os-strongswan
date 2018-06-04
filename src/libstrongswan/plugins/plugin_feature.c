@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013 Tobias Brunner
+ * Copyright (C) 2012-2015 Tobias Brunner
  * Hochschule fuer Technik Rapperswil
  *
  * Copyright (C) 2011 Martin Willi
@@ -30,6 +30,7 @@ ENUM(plugin_feature_names, FEATURE_NONE, FEATURE_CUSTOM,
 	"SIGNER",
 	"HASHER",
 	"PRF",
+	"XOF",
 	"DH",
 	"RNG",
 	"NONCE_GEN",
@@ -57,9 +58,9 @@ ENUM(plugin_feature_names, FEATURE_NONE, FEATURE_CUSTOM,
 /**
  * See header.
  */
-u_int32_t plugin_feature_hash(plugin_feature_t *feature)
+uint32_t plugin_feature_hash(plugin_feature_t *feature)
 {
-	chunk_t data;
+	chunk_t data = chunk_empty;
 
 	switch (feature->type)
 	{
@@ -86,6 +87,9 @@ u_int32_t plugin_feature_hash(plugin_feature_t *feature)
 			break;
 		case FEATURE_PRF:
 			data = chunk_from_thing(feature->arg.prf);
+			break;
+		case FEATURE_XOF:
+			data = chunk_from_thing(feature->arg.xof);
 			break;
 		case FEATURE_DH:
 			data = chunk_from_thing(feature->arg.dh_group);
@@ -160,6 +164,8 @@ bool plugin_feature_matches(plugin_feature_t *a, plugin_feature_t *b)
 				return a->arg.hasher == b->arg.hasher;
 			case FEATURE_PRF:
 				return a->arg.prf == b->arg.prf;
+			case FEATURE_XOF:
+				return a->arg.xof == b->arg.xof;
 			case FEATURE_DH:
 				return a->arg.dh_group == b->arg.dh_group;
 			case FEATURE_RNG:
@@ -185,7 +191,8 @@ bool plugin_feature_matches(plugin_feature_t *a, plugin_feature_t *b)
 				return a->arg.container == b->arg.container;
 			case FEATURE_EAP_SERVER:
 			case FEATURE_EAP_PEER:
-				return a->arg.eap == b->arg.eap;
+				return a->arg.eap.vendor == b->arg.eap.vendor &&
+					   a->arg.eap.type == b->arg.eap.type;
 			case FEATURE_DATABASE:
 				return a->arg.database == DB_ANY ||
 					   a->arg.database == b->arg.database;
@@ -217,6 +224,7 @@ bool plugin_feature_equals(plugin_feature_t *a, plugin_feature_t *b)
 			case FEATURE_SIGNER:
 			case FEATURE_HASHER:
 			case FEATURE_PRF:
+			case FEATURE_XOF:
 			case FEATURE_DH:
 			case FEATURE_NONCE_GEN:
 			case FEATURE_RESOLVER:
@@ -304,6 +312,13 @@ char* plugin_feature_get_string(plugin_feature_t *feature)
 				return str;
 			}
 			break;
+		case FEATURE_XOF:
+			if (asprintf(&str, "%N:%N", plugin_feature_names, feature->type,
+					ext_out_function_names, feature->arg.xof) > 0)
+			{
+				return str;
+			}
+			break;
 		case FEATURE_DH:
 			if (asprintf(&str, "%N:%N", plugin_feature_names, feature->type,
 					diffie_hellman_group_names, feature->arg.dh_group) > 0)
@@ -368,8 +383,15 @@ char* plugin_feature_get_string(plugin_feature_t *feature)
 			break;
 		case FEATURE_EAP_SERVER:
 		case FEATURE_EAP_PEER:
-			if (asprintf(&str, "%N:%N", plugin_feature_names, feature->type,
-					eap_type_short_names, feature->arg.eap) > 0)
+			if (feature->arg.eap.vendor &&
+				asprintf(&str, "%N:%d-%d", plugin_feature_names, feature->type,
+					feature->arg.eap.type, feature->arg.eap.vendor) > 0)
+			{
+				return str;
+			}
+			else if (!feature->arg.eap.vendor &&
+				asprintf(&str, "%N:%N", plugin_feature_names, feature->type,
+					eap_type_short_names, feature->arg.eap.type) > 0)
 			{
 				return str;
 			}
@@ -437,10 +459,12 @@ bool plugin_feature_load(plugin_t *plugin, plugin_feature_t *feature,
 	{
 		case FEATURE_CRYPTER:
 			lib->crypto->add_crypter(lib->crypto, feature->arg.crypter.alg,
+								feature->arg.crypter.key_size,
 								name, reg->arg.reg.f);
 			break;
 		case FEATURE_AEAD:
 			lib->crypto->add_aead(lib->crypto, feature->arg.aead.alg,
+								feature->arg.aead.key_size,
 								name, reg->arg.reg.f);
 			break;
 		case FEATURE_SIGNER:
@@ -453,6 +477,10 @@ bool plugin_feature_load(plugin_t *plugin, plugin_feature_t *feature,
 			break;
 		case FEATURE_PRF:
 			lib->crypto->add_prf(lib->crypto, feature->arg.prf,
+								name, reg->arg.reg.f);
+			break;
+		case FEATURE_XOF:
+			lib->crypto->add_xof(lib->crypto, feature->arg.xof,
 								name, reg->arg.reg.f);
 			break;
 		case FEATURE_DH:
@@ -541,6 +569,9 @@ bool plugin_feature_unload(plugin_t *plugin, plugin_feature_t *feature,
 			break;
 		case FEATURE_PRF:
 			lib->crypto->remove_prf(lib->crypto, reg->arg.reg.f);
+			break;
+		case FEATURE_XOF:
+			lib->crypto->remove_xof(lib->crypto, reg->arg.reg.f);
 			break;
 		case FEATURE_DH:
 			lib->crypto->remove_dh(lib->crypto, reg->arg.reg.f);

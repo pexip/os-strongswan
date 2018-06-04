@@ -1,7 +1,7 @@
 /*
- * Copyright (C) 2007-2014 Tobias Brunner
+ * Copyright (C) 2007-2016 Tobias Brunner
  * Copyright (C) 2007-2011 Martin Willi
- * Hochschule fuer Technik Rapperswil
+ * HSR Hochschule fuer Technik Rapperswil
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -67,7 +67,7 @@ struct exchange_t {
 	/**
 	 * Message ID used for this transaction
 	 */
-	u_int32_t mid;
+	uint32_t mid;
 
 	/**
 	 * generated packet for retransmission
@@ -104,12 +104,12 @@ struct private_task_manager_t {
 		/**
 		 * Message ID of the last response
 		 */
-		u_int32_t mid;
+		uint32_t mid;
 
 		/**
 		 * Hash of a previously received message
 		 */
-		u_int32_t hash;
+		uint32_t hash;
 
 		/**
 		 * packet(s) for retransmission
@@ -119,7 +119,7 @@ struct private_task_manager_t {
 		/**
 		 * Sequence number of the last sent message
 		 */
-		u_int32_t seqnr;
+		uint32_t seqnr;
 
 		/**
 		 * how many times we have retransmitted so far
@@ -135,12 +135,12 @@ struct private_task_manager_t {
 		/**
 		 * Message ID of the exchange
 		 */
-		u_int32_t mid;
+		uint32_t mid;
 
 		/**
 		 * Hashes of old responses we can ignore
 		 */
-		u_int32_t old_hashes[MAX_OLD_HASHES];
+		uint32_t old_hashes[MAX_OLD_HASHES];
 
 		/**
 		 * Position in old hash array
@@ -150,7 +150,7 @@ struct private_task_manager_t {
 		/**
 		 * Sequence number of the last sent message
 		 */
-		u_int32_t seqnr;
+		uint32_t seqnr;
 
 		/**
 		 * how many times we have retransmitted so far
@@ -212,12 +212,12 @@ struct private_task_manager_t {
 	/**
 	 * Sequence number for sending DPD requests
 	 */
-	u_int32_t dpd_send;
+	uint32_t dpd_send;
 
 	/**
 	 * Sequence number for received DPD requests
 	 */
-	u_int32_t dpd_recv;
+	uint32_t dpd_recv;
 };
 
 /**
@@ -341,11 +341,11 @@ static bool generate_message(private_task_manager_t *this, message_t *message,
 /**
  * Retransmit a packet (or its fragments)
  */
-static status_t retransmit_packet(private_task_manager_t *this, u_int32_t seqnr,
+static status_t retransmit_packet(private_task_manager_t *this, uint32_t seqnr,
 							u_int mid, u_int retransmitted, array_t *packets)
 {
 	packet_t *packet;
-	u_int32_t t;
+	uint32_t t;
 
 	array_get(packets, 0, &packet);
 	if (retransmitted > this->retransmit_tries)
@@ -354,14 +354,15 @@ static status_t retransmit_packet(private_task_manager_t *this, u_int32_t seqnr,
 		charon->bus->alert(charon->bus, ALERT_RETRANSMIT_SEND_TIMEOUT, packet);
 		return DESTROY_ME;
 	}
-	t = (u_int32_t)(this->retransmit_timeout * 1000.0 *
+	t = (uint32_t)(this->retransmit_timeout * 1000.0 *
 					pow(this->retransmit_base, retransmitted));
 	if (retransmitted)
 	{
 		DBG1(DBG_IKE, "sending retransmit %u of %s message ID %u, seq %u",
 			 retransmitted, seqnr < RESPONDING_SEQ ? "request" : "response",
 			 mid, seqnr < RESPONDING_SEQ ? seqnr : seqnr - RESPONDING_SEQ);
-		charon->bus->alert(charon->bus, ALERT_RETRANSMIT_SEND, packet);
+		charon->bus->alert(charon->bus, ALERT_RETRANSMIT_SEND, packet,
+						   retransmitted);
 	}
 	send_packets(this, packets);
 	lib->scheduler->schedule_job_ms(lib->scheduler, (job_t*)
@@ -370,7 +371,7 @@ static status_t retransmit_packet(private_task_manager_t *this, u_int32_t seqnr,
 }
 
 METHOD(task_manager_t, retransmit, status_t,
-	private_task_manager_t *this, u_int32_t seqnr)
+	private_task_manager_t *this, uint32_t seqnr)
 {
 	status_t status = SUCCESS;
 
@@ -514,6 +515,18 @@ METHOD(task_manager_t, initiate, status_t,
 					new_mid = TRUE;
 					break;
 				}
+				if (activate_task(this, TASK_QUICK_DELETE))
+				{
+					exchange = INFORMATIONAL_V1;
+					new_mid = TRUE;
+					break;
+				}
+				if (activate_task(this, TASK_ISAKMP_DELETE))
+				{
+					exchange = INFORMATIONAL_V1;
+					new_mid = TRUE;
+					break;
+				}
 				if (!mode_config_expected(this) &&
 					activate_task(this, TASK_QUICK_MODE))
 				{
@@ -527,19 +540,15 @@ METHOD(task_manager_t, initiate, status_t,
 					new_mid = TRUE;
 					break;
 				}
-				if (activate_task(this, TASK_QUICK_DELETE))
-				{
-					exchange = INFORMATIONAL_V1;
-					new_mid = TRUE;
-					break;
-				}
-				if (activate_task(this, TASK_ISAKMP_DELETE))
-				{
-					exchange = INFORMATIONAL_V1;
-					new_mid = TRUE;
-					break;
-				}
 				if (activate_task(this, TASK_ISAKMP_DPD))
+				{
+					exchange = INFORMATIONAL_V1;
+					new_mid = TRUE;
+					break;
+				}
+				break;
+			case IKE_REKEYING:
+				if (activate_task(this, TASK_ISAKMP_DELETE))
 				{
 					exchange = INFORMATIONAL_V1;
 					new_mid = TRUE;
@@ -752,6 +761,12 @@ static status_t build_response(private_task_manager_t *this, message_t *request)
 			case ALREADY_DONE:
 				cancelled = TRUE;
 				break;
+			case INVALID_ARG:
+				if (task->get_type(task) == TASK_QUICK_MODE)
+				{	/* not responsible for this exchange */
+					continue;
+				}
+				/* FALL */
 			case FAILED:
 			default:
 				charon->bus->ike_updown(charon->bus, this->ike_sa, FALSE);
@@ -801,7 +816,7 @@ static void send_notify(private_task_manager_t *this, message_t *request,
 	message_t *response;
 	array_t *packets = NULL;
 	host_t *me, *other;
-	u_int32_t mid;
+	uint32_t mid;
 
 	if (request->get_exchange_type(request) == INFORMATIONAL_V1)
 	{	/* don't respond to INFORMATIONAL requests to avoid a notify war */
@@ -851,7 +866,7 @@ static bool process_dpd(private_task_manager_t *this, message_t *message)
 {
 	notify_payload_t *notify;
 	notify_type_t type;
-	u_int32_t seq;
+	uint32_t seq;
 	chunk_t data;
 
 	type = DPD_R_U_THERE;
@@ -901,6 +916,56 @@ static bool process_dpd(private_task_manager_t *this, message_t *message)
 }
 
 /**
+ * Check if we already have a quick mode task queued for the exchange with the
+ * given message ID
+ */
+static bool have_quick_mode_task(private_task_manager_t *this, uint32_t mid)
+{
+	enumerator_t *enumerator;
+	quick_mode_t *qm;
+	task_t *task;
+	bool found = FALSE;
+
+	enumerator = this->passive_tasks->create_enumerator(this->passive_tasks);
+	while (enumerator->enumerate(enumerator, &task))
+	{
+		if (task->get_type(task) == TASK_QUICK_MODE)
+		{
+			qm = (quick_mode_t*)task;
+			if (qm->get_mid(qm) == mid)
+			{
+				found = TRUE;
+				break;
+			}
+		}
+	}
+	enumerator->destroy(enumerator);
+	return found;
+}
+
+/**
+ * Check if we still have a specific task queued
+ */
+static bool have_task_queued(private_task_manager_t *this, task_type_t type)
+{
+	enumerator_t *enumerator;
+	task_t *task;
+	bool found = FALSE;
+
+	enumerator = this->passive_tasks->create_enumerator(this->passive_tasks);
+	while (enumerator->enumerate(enumerator, &task))
+	{
+		if (task->get_type(task) == type)
+		{
+			found = TRUE;
+			break;
+		}
+	}
+	enumerator->destroy(enumerator);
+	return found;
+}
+
+/**
  * handle an incoming request message
  */
 static status_t process_request(private_task_manager_t *this,
@@ -911,6 +976,7 @@ static status_t process_request(private_task_manager_t *this,
 	bool send_response = FALSE, dpd = FALSE;
 
 	if (message->get_exchange_type(message) == INFORMATIONAL_V1 ||
+		message->get_exchange_type(message) == QUICK_MODE ||
 		this->passive_tasks->get_count(this->passive_tasks) == 0)
 	{	/* create tasks depending on request type, if not already some queued */
 		switch (message->get_exchange_type(message))
@@ -945,6 +1011,10 @@ static status_t process_request(private_task_manager_t *this,
 					DBG1(DBG_IKE, "received quick mode request for "
 						 "unestablished IKE_SA, ignored");
 					return FAILED;
+				}
+				if (have_quick_mode_task(this, message->get_message_id(message)))
+				{
+					break;
 				}
 				task = (task_t *)quick_mode_create(this->ike_sa, NULL,
 												   NULL, NULL);
@@ -1001,6 +1071,12 @@ static status_t process_request(private_task_manager_t *this,
 			case ALREADY_DONE:
 				send_response = FALSE;
 				break;
+			case INVALID_ARG:
+				if (task->get_type(task) == TASK_QUICK_MODE)
+				{	/* not responsible for this exchange */
+					continue;
+				}
+				/* FALL */
 			case FAILED:
 			default:
 				charon->bus->ike_updown(charon->bus, this->ike_sa, FALSE);
@@ -1027,6 +1103,22 @@ static status_t process_request(private_task_manager_t *this,
 	{	/* We don't send a response, so don't retransmit one if we get
 		 * the same message again. */
 		clear_packets(this->responding.packets);
+	}
+	if (this->queued &&
+		this->queued->get_exchange_type(this->queued) == INFORMATIONAL_V1)
+	{
+		message_t *queued;
+		status_t status;
+
+		queued = this->queued;
+		this->queued = NULL;
+		status = this->public.task_manager.process_message(
+											&this->public.task_manager, queued);
+		queued->destroy(queued);
+		if (status == DESTROY_ME)
+		{
+			return status;
+		}
 	}
 	if (this->passive_tasks->get_count(this->passive_tasks) == 0 &&
 		this->queued_tasks->get_count(this->queued_tasks) > 0)
@@ -1097,10 +1189,17 @@ static status_t process_response(private_task_manager_t *this,
 	}
 	enumerator->destroy(enumerator);
 
+	if (this->initiating.retransmitted > 1)
+	{
+		packet_t *packet = NULL;
+		array_get(this->initiating.packets, 0, &packet);
+		charon->bus->alert(charon->bus, ALERT_RETRANSMIT_SEND_CLEARED, packet);
+	}
 	this->initiating.type = EXCHANGE_TYPE_UNDEFINED;
 	clear_packets(this->initiating.packets);
 
-	if (this->queued && this->active_tasks->get_count(this->active_tasks) == 0)
+	if (this->queued && !this->active_tasks->get_count(this->active_tasks) &&
+		this->queued->get_exchange_type(this->queued) == TRANSACTION)
 	{
 		queued = this->queued;
 		this->queued = NULL;
@@ -1195,10 +1294,33 @@ static status_t parse_message(private_task_manager_t *this, message_t *msg)
 	return status;
 }
 
+/**
+ * Queue the given message if possible
+ */
+static status_t queue_message(private_task_manager_t *this, message_t *msg)
+{
+	if (this->queued)
+	{
+		DBG1(DBG_IKE, "ignoring %N request, queue full",
+			 exchange_type_names, msg->get_exchange_type(msg));
+		return FAILED;
+	}
+	this->queued = message_create_from_packet(msg->get_packet(msg));
+	if (this->queued->parse_header(this->queued) != SUCCESS)
+	{
+		this->queued->destroy(this->queued);
+		this->queued = NULL;
+		return FAILED;
+	}
+	DBG1(DBG_IKE, "queueing %N request as tasks still active",
+		 exchange_type_names, msg->get_exchange_type(msg));
+	return SUCCESS;
+}
+
 METHOD(task_manager_t, process_message, status_t,
 	private_task_manager_t *this, message_t *msg)
 {
-	u_int32_t hash, mid, i;
+	uint32_t hash, mid, i;
 	host_t *me, *other;
 	status_t status;
 
@@ -1295,25 +1417,36 @@ METHOD(task_manager_t, process_message, status_t,
 			}
 		}
 
-		if (msg->get_exchange_type(msg) == TRANSACTION &&
-			this->active_tasks->get_count(this->active_tasks))
-		{	/* main mode not yet complete, queue XAuth/Mode config tasks */
-			if (this->queued)
+		/* drop XAuth/Mode Config/Quick Mode messages until we received the last
+		 * Aggressive Mode message.  since Informational messages are not
+		 * retransmitted we queue them. */
+		if (have_task_queued(this, TASK_AGGRESSIVE_MODE))
+		{
+			if (msg->get_exchange_type(msg) == INFORMATIONAL_V1)
 			{
-				DBG1(DBG_IKE, "ignoring additional %N request, queue full",
-					 exchange_type_names, TRANSACTION);
-				return SUCCESS;
+				return queue_message(this, msg);
 			}
-			this->queued = message_create_from_packet(msg->get_packet(msg));
-			if (this->queued->parse_header(this->queued) != SUCCESS)
+			else if (msg->get_exchange_type(msg) != AGGRESSIVE)
 			{
-				this->queued->destroy(this->queued);
-				this->queued = NULL;
+				DBG1(DBG_IKE, "ignoring %N request while phase 1 is incomplete",
+					 exchange_type_names, msg->get_exchange_type(msg));
 				return FAILED;
 			}
-			DBG1(DBG_IKE, "queueing %N request as tasks still active",
-				 exchange_type_names, TRANSACTION);
-			return SUCCESS;
+		}
+
+		/* queue XAuth/Mode Config messages unless the Main Mode exchange we
+		 * initiated is complete */
+		if (msg->get_exchange_type(msg) == TRANSACTION &&
+			this->active_tasks->get_count(this->active_tasks))
+		{
+			return queue_message(this, msg);
+		}
+
+		/* some peers send INITIAL_CONTACT notifies during XAuth, cache it */
+		if (have_task_queued(this, TASK_XAUTH) &&
+			msg->get_exchange_type(msg) == INFORMATIONAL_V1)
+		{
+			return queue_message(this, msg);
 		}
 
 		msg->set_request(msg, TRUE);
@@ -1388,8 +1521,8 @@ static bool has_queued(private_task_manager_t *this, task_type_t type)
 	return found;
 }
 
-METHOD(task_manager_t, queue_task, void,
-	private_task_manager_t *this, task_t *task)
+METHOD(task_manager_t, queue_task_delayed, void,
+	private_task_manager_t *this, task_t *task, uint32_t delay)
 {
 	task_type_t type = task->get_type(task);
 
@@ -1408,6 +1541,12 @@ METHOD(task_manager_t, queue_task, void,
 	}
 	DBG2(DBG_IKE, "queueing %N task", task_type_names, task->get_type(task));
 	this->queued_tasks->insert_last(this->queued_tasks, task);
+}
+
+METHOD(task_manager_t, queue_task, void,
+	private_task_manager_t *this, task_t *task)
+{
+	queue_task_delayed(this, task, 0);
 }
 
 METHOD(task_manager_t, queue_ike, void,
@@ -1475,6 +1614,8 @@ METHOD(task_manager_t, queue_ike_reauth, void,
 	}
 	enumerator->destroy(enumerator);
 
+	charon->bus->children_migrate(charon->bus, new->get_id(new),
+								  new->get_unique_id(new));
 	enumerator = this->ike_sa->create_child_sa_enumerator(this->ike_sa);
 	while (enumerator->enumerate(enumerator, &child_sa))
 	{
@@ -1482,6 +1623,9 @@ METHOD(task_manager_t, queue_ike_reauth, void,
 		new->add_child_sa(new, child_sa);
 	}
 	enumerator->destroy(enumerator);
+	charon->bus->set_sa(charon->bus, new);
+	charon->bus->children_migrate(charon->bus, NULL, 0);
+	charon->bus->set_sa(charon->bus, this->ike_sa);
 
 	if (!new->get_child_count(new))
 	{	/* check if a Quick Mode task is queued (UNITY_LOAD_BALANCE case) */
@@ -1525,6 +1669,9 @@ METHOD(task_manager_t, queue_ike_delete, void,
 	enumerator_t *enumerator;
 	child_sa_t *child_sa;
 
+	/* cancel any currently active task to get the DELETE done quickly */
+	flush_queue(this, TASK_QUEUE_ACTIVE);
+
 	enumerator = this->ike_sa->create_child_sa_enumerator(this->ike_sa);
 	while (enumerator->enumerate(enumerator, &child_sa))
 	{
@@ -1544,7 +1691,7 @@ METHOD(task_manager_t, queue_mobike, void,
 }
 
 METHOD(task_manager_t, queue_child, void,
-	private_task_manager_t *this, child_cfg_t *cfg, u_int32_t reqid,
+	private_task_manager_t *this, child_cfg_t *cfg, uint32_t reqid,
 	traffic_selector_t *tsi, traffic_selector_t *tsr)
 {
 	quick_mode_t *task;
@@ -1596,7 +1743,8 @@ static bool is_redundant(private_task_manager_t *this, child_sa_t *child_sa)
 				child_sa->get_lifetime(child_sa, FALSE))
 		{
 			DBG1(DBG_IKE, "deleting redundant CHILD_SA %s{%d}",
-				 child_sa->get_name(child_sa), child_sa->get_reqid(child_sa));
+				 child_sa->get_name(child_sa),
+				 child_sa->get_unique_id(child_sa));
 			redundant = TRUE;
 			break;
 		}
@@ -1622,7 +1770,7 @@ static traffic_selector_t* get_first_ts(child_sa_t *child_sa, bool local)
 }
 
 METHOD(task_manager_t, queue_child_rekey, void,
-	private_task_manager_t *this, protocol_id_t protocol, u_int32_t spi)
+	private_task_manager_t *this, protocol_id_t protocol, uint32_t spi)
 {
 	child_sa_t *child_sa;
 	child_cfg_t *cfg;
@@ -1637,6 +1785,7 @@ METHOD(task_manager_t, queue_child_rekey, void,
 	{
 		if (is_redundant(this, child_sa))
 		{
+			child_sa->set_state(child_sa, CHILD_REKEYED);
 			queue_task(this, (task_t*)quick_delete_create(this->ike_sa,
 												protocol, spi, FALSE, FALSE));
 		}
@@ -1647,6 +1796,8 @@ METHOD(task_manager_t, queue_child_rekey, void,
 			task = quick_mode_create(this->ike_sa, cfg->get_ref(cfg),
 				get_first_ts(child_sa, TRUE), get_first_ts(child_sa, FALSE));
 			task->use_reqid(task, child_sa->get_reqid(child_sa));
+			task->use_marks(task, child_sa->get_mark(child_sa, TRUE).value,
+							child_sa->get_mark(child_sa, FALSE).value);
 			task->rekey(task, child_sa->get_spi(child_sa, TRUE));
 
 			queue_task(this, &task->task);
@@ -1655,7 +1806,7 @@ METHOD(task_manager_t, queue_child_rekey, void,
 }
 
 METHOD(task_manager_t, queue_child_delete, void,
-	private_task_manager_t *this, protocol_id_t protocol, u_int32_t spi,
+	private_task_manager_t *this, protocol_id_t protocol, uint32_t spi,
 	bool expired)
 {
 	queue_task(this, (task_t*)quick_delete_create(this->ike_sa, protocol,
@@ -1666,7 +1817,7 @@ METHOD(task_manager_t, queue_dpd, void,
 	private_task_manager_t *this)
 {
 	peer_cfg_t *peer_cfg;
-	u_int32_t t, retransmit;
+	uint32_t t, retransmit;
 
 	queue_task(this, (task_t*)isakmp_dpd_create(this->ike_sa, DPD_R_U_THERE,
 												this->dpd_send++));
@@ -1679,10 +1830,12 @@ METHOD(task_manager_t, queue_dpd, void,
 		/* use the same timeout as a retransmitting IKE message would have */
 		for (retransmit = 0; retransmit <= this->retransmit_tries; retransmit++)
 		{
-			t += (u_int32_t)(this->retransmit_timeout * 1000.0 *
+			t += (uint32_t)(this->retransmit_timeout * 1000.0 *
 							pow(this->retransmit_base, retransmit));
 		}
 	}
+	/* compensate for the already elapsed dpd delay */
+	t -= 1000 * peer_cfg->get_dpd(peer_cfg);
 
 	/* schedule DPD timeout job */
 	lib->scheduler->schedule_job_ms(lib->scheduler,
@@ -1750,7 +1903,7 @@ METHOD(task_manager_t, incr_mid, void,
 }
 
 METHOD(task_manager_t, reset, void,
-	private_task_manager_t *this, u_int32_t initiate, u_int32_t respond)
+	private_task_manager_t *this, uint32_t initiate, uint32_t respond)
 {
 	enumerator_t *enumerator;
 	task_t *task;
@@ -1839,6 +1992,7 @@ task_manager_v1_t *task_manager_v1_create(ike_sa_t *ike_sa)
 			.task_manager = {
 				.process_message = _process_message,
 				.queue_task = _queue_task,
+				.queue_task_delayed = _queue_task_delayed,
 				.queue_ike = _queue_ike,
 				.queue_ike_rekey = _queue_ike_rekey,
 				.queue_ike_reauth = _queue_ike_reauth,

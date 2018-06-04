@@ -1,9 +1,14 @@
 ipseclib_LTLIBRARIES = libcharon.la
 
 libcharon_la_SOURCES = \
+attributes/attributes.c attributes/attributes.h \
+attributes/attribute_provider.h attributes/attribute_handler.h \
+attributes/attribute_manager.c attributes/attribute_manager.h \
+attributes/mem_pool.c attributes/mem_pool.h \
 bus/bus.c bus/bus.h \
 bus/listeners/listener.h \
 bus/listeners/logger.h \
+bus/listeners/custom_logger.h \
 bus/listeners/file_logger.c bus/listeners/file_logger.h \
 config/backend_manager.c config/backend_manager.h config/backend.h \
 config/child_cfg.c config/child_cfg.h \
@@ -41,7 +46,10 @@ encoding/payloads/unknown_payload.c encoding/payloads/unknown_payload.h \
 encoding/payloads/vendor_id_payload.c encoding/payloads/vendor_id_payload.h \
 encoding/payloads/hash_payload.c encoding/payloads/hash_payload.h \
 encoding/payloads/fragment_payload.c encoding/payloads/fragment_payload.h \
-kernel/kernel_handler.c kernel/kernel_handler.h \
+kernel/kernel_interface.c kernel/kernel_interface.h \
+kernel/kernel_ipsec.c kernel/kernel_ipsec.h \
+kernel/kernel_net.c kernel/kernel_net.h \
+kernel/kernel_listener.h kernel/kernel_handler.c kernel/kernel_handler.h \
 network/receiver.c network/receiver.h network/sender.c network/sender.h \
 network/socket.c network/socket.h \
 network/socket_manager.c network/socket_manager.h \
@@ -50,6 +58,7 @@ processing/jobs/delete_child_sa_job.c processing/jobs/delete_child_sa_job.h \
 processing/jobs/delete_ike_sa_job.c processing/jobs/delete_ike_sa_job.h \
 processing/jobs/migrate_job.c processing/jobs/migrate_job.h \
 processing/jobs/process_message_job.c processing/jobs/process_message_job.h \
+processing/jobs/redirect_job.c processing/jobs/redirect_job.h \
 processing/jobs/rekey_child_sa_job.c processing/jobs/rekey_child_sa_job.h \
 processing/jobs/rekey_ike_sa_job.c processing/jobs/rekey_ike_sa_job.h \
 processing/jobs/retransmit_job.c processing/jobs/retransmit_job.h \
@@ -60,6 +69,7 @@ processing/jobs/start_action_job.c processing/jobs/start_action_job.h \
 processing/jobs/roam_job.c processing/jobs/roam_job.h \
 processing/jobs/update_sa_job.c processing/jobs/update_sa_job.h \
 processing/jobs/inactivity_job.c processing/jobs/inactivity_job.h \
+processing/jobs/initiate_tasks_job.c processing/jobs/initiate_tasks_job.h \
 sa/eap/eap_method.c sa/eap/eap_method.h sa/eap/eap_inner_method.h \
 sa/eap/eap_manager.c sa/eap/eap_manager.h \
 sa/xauth/xauth_method.c sa/xauth/xauth_method.h \
@@ -70,9 +80,11 @@ sa/ike_sa.c sa/ike_sa.h \
 sa/ike_sa_id.c sa/ike_sa_id.h \
 sa/keymat.h sa/keymat.c \
 sa/ike_sa_manager.c sa/ike_sa_manager.h \
+sa/child_sa_manager.c sa/child_sa_manager.h \
 sa/task_manager.h sa/task_manager.c \
 sa/shunt_manager.c sa/shunt_manager.h \
 sa/trap_manager.c sa/trap_manager.h \
+sa/redirect_provider.h sa/redirect_manager.c sa/redirect_manager.h \
 sa/task.c sa/task.h
 
 if USE_IKEV2
@@ -96,8 +108,11 @@ sa/ikev2/tasks/ike_natd.c sa/ikev2/tasks/ike_natd.h \
 sa/ikev2/tasks/ike_mobike.c sa/ikev2/tasks/ike_mobike.h \
 sa/ikev2/tasks/ike_rekey.c sa/ikev2/tasks/ike_rekey.h \
 sa/ikev2/tasks/ike_reauth.c sa/ikev2/tasks/ike_reauth.h \
+sa/ikev2/tasks/ike_reauth_complete.c sa/ikev2/tasks/ike_reauth_complete.h \
+sa/ikev2/tasks/ike_redirect.c sa/ikev2/tasks/ike_redirect.h \
 sa/ikev2/tasks/ike_auth_lifetime.c sa/ikev2/tasks/ike_auth_lifetime.h \
-sa/ikev2/tasks/ike_vendor.c sa/ikev2/tasks/ike_vendor.h
+sa/ikev2/tasks/ike_vendor.c sa/ikev2/tasks/ike_vendor.h \
+sa/ikev2/tasks/ike_verify_peer_cert.c sa/ikev2/tasks/ike_verify_peer_cert.h
 endif
 
 if USE_IKEV1
@@ -135,18 +150,19 @@ daemon.lo :		$(top_builddir)/config.status
 AM_CPPFLAGS = \
 	-I${linux_headers} \
 	-I$(top_srcdir)/src/libstrongswan \
-	-I$(top_srcdir)/src/libhydra \
 	-I$(top_srcdir)/src/libcharon \
 	-DIPSEC_DIR=\"${ipsecdir}\" \
 	-DIPSEC_PIDDIR=\"${piddir}\"
+
+AM_CFLAGS = \
+  @COVERAGE_CFLAGS@
 
 AM_LDFLAGS = \
   -no-undefined
 
 libcharon_la_LIBADD = \
   $(top_builddir)/src/libstrongswan/libstrongswan.la \
-  $(top_builddir)/src/libhydra/libhydra.la \
-  -lm $(PTHREADLIB) $(DLLIB) $(SOCKLIB)
+  -lm $(PTHREADLIB) $(ATOMICLIB) $(DLLIB) $(SOCKLIB)
 
 if USE_WINDOWS
   libcharon_la_LIBADD += -lws2_32
@@ -200,6 +216,20 @@ if USE_SOCKET_WIN
   SUBDIRS += plugins/socket_win
 if MONOLITHIC
   libcharon_la_LIBADD += plugins/socket_win/libstrongswan-socket-win.la
+endif
+endif
+
+if USE_CONNMARK
+  SUBDIRS += plugins/connmark
+if MONOLITHIC
+  libcharon_la_LIBADD += plugins/connmark/libstrongswan-connmark.la
+endif
+endif
+
+if USE_FORECAST
+  SUBDIRS += plugins/forecast
+if MONOLITHIC
+  libcharon_la_LIBADD += plugins/forecast/libstrongswan-forecast.la
 endif
 endif
 
@@ -462,6 +492,13 @@ if MONOLITHIC
 endif
 endif
 
+if USE_P_CSCF
+  SUBDIRS += plugins/p_cscf
+if MONOLITHIC
+  libcharon_la_LIBADD += plugins/p_cscf/libstrongswan-p-cscf.la
+endif
+endif
+
 if USE_ANDROID_DNS
   SUBDIRS += plugins/android_dns
 if MONOLITHIC
@@ -476,17 +513,31 @@ if MONOLITHIC
 endif
 endif
 
-if USE_MAEMO
-  SUBDIRS += plugins/maemo
-if MONOLITHIC
-  libcharon_la_LIBADD += plugins/maemo/libstrongswan-maemo.la
-endif
-endif
-
 if USE_HA
   SUBDIRS += plugins/ha
 if MONOLITHIC
   libcharon_la_LIBADD += plugins/ha/libstrongswan-ha.la
+endif
+endif
+
+if USE_KERNEL_PFKEY
+  SUBDIRS += plugins/kernel_pfkey
+if MONOLITHIC
+  libcharon_la_LIBADD += plugins/kernel_pfkey/libstrongswan-kernel-pfkey.la
+endif
+endif
+
+if USE_KERNEL_PFROUTE
+  SUBDIRS += plugins/kernel_pfroute
+if MONOLITHIC
+  libcharon_la_LIBADD += plugins/kernel_pfroute/libstrongswan-kernel-pfroute.la
+endif
+endif
+
+if USE_KERNEL_NETLINK
+  SUBDIRS += plugins/kernel_netlink
+if MONOLITHIC
+  libcharon_la_LIBADD += plugins/kernel_netlink/libstrongswan-kernel-netlink.la
 endif
 endif
 
@@ -595,13 +646,6 @@ if MONOLITHIC
 endif
 endif
 
-if USE_UNIT_TESTS
-  SUBDIRS += plugins/unit_tester
-if MONOLITHIC
-  libcharon_la_LIBADD += plugins/unit_tester/libstrongswan-unit-tester.la
-endif
-endif
-
 if USE_XAUTH_GENERIC
   SUBDIRS += plugins/xauth_generic
 if MONOLITHIC
@@ -629,3 +673,29 @@ if MONOLITHIC
   libcharon_la_LIBADD += plugins/xauth_noauth/libstrongswan-xauth-noauth.la
 endif
 endif
+
+if USE_RESOLVE
+  SUBDIRS += plugins/resolve
+if MONOLITHIC
+  libcharon_la_LIBADD += plugins/resolve/libstrongswan-resolve.la
+endif
+endif
+
+if USE_ATTR
+  SUBDIRS += plugins/attr
+if MONOLITHIC
+  libcharon_la_LIBADD += plugins/attr/libstrongswan-attr.la
+endif
+endif
+
+if USE_ATTR_SQL
+  SUBDIRS += plugins/attr_sql
+if MONOLITHIC
+  libcharon_la_LIBADD += plugins/attr_sql/libstrongswan-attr-sql.la
+endif
+endif
+
+if MONOLITHIC
+  SUBDIRS += .
+endif
+SUBDIRS += tests

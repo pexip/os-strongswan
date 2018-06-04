@@ -12,7 +12,7 @@ libtest_la_CFLAGS = \
 libtest_la_LDFLAGS = @COVERAGE_LDFLAGS@
 libtest_la_LIBADD = \
   $(top_builddir)/src/libstrongswan/libstrongswan.la \
-  $(PTHREADLIB)
+  $(PTHREADLIB) $(ATOMICLIB)
 
 
 TESTS = tests
@@ -29,6 +29,7 @@ tests_SOURCES = tests.h tests.c \
   suites/test_enum.c \
   suites/test_hashtable.c \
   suites/test_identification.c \
+  suites/test_traffic_selector.c \
   suites/test_threading.c \
   suites/test_process.c \
   suites/test_watcher.c \
@@ -40,15 +41,20 @@ tests_SOURCES = tests.h tests.c \
   suites/test_array.c \
   suites/test_ecdsa.c \
   suites/test_rsa.c \
+  suites/test_certpolicy.c \
+  suites/test_certnames.c \
   suites/test_host.c \
+  suites/test_auth_cfg.c \
   suites/test_hasher.c \
   suites/test_crypter.c \
   suites/test_crypto_factory.c \
+  suites/test_iv_gen.c \
   suites/test_pen.c \
   suites/test_asn1.c \
   suites/test_asn1_parser.c \
   suites/test_printf.c \
   suites/test_test_rng.c \
+  suites/test_mgf1.c \
   suites/test_ntru.c
 
 tests_CFLAGS = \

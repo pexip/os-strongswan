@@ -96,7 +96,7 @@ struct private_tun_device_t {
 	/**
 	 * Netmask for address
 	 */
-	u_int8_t netmask;
+	uint8_t netmask;
 };
 
 /**
@@ -105,7 +105,7 @@ struct private_tun_device_t {
 #if __FreeBSD__ >= 10
 
 static bool set_address_and_mask(struct in_aliasreq *ifra, host_t *addr,
-								 u_int8_t netmask)
+								 uint8_t netmask)
 {
 	host_t *mask;
 
@@ -132,7 +132,7 @@ static bool set_address_and_mask(struct in_aliasreq *ifra, host_t *addr,
  * on FreeBSD 10 an newer.
  */
 static bool set_address_impl(private_tun_device_t *this, host_t *addr,
-							 u_int8_t netmask)
+							 uint8_t netmask)
 {
 	struct in_aliasreq ifra;
 
@@ -171,7 +171,7 @@ static bool set_address_impl(private_tun_device_t *this, host_t *addr,
  * Set the address using the classic SIOCSIFADDR etc. commands on other systems.
  */
 static bool set_address_impl(private_tun_device_t *this, host_t *addr,
-							 u_int8_t netmask)
+							 uint8_t netmask)
 {
 	struct ifreq ifr;
 	host_t *mask;
@@ -218,7 +218,7 @@ static bool set_address_impl(private_tun_device_t *this, host_t *addr,
 #endif /* __FreeBSD__ */
 
 METHOD(tun_device_t, set_address, bool,
-	private_tun_device_t *this, host_t *addr, u_int8_t netmask)
+	private_tun_device_t *this, host_t *addr, uint8_t netmask)
 {
 	if (!set_address_impl(this, addr, netmask))
 	{
@@ -231,7 +231,7 @@ METHOD(tun_device_t, set_address, bool,
 }
 
 METHOD(tun_device_t, get_address, host_t*,
-	private_tun_device_t *this, u_int8_t *netmask)
+	private_tun_device_t *this, uint8_t *netmask)
 {
 	if (netmask && this->address)
 	{
@@ -326,7 +326,7 @@ METHOD(tun_device_t, write_packet, bool,
 #ifdef __APPLE__
 	/* UTUN's expect the packets to be prepended by a 32-bit protocol number
 	 * instead of parsing the packet again, we assume IPv4 for now */
-	u_int32_t proto = htonl(AF_INET);
+	uint32_t proto = htonl(AF_INET);
 	packet = chunk_cata("cc", chunk_from_thing(proto), packet);
 #endif
 	s = write(this->tunfd, packet.ptr, packet.len);
@@ -346,40 +346,27 @@ METHOD(tun_device_t, write_packet, bool,
 METHOD(tun_device_t, read_packet, bool,
 	private_tun_device_t *this, chunk_t *packet)
 {
+	chunk_t data;
 	ssize_t len;
-	fd_set set;
 	bool old;
 
-	FD_ZERO(&set);
-	FD_SET(this->tunfd, &set);
+	data = chunk_alloca(get_mtu(this));
 
 	old = thread_cancelability(TRUE);
-	len = select(this->tunfd + 1, &set, NULL, NULL, NULL);
+	len = read(this->tunfd, data.ptr, data.len);
 	thread_cancelability(old);
-
-	if (len < 0)
-	{
-		DBG1(DBG_LIB, "select on TUN device %s failed: %s", this->if_name,
-			 strerror(errno));
-		return FALSE;
-	}
-	/* FIXME: this is quite expensive for lots of small packets, copy from
-	 * local buffer instead? */
-	*packet = chunk_alloc(get_mtu(this));
-	len = read(this->tunfd, packet->ptr, packet->len);
 	if (len < 0)
 	{
 		DBG1(DBG_LIB, "reading from TUN device %s failed: %s", this->if_name,
 			 strerror(errno));
-		chunk_free(packet);
 		return FALSE;
 	}
-	packet->len = len;
+	data.len = len;
 #ifdef __APPLE__
 	/* UTUN's prepend packets with a 32-bit protocol number */
-	packet->len -= sizeof(u_int32_t);
-	memmove(packet->ptr, packet->ptr + sizeof(u_int32_t), packet->len);
+	data = chunk_skip(data, sizeof(uint32_t));
 #endif
+	*packet = chunk_clone(data);
 	return TRUE;
 }
 

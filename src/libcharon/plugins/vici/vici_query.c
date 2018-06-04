@@ -1,4 +1,7 @@
 /*
+ * Copyright (C) 2015 Tobias Brunner, Andreas Steffen
+ * HSR Hochschule fuer Technik Rapperswil
+ *
  * Copyright (C) 2014 Martin Willi
  * Copyright (C) 2014 revosec AG
  *
@@ -13,8 +16,31 @@
  * for more details.
  */
 
+/*
+ * Copyright (C) 2014 Timo Teräs <timo.teras@iki.fi>
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+
 #include "vici_query.h"
 #include "vici_builder.h"
+#include "vici_cert_info.h"
 
 #include <inttypes.h>
 #include <time.h>
@@ -26,6 +52,9 @@
 #endif
 
 #include <daemon.h>
+#include <asn1/asn1.h>
+#include <credentials/certificates/certificate.h>
+#include <credentials/certificates/x509.h>
 
 typedef struct private_vici_query_t private_vici_query_t;
 
@@ -57,17 +86,19 @@ static void list_child(private_vici_query_t *this, vici_builder_t *b,
 					   child_sa_t *child, time_t now)
 {
 	time_t t;
-	u_int64_t bytes, packets;
-	u_int16_t alg, ks;
+	uint64_t bytes, packets;
+	uint16_t alg, ks;
 	proposal_t *proposal;
 	enumerator_t *enumerator;
 	traffic_selector_t *ts;
 
+	b->add_kv(b, "uniqueid", "%u", child->get_unique_id(child));
 	b->add_kv(b, "reqid", "%u", child->get_reqid(child));
 	b->add_kv(b, "state", "%N", child_sa_state_names, child->get_state(child));
 	b->add_kv(b, "mode", "%N", ipsec_mode_names, child->get_mode(child));
 	if (child->get_state(child) == CHILD_INSTALLED ||
-		child->get_state(child) == CHILD_REKEYING)
+		child->get_state(child) == CHILD_REKEYING ||
+		child->get_state(child) == CHILD_REKEYED)
 	{
 		b->add_kv(b, "protocol", "%N", protocol_id_names,
 				  child->get_protocol(child));
@@ -96,18 +127,13 @@ static void list_child(private_vici_query_t *this, vici_builder_t *b,
 				}
 			}
 			if (proposal->get_algorithm(proposal, INTEGRITY_ALGORITHM,
-										&alg, &ks) && alg != ENCR_UNDEFINED)
+										&alg, &ks) && alg != AUTH_UNDEFINED)
 			{
 				b->add_kv(b, "integ-alg", "%N", integrity_algorithm_names, alg);
 				if (ks)
 				{
 					b->add_kv(b, "integ-keysize", "%u", ks);
 				}
-			}
-			if (proposal->get_algorithm(proposal, PSEUDO_RANDOM_FUNCTION,
-										&alg, NULL))
-			{
-				b->add_kv(b, "prf-alg", "%N", pseudo_random_function_names, alg);
 			}
 			if (proposal->get_algorithm(proposal, DIFFIE_HELLMAN_GROUP,
 										&alg, NULL))
@@ -126,7 +152,7 @@ static void list_child(private_vici_query_t *this, vici_builder_t *b,
 		b->add_kv(b, "packets-in", "%" PRIu64, packets);
 		if (t)
 		{
-			b->add_kv(b, "use-in", "%"PRIu64, (u_int64_t)(now - t));
+			b->add_kv(b, "use-in", "%"PRIu64, (uint64_t)(now - t));
 		}
 
 		child->get_usestats(child, FALSE, &t, &bytes, &packets);
@@ -134,7 +160,7 @@ static void list_child(private_vici_query_t *this, vici_builder_t *b,
 		b->add_kv(b, "packets-out", "%"PRIu64, packets);
 		if (t)
 		{
-			b->add_kv(b, "use-out", "%"PRIu64, (u_int64_t)(now - t));
+			b->add_kv(b, "use-out", "%"PRIu64, (uint64_t)(now - t));
 		}
 
 		t = child->get_lifetime(child, FALSE);
@@ -198,6 +224,45 @@ static void list_task_queue(private_vici_query_t *this, vici_builder_t *b,
 }
 
 /**
+ * Add an IKE_SA condition to the given builder
+ */
+static void add_condition(vici_builder_t *b, ike_sa_t *ike_sa,
+						  char *key, ike_condition_t cond)
+{
+	if (ike_sa->has_condition(ike_sa, cond))
+	{
+		b->add_kv(b, key, "yes");
+	}
+}
+
+/**
+ * List virtual IPs
+ */
+static void list_vips(private_vici_query_t *this, vici_builder_t *b,
+					  ike_sa_t *ike_sa, bool local, char *name)
+{
+	enumerator_t *enumerator;
+	bool has = FALSE;
+	host_t *vip;
+
+	enumerator = ike_sa->create_virtual_ip_enumerator(ike_sa, local);
+	while (enumerator->enumerate(enumerator, &vip))
+	{
+		if (!has)
+		{
+			b->begin_list(b, name);
+			has = TRUE;
+		}
+		b->add_li(b, "%H", vip);
+	}
+	enumerator->destroy(enumerator);
+	if (has)
+	{
+		b->end_list(b);
+	}
+}
+
+/**
  * List details of an IKE_SA
  */
 static void list_ike(private_vici_query_t *this, vici_builder_t *b,
@@ -207,16 +272,21 @@ static void list_ike(private_vici_query_t *this, vici_builder_t *b,
 	ike_sa_id_t *id;
 	identification_t *eap;
 	proposal_t *proposal;
-	u_int16_t alg, ks;
+	uint16_t alg, ks;
+	host_t *host;
 
 	b->add_kv(b, "uniqueid", "%u", ike_sa->get_unique_id(ike_sa));
 	b->add_kv(b, "version", "%u", ike_sa->get_version(ike_sa));
 	b->add_kv(b, "state", "%N", ike_sa_state_names, ike_sa->get_state(ike_sa));
 
-	b->add_kv(b, "local-host", "%H", ike_sa->get_my_host(ike_sa));
+	host = ike_sa->get_my_host(ike_sa);
+	b->add_kv(b, "local-host", "%H", host);
+	b->add_kv(b, "local-port", "%d", host->get_port(host));
 	b->add_kv(b, "local-id", "%Y", ike_sa->get_my_id(ike_sa));
 
-	b->add_kv(b, "remote-host", "%H", ike_sa->get_other_host(ike_sa));
+	host = ike_sa->get_other_host(ike_sa);
+	b->add_kv(b, "remote-host", "%H", host);
+	b->add_kv(b, "remote-port", "%d", host->get_port(host));
 	b->add_kv(b, "remote-id", "%Y", ike_sa->get_other_id(ike_sa));
 
 	eap = ike_sa->get_other_eap_id(ike_sa);
@@ -238,8 +308,15 @@ static void list_ike(private_vici_query_t *this, vici_builder_t *b,
 	{
 		b->add_kv(b, "initiator", "yes");
 	}
-	b->add_kv(b, "initiator-spi", "%.16"PRIx64, id->get_initiator_spi(id));
-	b->add_kv(b, "responder-spi", "%.16"PRIx64, id->get_responder_spi(id));
+	b->add_kv(b, "initiator-spi", "%.16"PRIx64,
+			  be64toh(id->get_initiator_spi(id)));
+	b->add_kv(b, "responder-spi", "%.16"PRIx64,
+			  be64toh(id->get_responder_spi(id)));
+
+	add_condition(b, ike_sa, "nat-local", COND_NAT_HERE);
+	add_condition(b, ike_sa, "nat-remote", COND_NAT_THERE);
+	add_condition(b, ike_sa, "nat-fake", COND_NAT_FAKE);
+	add_condition(b, ike_sa, "nat-any", COND_NAT_ANY);
 
 	proposal = ike_sa->get_proposal(ike_sa);
 	if (proposal)
@@ -285,6 +362,9 @@ static void list_ike(private_vici_query_t *this, vici_builder_t *b,
 			b->add_kv(b, "reauth-time", "%"PRId64, (int64_t)(t - now));
 		}
 	}
+
+	list_vips(this, b, ike_sa, TRUE, "local-vips");
+	list_vips(this, b, ike_sa, FALSE, "remote-vips");
 
 	list_task_queue(this, b, ike_sa, TASK_QUEUE_QUEUED, "tasks-queued");
 	list_task_queue(this, b, ike_sa, TASK_QUEUE_ACTIVE, "tasks-active");
@@ -507,11 +587,14 @@ static void build_auth_cfgs(peer_cfg_t *peer_cfg, bool local, vici_builder_t *b)
 		certificate_t *cert;
 		char *str;
 	} v;
+	char buf[32];
+	int i = 0;
 
 	enumerator = peer_cfg->create_auth_cfg_enumerator(peer_cfg, local);
 	while (enumerator->enumerate(enumerator, &auth))
 	{
-		b->begin_section(b, local ? "local" : "remote");
+		snprintf(buf, sizeof(buf), "%s-%d", local ? "local" : "remote", ++i);
+		b->begin_section(b, buf);
 
 		rules = auth->create_enumerator(auth);
 		while (rules->enumerate(rules, &rule, &v))
@@ -599,9 +682,11 @@ CALLBACK(list_conns, vici_message_t*,
 	peer_cfg_t *peer_cfg;
 	ike_cfg_t *ike_cfg;
 	child_cfg_t *child_cfg;
-	char *ike, *str;
+	char *ike, *str, *interface;
+	uint32_t manual_prio;
 	linked_list_t *list;
 	traffic_selector_t *ts;
+	lifetime_cfg_t *lft;
 	vici_builder_t *b;
 
 	ike = request->get_str(request, NULL, "ike");
@@ -642,6 +727,10 @@ CALLBACK(list_conns, vici_message_t*,
 
 		b->add_kv(b, "version", "%N", ike_version_names,
 			peer_cfg->get_ike_version(peer_cfg));
+		b->add_kv(b, "reauth_time", "%u",
+			peer_cfg->get_reauth_time(peer_cfg, FALSE));
+		b->add_kv(b, "rekey_time", "%u",
+			peer_cfg->get_rekey_time(peer_cfg, FALSE));
 
 		build_auth_cfgs(peer_cfg, TRUE, b);
 		build_auth_cfgs(peer_cfg, FALSE, b);
@@ -655,6 +744,12 @@ CALLBACK(list_conns, vici_message_t*,
 
 			b->add_kv(b, "mode", "%N", ipsec_mode_names,
 				child_cfg->get_mode(child_cfg));
+
+			lft = child_cfg->get_lifetime(child_cfg, FALSE);
+			b->add_kv(b, "rekey_time",    "%"PRIu64, lft->time.rekey);
+			b->add_kv(b, "rekey_bytes",   "%"PRIu64, lft->bytes.rekey);
+			b->add_kv(b, "rekey_packets", "%"PRIu64, lft->packets.rekey);
+			free(lft);
 
 			b->begin_list(b, "local-ts");
 			list = child_cfg->get_traffic_selectors(child_cfg, TRUE, NULL, NULL);
@@ -678,6 +773,18 @@ CALLBACK(list_conns, vici_message_t*,
 			list->destroy_offset(list, offsetof(traffic_selector_t, destroy));
 			b->end_list(b /* remote-ts */);
 
+			interface = child_cfg->get_interface(child_cfg);
+			if (interface)
+			{
+				b->add_kv(b, "interface", "%s", interface);
+			}
+
+			manual_prio = child_cfg->get_manual_prio(child_cfg);
+			if (manual_prio)
+			{
+				b->add_kv(b, "priority", "%u", manual_prio);
+			}
+
 			b->end_section(b);
 		}
 		children->destroy(children);
@@ -698,7 +805,7 @@ CALLBACK(list_conns, vici_message_t*,
 /**
  * Do we have a private key for given certificate
  */
-static bool has_privkey(private_vici_query_t *this, certificate_t *cert)
+static bool has_privkey(certificate_t *cert)
 {
 	private_key_t *private;
 	public_key_t *public;
@@ -726,54 +833,49 @@ static bool has_privkey(private_vici_query_t *this, certificate_t *cert)
 	return found;
 }
 
-CALLBACK(list_certs, vici_message_t*,
-	private_vici_query_t *this, char *name, u_int id, vici_message_t *request)
+/**
+ * Store cert filter data
+ */
+typedef struct {
+	certificate_type_t type;
+	x509_flag_t flag;
+	identification_t *subject;
+} cert_filter_t;
+
+/**
+ * Enumerate all X.509 certificates with a given flag
+ */
+static void enum_x509(private_vici_query_t *this, u_int id,
+					  linked_list_t *certs, cert_filter_t *filter,
+					  x509_flag_t flag)
 {
-	enumerator_t *enumerator, *added;
-	linked_list_t *list;
-	certificate_t *cert, *current;
-	chunk_t encoding;
-	identification_t *subject = NULL;
-	int type;
+	enumerator_t *enumerator;
+	certificate_t *cert;
 	vici_builder_t *b;
-	bool found;
-	char *str;
+	chunk_t encoding;
+	x509_t *x509;
 
-	str = request->get_str(request, "ANY", "type");
-	if (!enum_from_name(certificate_type_names, str, &type))
+	if (filter->type != CERT_ANY && filter->flag != X509_ANY &&
+		filter->flag != flag)
 	{
-		b = vici_builder_create();
-		return b->finalize(b);
-	}
-	str = request->get_str(request, NULL, "subject");
-	if (str)
-	{
-		subject = identification_create_from_string(str);
+		return;
 	}
 
-	list = linked_list_create();
-	enumerator = lib->credmgr->create_cert_enumerator(lib->credmgr,
-												type, KEY_ANY, subject, FALSE);
+	enumerator = certs->create_enumerator(certs);
 	while (enumerator->enumerate(enumerator, &cert))
 	{
-		found = FALSE;
-		added = list->create_enumerator(list);
-		while (added->enumerate(added, &current))
+		x509 = (x509_t*)cert;
+		if ((x509->get_flags(x509) & X509_ANY) != flag)
 		{
-			if (current->equals(current, cert))
-			{
-				found = TRUE;
-				break;
-			}
+			continue;
 		}
-		added->destroy(added);
 
-		if (!found && cert->get_encoding(cert, CERT_ASN1_DER, &encoding))
+		if (cert->get_encoding(cert, CERT_ASN1_DER, &encoding))
 		{
 			b = vici_builder_create();
-			b->add_kv(b, "type", "%N",
-					  certificate_type_names, cert->get_type(cert));
-			if (has_privkey(this, cert))
+			b->add_kv(b, "type", "%N", certificate_type_names, CERT_X509);
+			b->add_kv(b, "flag", "%N", x509_flag_names, flag);
+			if (has_privkey(cert))
 			{
 				b->add_kv(b, "has_privkey", "yes");
 			}
@@ -782,15 +884,282 @@ CALLBACK(list_certs, vici_message_t*,
 
 			this->dispatcher->raise_event(this->dispatcher, "list-cert", id,
 										  b->finalize(b));
-			list->insert_last(list, cert->get_ref(cert));
 		}
 	}
 	enumerator->destroy(enumerator);
+}
 
-	list->destroy_offset(list, offsetof(certificate_t, destroy));
-	DESTROY_IF(subject);
+/**
+ * Enumerate all non-X.509 certificate types
+ */
+static void enum_others(private_vici_query_t *this, u_int id,
+						linked_list_t *certs, certificate_type_t type)
+{
+	enumerator_t *enumerator;
+	certificate_t *cert;
+	vici_builder_t *b;
+	chunk_t encoding, t_ch;
+	cred_encoding_type_t encoding_type;
+	identification_t *subject;
+	time_t not_before, not_after;
+
+	encoding_type = (type == CERT_TRUSTED_PUBKEY) ? PUBKEY_SPKI_ASN1_DER :
+													CERT_ASN1_DER;
+
+	enumerator = certs->create_enumerator(certs);
+	while (enumerator->enumerate(enumerator, &cert))
+	{
+		if (cert->get_encoding(cert, encoding_type, &encoding))
+		{
+			b = vici_builder_create();
+			b->add_kv(b, "type", "%N", certificate_type_names, type);
+			if (has_privkey(cert))
+			{
+				b->add_kv(b, "has_privkey", "yes");
+			}
+			b->add(b, VICI_KEY_VALUE, "data", encoding);
+			free(encoding.ptr);
+
+			if (type == CERT_TRUSTED_PUBKEY)
+			{
+				subject = cert->get_subject(cert);
+				if (subject->get_type(subject) != ID_KEY_ID)
+				{
+					b->add_kv(b, "subject", "%Y", cert->get_subject(cert));
+				}
+				cert->get_validity(cert, NULL, &not_before, &not_after);
+				if (not_before != UNDEFINED_TIME)
+				{
+					t_ch = asn1_from_time(&not_before, ASN1_GENERALIZEDTIME);
+					b->add(b, VICI_KEY_VALUE, "not-before", chunk_skip(t_ch, 2));
+					chunk_free(&t_ch);
+				}
+				if (not_after != UNDEFINED_TIME)
+				{
+					t_ch = asn1_from_time(&not_after, ASN1_GENERALIZEDTIME);
+					b->add(b, VICI_KEY_VALUE, "not-after", chunk_skip(t_ch, 2));
+					chunk_free(&t_ch);
+				}
+			}
+			this->dispatcher->raise_event(this->dispatcher, "list-cert", id,
+										  b->finalize(b));
+		}
+	}
+	enumerator->destroy(enumerator);
+}
+
+/**
+ * Enumerate all certificates of a given type
+ */
+static void enum_certs(private_vici_query_t *this,	u_int id,
+					   cert_filter_t *filter, certificate_type_t type)
+{
+	enumerator_t *e1, *e2;
+	certificate_t *cert, *current;
+	linked_list_t *certs;
+	bool found;
+
+	if (filter->type != CERT_ANY && filter->type != type)
+	{
+		return;
+	}
+	certs = linked_list_create();
+
+	e1 = lib->credmgr->create_cert_enumerator(lib->credmgr, type, KEY_ANY,
+											  filter->subject, FALSE);
+	while (e1->enumerate(e1, &cert))
+	{
+		found = FALSE;
+
+		e2 = certs->create_enumerator(certs);
+		while (e2->enumerate(e2, &current))
+		{
+			if (current->equals(current, cert))
+			{
+				found = TRUE;
+				break;
+			}
+		}
+		e2->destroy(e2);
+
+		if (!found)
+		{
+			certs->insert_last(certs, cert->get_ref(cert));
+		}
+	}
+	e1->destroy(e1);
+
+	if (type == CERT_X509)
+	{
+		enum_x509(this, id, certs, filter, X509_NONE);
+		enum_x509(this, id, certs, filter, X509_CA);
+		enum_x509(this, id, certs, filter, X509_AA);
+		enum_x509(this, id, certs, filter, X509_OCSP_SIGNER);
+	}
+	else
+	{
+		enum_others(this, id, certs, type);
+	}
+	certs->destroy_offset(certs, offsetof(certificate_t, destroy));
+}
+
+CALLBACK(list_certs, vici_message_t*,
+	private_vici_query_t *this, char *name, u_int id, vici_message_t *request)
+{
+	cert_filter_t filter = {
+		.type = CERT_ANY,
+		.flag = X509_ANY,
+		.subject = NULL
+	};
+	vici_builder_t *b;
+	char *str;
+
+	str = request->get_str(request, "ANY", "type");
+	if (enum_from_name(certificate_type_names, str, &filter.type))
+	{
+		if (filter.type == CERT_X509)
+		{
+			str = request->get_str(request, "ANY", "flag");
+			if (!enum_from_name(x509_flag_names, str, &filter.flag))
+			{
+				DBG1(DBG_CFG, "invalid certificate flag '%s'", str);
+				goto finalize;
+			}
+		}
+	}
+	else if	(!vici_cert_info_from_str(str, &filter.type, &filter.flag))
+	{
+		DBG1(DBG_CFG, "invalid certificate type '%s'", str);
+		goto finalize;
+	}
+
+	str = request->get_str(request, NULL, "subject");
+	if (str)
+	{
+		filter.subject = identification_create_from_string(str);
+	}
+
+	enum_certs(this, id, &filter, CERT_TRUSTED_PUBKEY);
+	enum_certs(this, id, &filter, CERT_X509);
+	enum_certs(this, id, &filter, CERT_X509_AC);
+	enum_certs(this, id, &filter, CERT_X509_CRL);
+	enum_certs(this, id, &filter, CERT_X509_OCSP_RESPONSE);
+	DESTROY_IF(filter.subject);
+
+finalize:
+	b = vici_builder_create();
+	return b->finalize(b);
+}
+
+/**
+ * Add a key/value pair of ALG => plugin
+ */
+static void add_algorithm(vici_builder_t *b, enum_name_t *alg_names,
+						  int alg_type, const char *plugin_name)
+{
+	char alg_name[BUF_LEN];
+
+	sprintf(alg_name, "%N", alg_names, alg_type);
+	b->add_kv(b, alg_name, (char*)plugin_name);
+}
+
+CALLBACK(get_algorithms, vici_message_t*,
+	private_vici_query_t *this, char *name, u_int id, vici_message_t *request)
+{
+	vici_builder_t *b;
+	enumerator_t *enumerator;
+	encryption_algorithm_t encryption;
+	integrity_algorithm_t integrity;
+	hash_algorithm_t hash;
+	pseudo_random_function_t prf;
+	ext_out_function_t xof;
+	diffie_hellman_group_t group;
+	rng_quality_t quality;
+	const char *plugin_name;
 
 	b = vici_builder_create();
+
+	b->begin_section(b, "encryption");
+	enumerator = lib->crypto->create_crypter_enumerator(lib->crypto);
+	while (enumerator->enumerate(enumerator, &encryption, &plugin_name))
+	{
+		add_algorithm(b, encryption_algorithm_names, encryption, plugin_name);
+	}
+	enumerator->destroy(enumerator);
+	b->end_section(b);
+
+	b->begin_section(b, "integrity");
+	enumerator = lib->crypto->create_signer_enumerator(lib->crypto);
+	while (enumerator->enumerate(enumerator, &integrity, &plugin_name))
+	{
+		add_algorithm(b, integrity_algorithm_names, integrity, plugin_name);
+	}
+	enumerator->destroy(enumerator);
+	b->end_section(b);
+
+	b->begin_section(b, "aead");
+	enumerator = lib->crypto->create_aead_enumerator(lib->crypto);
+	while (enumerator->enumerate(enumerator, &encryption, &plugin_name))
+	{
+		add_algorithm(b, encryption_algorithm_names, encryption, plugin_name);
+	}
+	enumerator->destroy(enumerator);
+	b->end_section(b);
+
+	b->begin_section(b, "hasher");
+	enumerator = lib->crypto->create_hasher_enumerator(lib->crypto);
+	while (enumerator->enumerate(enumerator, &hash, &plugin_name))
+	{
+		add_algorithm(b, hash_algorithm_names, hash, plugin_name);
+	}
+	enumerator->destroy(enumerator);
+	b->end_section(b);
+
+	b->begin_section(b, "prf");
+	enumerator = lib->crypto->create_prf_enumerator(lib->crypto);
+	while (enumerator->enumerate(enumerator, &prf, &plugin_name))
+	{
+		add_algorithm(b, pseudo_random_function_names, prf, plugin_name);
+	}
+	enumerator->destroy(enumerator);
+	b->end_section(b);
+
+	b->begin_section(b, "xof");
+	enumerator = lib->crypto->create_xof_enumerator(lib->crypto);
+	while (enumerator->enumerate(enumerator, &xof, &plugin_name))
+	{
+		add_algorithm(b, ext_out_function_names, xof, plugin_name);
+	}
+	enumerator->destroy(enumerator);
+	b->end_section(b);
+
+	b->begin_section(b, "dh");
+	enumerator = lib->crypto->create_dh_enumerator(lib->crypto);
+	while (enumerator->enumerate(enumerator, &group, &plugin_name))
+	{
+		add_algorithm(b, diffie_hellman_group_names, group, plugin_name);
+	}
+	enumerator->destroy(enumerator);
+	b->end_section(b);
+
+	b->begin_section(b, "rng");
+	enumerator = lib->crypto->create_rng_enumerator(lib->crypto);
+	while (enumerator->enumerate(enumerator, &quality, &plugin_name))
+	{
+		add_algorithm(b, rng_quality_names, quality, plugin_name);
+	}
+	enumerator->destroy(enumerator);
+	b->end_section(b);
+
+	b->begin_section(b, "nonce-gen");
+	enumerator = lib->crypto->create_nonce_gen_enumerator(lib->crypto);
+	while (enumerator->enumerate(enumerator, &plugin_name))
+	{
+		b->add_kv(b, "NONCE_GEN", (char*)plugin_name);
+	}
+	enumerator->destroy(enumerator);
+	b->end_section(b);
+
 	return b->finalize(b);
 }
 
@@ -800,7 +1169,6 @@ CALLBACK(version, vici_message_t*,
 	vici_builder_t *b;
 
 	b = vici_builder_create();
-
 	b->add_kv(b, "daemon", "%s", lib->ns);
 	b->add_kv(b, "version", "%s", VERSION);
 
@@ -839,18 +1207,6 @@ CALLBACK(version, vici_message_t*,
 	}
 #endif /* !WIN32 */
 	return b->finalize(b);
-}
-
-/**
- * Callback function for memusage summary
- */
-CALLBACK(sum_usage, void,
-	vici_builder_t *b, int count, size_t bytes, int whitelisted)
-{
-	b->begin_section(b, "mem");
-	b->add_kv(b, "total", "%zu", bytes);
-	b->add_kv(b, "allocs", "%d", count);
-	b->end_section(b);
 }
 
 CALLBACK(stats, vici_message_t*,
@@ -902,7 +1258,7 @@ CALLBACK(stats, vici_message_t*,
 		charon->ike_sa_manager->get_count(charon->ike_sa_manager));
 	b->add_kv(b, "half-open", "%u",
 		charon->ike_sa_manager->get_half_open_count(charon->ike_sa_manager,
-													NULL));
+													NULL, FALSE));
 	b->end_section(b);
 
 	b->begin_list(b, "plugins");
@@ -914,12 +1270,7 @@ CALLBACK(stats, vici_message_t*,
 	enumerator->destroy(enumerator);
 	b->end_list(b);
 
-	if (lib->leak_detective)
-	{
-		lib->leak_detective->usage(lib->leak_detective, NULL, sum_usage, b);
-	}
 #ifdef WIN32
-	else
 	{
 		DWORD lasterr = ERROR_INVALID_HANDLE;
 		HANDLE heaps[32];
@@ -976,10 +1327,10 @@ CALLBACK(stats, vici_message_t*,
 		struct mallinfo mi = mallinfo();
 
 		b->begin_section(b, "mallinfo");
-		b->add_kv(b, "sbrk", "%d", mi.arena);
-		b->add_kv(b, "mmap", "%d", mi.hblkhd);
-		b->add_kv(b, "used", "%d", mi.uordblks);
-		b->add_kv(b, "free", "%d", mi.fordblks);
+		b->add_kv(b, "sbrk", "%u", mi.arena);
+		b->add_kv(b, "mmap", "%u", mi.hblkhd);
+		b->add_kv(b, "used", "%u", mi.uordblks);
+		b->add_kv(b, "free", "%u", mi.fordblks);
 		b->end_section(b);
 	}
 #endif /* HAVE_MALLINFO */
@@ -1003,12 +1354,151 @@ static void manage_commands(private_vici_query_t *this, bool reg)
 	this->dispatcher->manage_event(this->dispatcher, "list-policy", reg);
 	this->dispatcher->manage_event(this->dispatcher, "list-conn", reg);
 	this->dispatcher->manage_event(this->dispatcher, "list-cert", reg);
+	this->dispatcher->manage_event(this->dispatcher, "ike-updown", reg);
+	this->dispatcher->manage_event(this->dispatcher, "ike-rekey", reg);
+	this->dispatcher->manage_event(this->dispatcher, "child-updown", reg);
+	this->dispatcher->manage_event(this->dispatcher, "child-rekey", reg);
 	manage_command(this, "list-sas", list_sas, reg);
 	manage_command(this, "list-policies", list_policies, reg);
 	manage_command(this, "list-conns", list_conns, reg);
 	manage_command(this, "list-certs", list_certs, reg);
+	manage_command(this, "get-algorithms", get_algorithms, reg);
 	manage_command(this, "version", version, reg);
 	manage_command(this, "stats", stats, reg);
+}
+
+METHOD(listener_t, ike_updown, bool,
+	private_vici_query_t *this, ike_sa_t *ike_sa, bool up)
+{
+	vici_builder_t *b;
+	time_t now;
+
+	if (!this->dispatcher->has_event_listeners(this->dispatcher, "ike-updown"))
+	{
+		return TRUE;
+	}
+
+	now = time_monotonic(NULL);
+
+	b = vici_builder_create();
+
+	if (up)
+	{
+		b->add_kv(b, "up", "yes");
+	}
+
+	b->begin_section(b, ike_sa->get_name(ike_sa));
+	list_ike(this, b, ike_sa, now);
+	b->end_section(b);
+
+	this->dispatcher->raise_event(this->dispatcher,
+								  "ike-updown", 0, b->finalize(b));
+
+	return TRUE;
+}
+
+METHOD(listener_t, ike_rekey, bool,
+	private_vici_query_t *this, ike_sa_t *old, ike_sa_t *new)
+{
+	vici_builder_t *b;
+	time_t now;
+
+	if (!this->dispatcher->has_event_listeners(this->dispatcher, "ike-rekey"))
+	{
+		return TRUE;
+	}
+
+	now = time_monotonic(NULL);
+
+	b = vici_builder_create();
+	b->begin_section(b, old->get_name(old));
+	b->begin_section(b, "old");
+	list_ike(this, b, old, now);
+	b->end_section(b);
+	b->begin_section(b, "new");
+	list_ike(this, b, new, now);
+	b->end_section(b);
+	b->end_section(b);
+
+	this->dispatcher->raise_event(this->dispatcher,
+								  "ike-rekey", 0, b->finalize(b));
+
+	return TRUE;
+}
+
+METHOD(listener_t, child_updown, bool,
+	private_vici_query_t *this, ike_sa_t *ike_sa, child_sa_t *child_sa, bool up)
+{
+	vici_builder_t *b;
+	time_t now;
+
+	if (!this->dispatcher->has_event_listeners(this->dispatcher, "child-updown"))
+	{
+		return TRUE;
+	}
+
+	now = time_monotonic(NULL);
+	b = vici_builder_create();
+
+	if (up)
+	{
+		b->add_kv(b, "up", "yes");
+	}
+
+	b->begin_section(b, ike_sa->get_name(ike_sa));
+	list_ike(this, b, ike_sa, now);
+	b->begin_section(b, "child-sas");
+
+	b->begin_section(b, child_sa->get_name(child_sa));
+	list_child(this, b, child_sa, now);
+	b->end_section(b);
+
+	b->end_section(b);
+	b->end_section(b);
+
+	this->dispatcher->raise_event(this->dispatcher,
+								  "child-updown", 0, b->finalize(b));
+
+	return TRUE;
+}
+
+METHOD(listener_t, child_rekey, bool,
+	private_vici_query_t *this, ike_sa_t *ike_sa, child_sa_t *old,
+	child_sa_t *new)
+{
+	vici_builder_t *b;
+	time_t now;
+
+	if (!this->dispatcher->has_event_listeners(this->dispatcher, "child-rekey"))
+	{
+		return TRUE;
+	}
+
+	now = time_monotonic(NULL);
+	b = vici_builder_create();
+
+	b->begin_section(b, ike_sa->get_name(ike_sa));
+	list_ike(this, b, ike_sa, now);
+	b->begin_section(b, "child-sas");
+
+	b->begin_section(b, old->get_name(old));
+
+	b->begin_section(b, "old");
+	list_child(this, b, old, now);
+	b->end_section(b);
+	b->begin_section(b, "new");
+	list_child(this, b, new, now);
+	b->end_section(b);
+
+	b->end_section(b);
+
+	b->end_section(b);
+	b->end_section(b);
+
+	this->dispatcher->raise_event(this->dispatcher,
+								  "child-rekey", 0, b->finalize(b));
+
+	return TRUE;
 }
 
 METHOD(vici_query_t, destroy, void,
@@ -1027,6 +1517,12 @@ vici_query_t *vici_query_create(vici_dispatcher_t *dispatcher)
 
 	INIT(this,
 		.public = {
+			.listener = {
+				.ike_updown = _ike_updown,
+				.ike_rekey = _ike_rekey,
+				.child_updown = _child_updown,
+				.child_rekey = _child_rekey,
+			},
 			.destroy = _destroy,
 		},
 		.dispatcher = dispatcher,

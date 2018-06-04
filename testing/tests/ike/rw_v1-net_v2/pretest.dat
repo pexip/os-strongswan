@@ -1,7 +1,8 @@
 moon::ipsec start
 sun::ipsec start
 carol::ipsec start
-moon::sleep 1 
+sun::expect-connection net-net
+moon::expect-connection net-net
+carol::expect-connection home
 moon::ipsec up net-net
 carol::ipsec up home
-moon::sleep 1

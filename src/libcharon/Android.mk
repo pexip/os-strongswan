@@ -3,9 +3,14 @@ include $(CLEAR_VARS)
 
 # copy-n-paste from Makefile.am
 libcharon_la_SOURCES := \
+attributes/attributes.c attributes/attributes.h \
+attributes/attribute_provider.h attributes/attribute_handler.h \
+attributes/attribute_manager.c attributes/attribute_manager.h \
+attributes/mem_pool.c attributes/mem_pool.h \
 bus/bus.c bus/bus.h \
 bus/listeners/listener.h \
 bus/listeners/logger.h \
+bus/listeners/custom_logger.h \
 bus/listeners/file_logger.c bus/listeners/file_logger.h \
 config/backend_manager.c config/backend_manager.h config/backend.h \
 config/child_cfg.c config/child_cfg.h \
@@ -43,7 +48,10 @@ encoding/payloads/unknown_payload.c encoding/payloads/unknown_payload.h \
 encoding/payloads/vendor_id_payload.c encoding/payloads/vendor_id_payload.h \
 encoding/payloads/hash_payload.c encoding/payloads/hash_payload.h \
 encoding/payloads/fragment_payload.c encoding/payloads/fragment_payload.h \
-kernel/kernel_handler.c kernel/kernel_handler.h \
+kernel/kernel_interface.c kernel/kernel_interface.h \
+kernel/kernel_ipsec.c kernel/kernel_ipsec.h \
+kernel/kernel_net.c kernel/kernel_net.h \
+kernel/kernel_listener.h kernel/kernel_handler.c kernel/kernel_handler.h \
 network/receiver.c network/receiver.h network/sender.c network/sender.h \
 network/socket.c network/socket.h \
 network/socket_manager.c network/socket_manager.h \
@@ -52,6 +60,7 @@ processing/jobs/delete_child_sa_job.c processing/jobs/delete_child_sa_job.h \
 processing/jobs/delete_ike_sa_job.c processing/jobs/delete_ike_sa_job.h \
 processing/jobs/migrate_job.c processing/jobs/migrate_job.h \
 processing/jobs/process_message_job.c processing/jobs/process_message_job.h \
+processing/jobs/redirect_job.c processing/jobs/redirect_job.h \
 processing/jobs/rekey_child_sa_job.c processing/jobs/rekey_child_sa_job.h \
 processing/jobs/rekey_ike_sa_job.c processing/jobs/rekey_ike_sa_job.h \
 processing/jobs/retransmit_job.c processing/jobs/retransmit_job.h \
@@ -62,6 +71,7 @@ processing/jobs/start_action_job.c processing/jobs/start_action_job.h \
 processing/jobs/roam_job.c processing/jobs/roam_job.h \
 processing/jobs/update_sa_job.c processing/jobs/update_sa_job.h \
 processing/jobs/inactivity_job.c processing/jobs/inactivity_job.h \
+processing/jobs/initiate_tasks_job.c processing/jobs/initiate_tasks_job.h \
 sa/eap/eap_method.c sa/eap/eap_method.h sa/eap/eap_inner_method.h \
 sa/eap/eap_manager.c sa/eap/eap_manager.h \
 sa/xauth/xauth_method.c sa/xauth/xauth_method.h \
@@ -72,9 +82,11 @@ sa/ike_sa.c sa/ike_sa.h \
 sa/ike_sa_id.c sa/ike_sa_id.h \
 sa/keymat.h sa/keymat.c \
 sa/ike_sa_manager.c sa/ike_sa_manager.h \
+sa/child_sa_manager.c sa/child_sa_manager.h \
 sa/task_manager.h sa/task_manager.c \
 sa/shunt_manager.c sa/shunt_manager.h \
 sa/trap_manager.c sa/trap_manager.h \
+sa/redirect_provider.h sa/redirect_manager.c sa/redirect_manager.h \
 sa/task.c sa/task.h
 
 libcharon_la_SOURCES += \
@@ -97,8 +109,11 @@ sa/ikev2/tasks/ike_natd.c sa/ikev2/tasks/ike_natd.h \
 sa/ikev2/tasks/ike_mobike.c sa/ikev2/tasks/ike_mobike.h \
 sa/ikev2/tasks/ike_rekey.c sa/ikev2/tasks/ike_rekey.h \
 sa/ikev2/tasks/ike_reauth.c sa/ikev2/tasks/ike_reauth.h \
+sa/ikev2/tasks/ike_reauth_complete.c sa/ikev2/tasks/ike_reauth_complete.h \
+sa/ikev2/tasks/ike_redirect.c sa/ikev2/tasks/ike_redirect.h \
 sa/ikev2/tasks/ike_auth_lifetime.c sa/ikev2/tasks/ike_auth_lifetime.h \
-sa/ikev2/tasks/ike_vendor.c sa/ikev2/tasks/ike_vendor.h
+sa/ikev2/tasks/ike_vendor.c sa/ikev2/tasks/ike_vendor.h \
+sa/ikev2/tasks/ike_verify_peer_cert.c sa/ikev2/tasks/ike_verify_peer_cert.h
 
 libcharon_la_SOURCES += \
 sa/ikev1/keymat_v1.c sa/ikev1/keymat_v1.h \
@@ -141,6 +156,8 @@ LOCAL_LDLIBS += -llog
 endif
 
 LOCAL_SRC_FILES += $(call add_plugin, attr)
+
+LOCAL_SRC_FILES += $(call add_plugin, p-cscf)
 
 LOCAL_SRC_FILES += $(call add_plugin, eap-aka)
 
@@ -209,6 +226,10 @@ endif
 
 LOCAL_SRC_FILES += $(call add_plugin, load-tester)
 
+LOCAL_SRC_FILES += $(call add_plugin, kernel-pfkey)
+
+LOCAL_SRC_FILES += $(call add_plugin, kernel-netlink)
+
 LOCAL_SRC_FILES += $(call add_plugin, socket-default)
 
 LOCAL_SRC_FILES += $(call add_plugin, socket-dynamic)
@@ -221,8 +242,6 @@ endif
 # build libcharon --------------------------------------------------------------
 
 LOCAL_C_INCLUDES += \
-	$(strongswan_PATH)/src/include \
-	$(strongswan_PATH)/src/libhydra \
 	$(strongswan_PATH)/src/libstrongswan
 
 LOCAL_CFLAGS := $(strongswan_CFLAGS)
@@ -235,7 +254,6 @@ LOCAL_ARM_MODE := arm
 
 LOCAL_PRELINK_MODULE := false
 
-LOCAL_SHARED_LIBRARIES += libstrongswan libhydra
+LOCAL_SHARED_LIBRARIES += libstrongswan
 
 include $(BUILD_SHARED_LIBRARY)
-

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Reto Buerki
+ * Copyright (C) 2012-2014 Reto Buerki
  * Copyright (C) 2012 Adrian-Ken Rueegsegger
  * Hochschule fuer Technik Rapperswil
  *
@@ -26,7 +26,6 @@
 #include "tkm_utils.h"
 #include "tkm_types.h"
 #include "tkm_keymat.h"
-#include "tkm_kernel_sad.h"
 #include "tkm_kernel_ipsec.h"
 
 /** From linux/in.h */
@@ -51,16 +50,11 @@ struct private_tkm_kernel_ipsec_t {
 	 */
 	rng_t *rng;
 
-	/**
-	 * CHILD/ESP SA database.
-	 */
-	tkm_kernel_sad_t *sad;
-
 };
 
 METHOD(kernel_ipsec_t, get_spi, status_t,
 	private_tkm_kernel_ipsec_t *this, host_t *src, host_t *dst,
-	u_int8_t protocol, u_int32_t reqid, u_int32_t *spi)
+	uint8_t protocol, uint32_t *spi)
 {
 	bool result;
 
@@ -74,30 +68,23 @@ METHOD(kernel_ipsec_t, get_spi, status_t,
 		}
 	}
 
-	DBG1(DBG_KNL, "getting SPI for reqid {%u}", reqid);
-	result = this->rng->get_bytes(this->rng, sizeof(u_int32_t),
-								  (u_int8_t *)spi);
+	result = this->rng->get_bytes(this->rng, sizeof(uint32_t),
+								  (uint8_t *)spi);
 	return result ? SUCCESS : FAILED;
 }
 
 METHOD(kernel_ipsec_t, get_cpi, status_t,
 	private_tkm_kernel_ipsec_t *this, host_t *src, host_t *dst,
-	u_int32_t reqid, u_int16_t *cpi)
+	uint16_t *cpi)
 {
 	return NOT_SUPPORTED;
 }
 
 METHOD(kernel_ipsec_t, add_sa, status_t,
-	private_tkm_kernel_ipsec_t *this, host_t *src, host_t *dst,
-	u_int32_t spi, u_int8_t protocol, u_int32_t reqid, mark_t mark,
-	u_int32_t tfc, lifetime_cfg_t *lifetime, u_int16_t enc_alg, chunk_t enc_key,
-	u_int16_t int_alg, chunk_t int_key, ipsec_mode_t mode,
-	u_int16_t ipcomp, u_int16_t cpi, u_int32_t replay_window,
-	bool _initiator, bool encap, bool esn, bool inbound,
-	traffic_selector_t* src_ts, traffic_selector_t* dst_ts)
+	private_tkm_kernel_ipsec_t *this, kernel_ipsec_sa_id_t *id,
+	kernel_ipsec_add_sa_t *data)
 {
 	esa_info_t esa;
-	bool initiator;
 	esp_spi_type spi_loc, spi_rem;
 	host_t *local, *peer;
 	chunk_t *nonce_loc, *nonce_rem;
@@ -105,45 +92,43 @@ METHOD(kernel_ipsec_t, add_sa, status_t,
 	esa_id_type esa_id;
 	nonce_type nc_rem;
 
-	if (enc_key.ptr == NULL)
+	if (data->enc_key.ptr == NULL)
 	{
 		DBG1(DBG_KNL, "Unable to get ESA information");
 		return FAILED;
 	}
-	esa = *(esa_info_t *)(enc_key.ptr);
+	esa = *(esa_info_t *)(data->enc_key.ptr);
 
 	/* only handle the case where we have both distinct ESP spi's available */
-	if (esa.spi_r == spi)
+	if (esa.spi_r == id->spi)
 	{
 		chunk_free(&esa.nonce_i);
 		chunk_free(&esa.nonce_r);
 		return SUCCESS;
 	}
 
-	/* Initiator if encr_r is passed as enc_key to the inbound add_sa call */
-	/* TODO: does the new _initiator parameter have the same meaning? */
-	initiator = esa.is_encr_r && inbound;
-	if (initiator)
+	if (data->initiator)
 	{
-		spi_loc = spi;
+		spi_loc = id->spi;
 		spi_rem = esa.spi_r;
-		local = dst;
-		peer = src;
+		local = id->dst;
+		peer = id->src;
 		nonce_loc = &esa.nonce_i;
 		nonce_rem = &esa.nonce_r;
 	}
 	else
 	{
 		spi_loc = esa.spi_r;
-		spi_rem = spi;
-		local = src;
-		peer = dst;
+		spi_rem = id->spi;
+		local = id->src;
+		peer = id->dst;
 		nonce_loc = &esa.nonce_r;
 		nonce_rem = &esa.nonce_i;
 	}
 
 	esa_id = tkm->idmgr->acquire_id(tkm->idmgr, TKM_CTX_ESA);
-	if (!this->sad->insert(this->sad, esa_id, peer, local, spi_loc, protocol))
+	if (!tkm->sad->insert(tkm->sad, esa_id, data->reqid, local, peer,
+						  spi_loc, spi_rem, id->proto))
 	{
 		DBG1(DBG_KNL, "unable to add entry (%llu) to SAD", esa_id);
 		goto sad_failure;
@@ -156,8 +141,8 @@ METHOD(kernel_ipsec_t, add_sa, status_t,
 	nonce_loc_id = tkm->chunk_map->get_id(tkm->chunk_map, nonce_loc);
 	if (nonce_loc_id == 0 && esa.dh_id == 0)
 	{
-		if (ike_esa_create_first(esa_id, esa.isa_id, reqid, 1, spi_loc, spi_rem)
-			!= TKM_OK)
+		if (ike_esa_create_first(esa_id, esa.isa_id, data->reqid, 1, spi_loc,
+								 spi_rem) != TKM_OK)
 		{
 			DBG1(DBG_KNL, "child SA (%llu, first) creation failed", esa_id);
 			goto failure;
@@ -167,25 +152,28 @@ METHOD(kernel_ipsec_t, add_sa, status_t,
 	else if (nonce_loc_id != 0 && esa.dh_id == 0)
 	{
 		chunk_to_sequence(nonce_rem, &nc_rem, sizeof(nonce_type));
-		if (ike_esa_create_no_pfs(esa_id, esa.isa_id, reqid, 1, nonce_loc_id,
-								  nc_rem, initiator, spi_loc, spi_rem)
-			!= TKM_OK)
+		if (ike_esa_create_no_pfs(esa_id, esa.isa_id, data->reqid, 1,
+								  nonce_loc_id, nc_rem, data->initiator,
+								  spi_loc, spi_rem) != TKM_OK)
 		{
 			DBG1(DBG_KNL, "child SA (%llu, no PFS) creation failed", esa_id);
 			goto failure;
 		}
+		tkm->chunk_map->remove(tkm->chunk_map, nonce_loc);
 		tkm->idmgr->release_id(tkm->idmgr, TKM_CTX_NONCE, nonce_loc_id);
 	}
 	/* creation of subsequent child SA with PFS: nonce and dh context are set */
 	else
 	{
 		chunk_to_sequence(nonce_rem, &nc_rem, sizeof(nonce_type));
-		if (ike_esa_create(esa_id, esa.isa_id, reqid, 1, esa.dh_id, nonce_loc_id,
-						   nc_rem, initiator, spi_loc, spi_rem) != TKM_OK)
+		if (ike_esa_create(esa_id, esa.isa_id, data->reqid, 1, esa.dh_id,
+						   nonce_loc_id, nc_rem, data->initiator, spi_loc,
+						   spi_rem) != TKM_OK)
 		{
 			DBG1(DBG_KNL, "child SA (%llu) creation failed", esa_id);
 			goto failure;
 		}
+		tkm->chunk_map->remove(tkm->chunk_map, nonce_loc);
 		tkm->idmgr->release_id(tkm->idmgr, TKM_CTX_NONCE, nonce_loc_id);
 	}
 	if (ike_esa_select(esa_id) != TKM_OK)
@@ -200,14 +188,14 @@ METHOD(kernel_ipsec_t, add_sa, status_t,
 
 	DBG1(DBG_KNL, "added child SA (esa: %llu, isa: %llu, esp_spi_loc: %x, "
 		 "esp_spi_rem: %x, role: %s)", esa_id, esa.isa_id, ntohl(spi_loc),
-		 ntohl(spi_rem), initiator ? "initiator" : "responder");
+		 ntohl(spi_rem), data->initiator ? "initiator" : "responder");
 	chunk_free(&esa.nonce_i);
 	chunk_free(&esa.nonce_r);
 
 	return SUCCESS;
 
 failure:
-	this->sad->remove(this->sad, esa_id);
+	tkm->sad->remove(tkm->sad, esa_id);
 sad_failure:
 	tkm->idmgr->release_id(tkm->idmgr, TKM_CTX_ESA, esa_id);
 	chunk_free(&esa.nonce_i);
@@ -216,39 +204,50 @@ sad_failure:
 }
 
 METHOD(kernel_ipsec_t, query_sa, status_t,
-	private_tkm_kernel_ipsec_t *this, host_t *src, host_t *dst,
-	u_int32_t spi, u_int8_t protocol, mark_t mark, u_int64_t *bytes,
-	u_int64_t *packets, time_t *time)
+	private_tkm_kernel_ipsec_t *this, kernel_ipsec_sa_id_t *id,
+	kernel_ipsec_query_sa_t *data, uint64_t *bytes, uint64_t *packets,
+	time_t *time)
 {
 	return NOT_SUPPORTED;
 }
 
 METHOD(kernel_ipsec_t, del_sa, status_t,
-	private_tkm_kernel_ipsec_t *this, host_t *src, host_t *dst,
-	u_int32_t spi, u_int8_t protocol, u_int16_t cpi, mark_t mark)
+	private_tkm_kernel_ipsec_t *this, kernel_ipsec_sa_id_t *id,
+	kernel_ipsec_del_sa_t *data)
 {
-	esa_id_type esa_id;
+	esa_id_type esa_id, other_esa_id;
 
-	esa_id = this->sad->get_esa_id(this->sad, src, dst, spi, protocol);
+	esa_id = tkm->sad->get_esa_id(tkm->sad, id->src, id->dst,
+								  id->spi, id->proto);
 	if (esa_id)
 	{
+		other_esa_id = tkm->sad->get_other_esa_id(tkm->sad, esa_id);
+		if (other_esa_id)
+		{
+			DBG1(DBG_KNL, "selecting child SA (esa: %llu)", other_esa_id);
+			if (ike_esa_select(other_esa_id) != TKM_OK)
+			{
+				DBG1(DBG_KNL, "error selecting other child SA (esa: %llu)",
+						other_esa_id);
+			}
+		}
+
 		DBG1(DBG_KNL, "deleting child SA (esa: %llu, spi: %x)", esa_id,
-			 ntohl(spi));
+			 ntohl(id->spi));
 		if (ike_esa_reset(esa_id) != TKM_OK)
 		{
 			DBG1(DBG_KNL, "child SA (%llu) deletion failed", esa_id);
 			return FAILED;
 		}
-		this->sad->remove(this->sad, esa_id);
+		tkm->sad->remove(tkm->sad, esa_id);
 		tkm->idmgr->release_id(tkm->idmgr, TKM_CTX_ESA, esa_id);
 	}
 	return SUCCESS;
 }
 
 METHOD(kernel_ipsec_t, update_sa, status_t,
-	private_tkm_kernel_ipsec_t *this, u_int32_t spi, u_int8_t protocol,
-	u_int16_t cpi, host_t *src, host_t *dst, host_t *new_src, host_t *new_dst,
-	bool old_encap, bool new_encap, mark_t mark)
+	private_tkm_kernel_ipsec_t *this, kernel_ipsec_sa_id_t *id,
+	kernel_ipsec_update_sa_t *data)
 {
 	return NOT_SUPPORTED;
 }
@@ -261,26 +260,22 @@ METHOD(kernel_ipsec_t, flush_sas, status_t,
 }
 
 METHOD(kernel_ipsec_t, add_policy, status_t,
-	private_tkm_kernel_ipsec_t *this, host_t *src, host_t *dst,
-	traffic_selector_t *src_ts, traffic_selector_t *dst_ts,
-	policy_dir_t direction, policy_type_t type, ipsec_sa_cfg_t *sa,
-	mark_t mark, policy_priority_t priority)
+	private_tkm_kernel_ipsec_t *this, kernel_ipsec_policy_id_t *id,
+	kernel_ipsec_manage_policy_t *data)
 {
 	return SUCCESS;
 }
 
 METHOD(kernel_ipsec_t, query_policy, status_t,
-	private_tkm_kernel_ipsec_t *this, traffic_selector_t *src_ts,
-	traffic_selector_t *dst_ts, policy_dir_t direction, mark_t mark,
-	time_t *use_time)
+	private_tkm_kernel_ipsec_t *this, kernel_ipsec_policy_id_t *id,
+	kernel_ipsec_query_policy_t *data, time_t *use_time)
 {
 	return NOT_SUPPORTED;
 }
 
 METHOD(kernel_ipsec_t, del_policy, status_t,
-	private_tkm_kernel_ipsec_t *this, traffic_selector_t *src_ts,
-	traffic_selector_t *dst_ts, policy_dir_t direction, u_int32_t reqid,
-	mark_t mark, policy_priority_t prio)
+	private_tkm_kernel_ipsec_t *this, kernel_ipsec_policy_id_t *id,
+	kernel_ipsec_manage_policy_t *data)
 {
 	return SUCCESS;
 }
@@ -334,7 +329,7 @@ METHOD(kernel_ipsec_t, bypass_socket, bool,
 }
 
 METHOD(kernel_ipsec_t, enable_udp_decap, bool,
-	private_tkm_kernel_ipsec_t *this, int fd, int family, u_int16_t port)
+	private_tkm_kernel_ipsec_t *this, int fd, int family, uint16_t port)
 {
 	int type = UDP_ENCAP_ESPINUDP;
 
@@ -350,7 +345,6 @@ METHOD(kernel_ipsec_t, destroy, void,
 	private_tkm_kernel_ipsec_t *this)
 {
 	DESTROY_IF(this->rng);
-	DESTROY_IF(this->sad);
 	free(this);
 }
 
@@ -380,15 +374,7 @@ tkm_kernel_ipsec_t *tkm_kernel_ipsec_create()
 				.destroy = _destroy,
 			},
 		},
-		.sad = tkm_kernel_sad_create(),
 	);
-
-	if (!this->sad)
-	{
-		DBG1(DBG_KNL, "unable to create SAD");
-		destroy(this);
-		return NULL;
-	}
 
 	return &this->public;
 }

@@ -1,6 +1,7 @@
 AM_CPPFLAGS = \
 	-I$(top_srcdir)/src/libstrongswan \
 	-I$(top_srcdir)/src/libtncif \
+	-I$(top_srcdir)/src/libtpmtss \
 	-DIPSEC_SCRIPT=\"${ipsec_script}\"
 
 ipseclib_LTLIBRARIES = libimcv.la
@@ -10,11 +11,8 @@ libimcv_la_LDFLAGS = \
 
 libimcv_la_LIBADD = \
 	$(top_builddir)/src/libstrongswan/libstrongswan.la \
-	$(top_builddir)/src/libtncif/libtncif.la
-
-if USE_TROUSERS
-  libimcv_la_LIBADD += -ltspi
-endif
+	$(top_builddir)/src/libtncif/libtncif.la \
+	$(top_builddir)/src/libtpmtss/libtpmtss.la
 
 if USE_WINDOWS
   libimcv_la_LIBADD += -lws2_32
@@ -36,11 +34,13 @@ libimcv_la_SOURCES = \
 	imv/imv_session.h imv/imv_session.c \
 	imv/imv_session_manager.h imv/imv_session_manager.c \
 	imv/imv_workitem.h imv/imv_workitem.c \
+	generic/generic_attr_bool.h generic/generic_attr_bool.c \
+	generic/generic_attr_chunk.h generic/generic_attr_chunk.c \
+	generic/generic_attr_string.h generic/generic_attr_string.c \
 	ietf/ietf_attr.h ietf/ietf_attr.c \
 	ietf/ietf_attr_assess_result.h ietf/ietf_attr_assess_result.c \
 	ietf/ietf_attr_attr_request.h ietf/ietf_attr_attr_request.c \
 	ietf/ietf_attr_fwd_enabled.h ietf/ietf_attr_fwd_enabled.c \
-	ietf/ietf_attr_default_pwd_enabled.h ietf/ietf_attr_default_pwd_enabled.c \
 	ietf/ietf_attr_installed_packages.h ietf/ietf_attr_installed_packages.c \
 	ietf/ietf_attr_numeric_version.h ietf/ietf_attr_numeric_version.c \
 	ietf/ietf_attr_op_status.h ietf/ietf_attr_op_status.c \
@@ -55,7 +55,6 @@ libimcv_la_SOURCES = \
 	ita/ita_attr_get_settings.h ita/ita_attr_get_settings.c \
 	ita/ita_attr_settings.h ita/ita_attr_settings.c \
 	ita/ita_attr_angel.h ita/ita_attr_angel.c \
-	ita/ita_attr_device_id.h ita/ita_attr_device_id.c \
 	os_info/os_info.h os_info/os_info.c \
 	pa_tnc/pa_tnc_attr.h \
 	pa_tnc/pa_tnc_msg.h pa_tnc/pa_tnc_msg.c \
@@ -65,7 +64,6 @@ libimcv_la_SOURCES = \
 	pts/pts_pcr.h pts/pts_pcr.c \
 	pts/pts_proto_caps.h \
 	pts/pts_req_func_comp_evid.h \
-	pts/pts_simple_evid_final.h \
 	pts/pts_creds.h pts/pts_creds.c \
 	pts/pts_database.h pts/pts_database.c \
 	pts/pts_dh_group.h pts/pts_dh_group.c \
@@ -84,6 +82,8 @@ libimcv_la_SOURCES = \
 	pts/components/ita/ita_comp_tboot.h pts/components/ita/ita_comp_tboot.c \
 	pts/components/ita/ita_comp_tgrub.h pts/components/ita/ita_comp_tgrub.c \
 	pts/components/tcg/tcg_comp_func_name.h pts/components/tcg/tcg_comp_func_name.c \
+	pwg/pwg_attr.h pwg/pwg_attr.c \
+	pwg/pwg_attr_vendor_smi_code.h pwg/pwg_attr_vendor_smi_code.c \
 	seg/seg_contract.h seg/seg_contract.c \
 	seg/seg_contract_manager.h seg/seg_contract_manager.c \
 	seg/seg_env.h seg/seg_env.c \
@@ -127,7 +127,8 @@ imv_policy_manager_SOURCES = \
 	imv/imv_policy_manager.c \
 	imv/imv_policy_manager_usage.h imv/imv_policy_manager_usage.c
 imv_policy_manager_LDADD = \
-	$(top_builddir)/src/libstrongswan/libstrongswan.la
+	$(top_builddir)/src/libstrongswan/libstrongswan.la \
+	$(top_builddir)/src/libtncif/libtncif.la
 #imv/imv_policy_manager.o :	$(top_builddir)/config.status
 
 SUBDIRS = .
@@ -172,6 +173,14 @@ if USE_IMV_SWID
   SUBDIRS += plugins/imv_swid
 endif
 
+if USE_IMC_HCD
+  SUBDIRS += plugins/imc_hcd
+endif
+
+if USE_IMV_HCD
+  SUBDIRS += plugins/imv_hcd
+endif
+
 TESTS = imcv_tests
 
 check_PROGRAMS = $(TESTS)
@@ -195,5 +204,6 @@ imcv_tests_CFLAGS = \
 imcv_tests_LDFLAGS = @COVERAGE_LDFLAGS@
 imcv_tests_LDADD = \
 	$(top_builddir)/src/libimcv/libimcv.la \
+	$(top_builddir)/src/libtpmtss/libtpmtss.la \
 	$(top_builddir)/src/libstrongswan/libstrongswan.la \
 	$(top_builddir)/src/libstrongswan/tests/libtest.la

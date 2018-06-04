@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2013 Tobias Brunner
- * Copyright (C) 2012 Reto Buerki
+ * Copyright (C) 2012-2014 Reto Buerki
  * Copyright (C) 2012 Adrian-Ken Rueegsegger
  * Hochschule fuer Technik Rapperswil
  *
@@ -18,7 +18,6 @@
 #include <tests/test_runner.h>
 
 #include <library.h>
-#include <hydra.h>
 #include <daemon.h>
 
 #include "tkm.h"
@@ -36,8 +35,8 @@
 static test_configuration_t tests[] = {
 #define TEST_SUITE(x) \
 	{ .suite = x, },
-#define TEST_SUITE_DEPEND(x, type, args) \
-	{ .suite = x, .feature = PLUGIN_DEPENDS(type, args) },
+#define TEST_SUITE_DEPEND(x, type, ...) \
+	{ .suite = x, .feature = PLUGIN_DEPENDS(type, __VA_ARGS__) },
 #include "tests.h"
 	{ .suite = NULL, }
 };
@@ -50,10 +49,9 @@ static bool test_runner_init(bool init)
 
 	if (init)
 	{
-		libhydra_init();
 		libcharon_init();
 		lib->settings->set_int(lib->settings,
-							   "test_runner.filelog.stdout.default", 0);
+							   "test-runner.filelog.stdout.default", 0);
 		charon->load_loggers(charon, NULL, FALSE);
 
 		/* Register TKM specific plugins */
@@ -74,8 +72,6 @@ static bool test_runner_init(bool init)
 
 		plugin_loader_add_plugindirs(BUILDDIR "/src/libstrongswan/plugins",
 									 PLUGINS);
-		plugin_loader_add_plugindirs(BUILDDIR "/src/libhydra/plugins",
-									 PLUGINS);
 		plugin_loader_add_plugindirs(BUILDDIR "/src/libcharon/plugins",
 									 PLUGINS);
 		if (charon->initialize(charon, PLUGINS))
@@ -95,7 +91,6 @@ static bool test_runner_init(bool init)
 
 	destroy_dh_mapping();
 	libcharon_deinit();
-	libhydra_deinit();
 	return result;
 }
 

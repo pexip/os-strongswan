@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2015 Tobias Brunner
  * Copyright (C) 2005-2006 Martin Willi
  * Copyright (C) 2005 Jan Hutter
  * Hochschule fuer Technik Rapperswil
@@ -50,7 +51,7 @@ struct delete_payload_t {
 	 *
 	 * @param spi			spi to add
 	 */
-	void (*add_spi) (delete_payload_t *this, u_int32_t spi);
+	void (*add_spi) (delete_payload_t *this, uint32_t spi);
 
 	/**
 	 * Set the IKE SPIs for an IKEv1 delete.
@@ -58,12 +59,21 @@ struct delete_payload_t {
 	 * @param spi_i			initiator SPI
 	 * @param spi_r			responder SPI
 	 */
-	void (*set_ike_spi)(delete_payload_t *this, u_int64_t spi_i, u_int64_t spi_r);
+	void (*set_ike_spi)(delete_payload_t *this, uint64_t spi_i, uint64_t spi_r);
+
+	/**
+	 * Get the IKE SPIs from an IKEv1 delete.
+	 *
+	 * @param spi_i			initiator SPI
+	 * @param spi_r			responder SPI
+	 * @return				TRUE if SPIs extracted successfully
+	 */
+	bool (*get_ike_spi)(delete_payload_t *this, uint64_t *spi_i, uint64_t *spi_r);
 
 	/**
 	 * Get an enumerator over the SPIs in network order.
 	 *
-	 * @return				enumerator over SPIs, u_int32_t
+	 * @return				enumerator over SPIs, uint32_t
 	 */
 	enumerator_t *(*create_spi_enumerator) (delete_payload_t *this);
 

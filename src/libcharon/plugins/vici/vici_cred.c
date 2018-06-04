@@ -2,6 +2,9 @@
  * Copyright (C) 2014 Martin Willi
  * Copyright (C) 2014 revosec AG
  *
+ * Copyright (C) 2015-2016 Andreas Steffen
+ * HSR Hochschule fuer Technik Rapperswil
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
  * Free Software Foundation; either version 2 of the License, or (at your
@@ -15,13 +18,21 @@
 
 #include "vici_cred.h"
 #include "vici_builder.h"
+#include "vici_cert_info.h"
 
 #include <credentials/sets/mem_cred.h>
 #include <credentials/certificates/ac.h>
 #include <credentials/certificates/crl.h>
 #include <credentials/certificates/x509.h>
 
+#include <errno.h>
+
 typedef struct private_vici_cred_t private_vici_cred_t;
+
+/**
+ * Directory for saved X.509 CRLs
+ */
+#define CRL_DIR SWANCTLDIR "/x509crl"
 
 /**
  * Private data of an vici_cred_t object.
@@ -42,7 +53,53 @@ struct private_vici_cred_t {
 	 * credentials
 	 */
 	mem_cred_t *creds;
+
+	/**
+	 * cache CRLs to disk?
+	 */
+	bool cachecrl;
+
 };
+
+METHOD(credential_set_t, cache_cert, void,
+	private_vici_cred_t *this, certificate_t *cert)
+{
+	if (cert->get_type(cert) == CERT_X509_CRL && this->cachecrl)
+	{
+		/* CRLs get written to /etc/swanctl/x509crl/<authkeyId>.crl */
+		crl_t *crl = (crl_t*)cert;
+
+		cert->get_ref(cert);
+		if (this->creds->add_crl(this->creds, crl))
+		{
+			char buf[BUF_LEN];
+			chunk_t chunk, hex;
+			bool is_delta_crl;
+
+			is_delta_crl = crl->is_delta_crl(crl, NULL);
+			chunk = crl->get_authKeyIdentifier(crl);
+			hex = chunk_to_hex(chunk, NULL, FALSE);
+			snprintf(buf, sizeof(buf), "%s/%s%s.crl", CRL_DIR, hex.ptr,
+										is_delta_crl ? "_delta" : "");
+			free(hex.ptr);
+
+			if (cert->get_encoding(cert, CERT_ASN1_DER, &chunk))
+			{
+				if (chunk_write(chunk, buf, 022, TRUE))
+				{
+					DBG1(DBG_CFG, "  written crl file '%s' (%d bytes)",
+						 buf, chunk.len);
+				}
+				else
+				{
+					DBG1(DBG_CFG, "  writing crl file '%s' failed: %s",
+						 buf, strerror(errno));
+				}
+				free(chunk.ptr);
+			}
+		}
+	}
+}
 
 /**
  * Create a (error) reply message
@@ -66,11 +123,12 @@ static vici_message_t* create_reply(char *fmt, ...)
 CALLBACK(load_cert, vici_message_t*,
 	private_vici_cred_t *this, char *name, u_int id, vici_message_t *message)
 {
-	certificate_type_t type;
-	x509_flag_t required_flags = 0, additional_flags = 0;
 	certificate_t *cert;
+	certificate_type_t type;
+	x509_flag_t ext_flag, flag = X509_NONE;
 	x509_t *x509;
 	chunk_t data;
+	bool trusted = TRUE;
 	char *str;
 
 	str = message->get_str(message, NULL, "type");
@@ -78,61 +136,63 @@ CALLBACK(load_cert, vici_message_t*,
 	{
 		return create_reply("certificate type missing");
 	}
-	if (strcaseeq(str, "x509"))
+	if (enum_from_name(certificate_type_names, str, &type))
 	{
-		type = CERT_X509;
+		if (type == CERT_X509)
+		{
+			str = message->get_str(message, "NONE", "flag");
+			if (!enum_from_name(x509_flag_names, str, &flag))
+			{
+				return create_reply("invalid certificate flag '%s'", str);
+			}
+		}
 	}
-	else if (strcaseeq(str, "x509ca"))
+	else if	(!vici_cert_info_from_str(str, &type, &flag))
 	{
-		type = CERT_X509;
-		required_flags = X509_CA;
+		return create_reply("invalid certificate type '%s'", str);
 	}
-	else if (strcaseeq(str, "x509aa"))
-	{
-		type = CERT_X509;
-		additional_flags = X509_AA;
-	}
-	else if (strcaseeq(str, "x509crl"))
-	{
-		type = CERT_X509_CRL;
-	}
-	else if (strcaseeq(str, "x509ac"))
-	{
-		type = CERT_X509_AC;
-	}
-	else
-	{
-		return create_reply("invalid certificate type: %s", str);
-	}
+
 	data = message->get_value(message, chunk_empty, "data");
 	if (!data.len)
 	{
 		return create_reply("certificate data missing");
 	}
+
+	/* do not set CA flag externally */
+	ext_flag = (flag & X509_CA) ? X509_NONE : flag;
+
 	cert = lib->creds->create(lib->creds, CRED_CERTIFICATE, type,
 							  BUILD_BLOB_PEM, data,
-							  BUILD_X509_FLAG, additional_flags,
+							  BUILD_X509_FLAG, ext_flag,
 							  BUILD_END);
 	if (!cert)
 	{
 		return create_reply("parsing %N certificate failed",
 							certificate_type_names, type);
 	}
-	if (cert->get_type(cert) == CERT_X509)
-	{
-		x509 = (x509_t*)cert;
-
-		if ((required_flags & x509->get_flags(x509)) != required_flags)
-		{
-			cert->destroy(cert);
-			return create_reply("certificate misses required flag, rejected");
-		}
-	}
-
 	DBG1(DBG_CFG, "loaded certificate '%Y'", cert->get_subject(cert));
 
-	this->creds->add_cert(this->creds, TRUE, cert);
+	/* check if CA certificate has CA basic constraint set */
+	if (flag & X509_CA)
+	{
+		char err_msg[] = "ca certificate lacks CA basic constraint, rejected";
+		x509 = (x509_t*)cert;
 
+		if (!(x509->get_flags(x509) & X509_CA))
+		{
+			cert->destroy(cert);
+			DBG1(DBG_CFG, "  %s", err_msg);
+			return create_reply(err_msg);
+		}
+	}
+	if (type == CERT_X509_CRL)
+	{
+		this->creds->add_crl(this->creds, (crl_t*)cert);
+	}
+	else
+	{
+		this->creds->add_cert(this->creds, trusted, cert);
+	}
 	return create_reply(NULL);
 }
 
@@ -160,6 +220,10 @@ CALLBACK(load_key, vici_message_t*,
 	else if (strcaseeq(str, "ecdsa"))
 	{
 		type = KEY_ECDSA;
+	}
+	else if (strcaseeq(str, "bliss"))
+	{
+		type = KEY_BLISS;
 	}
 	else
 	{
@@ -276,6 +340,24 @@ CALLBACK(clear_creds, vici_message_t*,
 	return create_reply(NULL);
 }
 
+CALLBACK(flush_certs, vici_message_t*,
+	private_vici_cred_t *this, char *name, u_int id, vici_message_t *message)
+{
+	certificate_type_t type = CERT_ANY;
+	x509_flag_t flag = X509_NONE;
+	char *str;
+
+	str = message->get_str(message, NULL, "type");
+	if (str && !enum_from_name(certificate_type_names, str, &type) &&
+			   !vici_cert_info_from_str(str, &type, &flag))
+	{
+		return create_reply("invalid certificate type '%s'", str);
+	}
+	lib->credmgr->flush_cache(lib->credmgr, type);
+
+	return create_reply(NULL);
+}
+
 static void manage_command(private_vici_cred_t *this,
 						   char *name, vici_command_cb_t cb, bool reg)
 {
@@ -289,9 +371,16 @@ static void manage_command(private_vici_cred_t *this,
 static void manage_commands(private_vici_cred_t *this, bool reg)
 {
 	manage_command(this, "clear-creds", clear_creds, reg);
+	manage_command(this, "flush-certs", flush_certs, reg);
 	manage_command(this, "load-cert", load_cert, reg);
 	manage_command(this, "load-key", load_key, reg);
 	manage_command(this, "load-shared", load_shared, reg);
+}
+
+METHOD(vici_cred_t, add_cert, certificate_t*,
+	private_vici_cred_t *this, certificate_t *cert)
+{
+	return this->creds->add_cert_ref(this->creds, TRUE, cert);
 }
 
 METHOD(vici_cred_t, destroy, void,
@@ -313,12 +402,25 @@ vici_cred_t *vici_cred_create(vici_dispatcher_t *dispatcher)
 
 	INIT(this,
 		.public = {
+			.set = {
+				.create_private_enumerator = (void*)return_null,
+				.create_cert_enumerator = (void*)return_null,
+				.create_shared_enumerator = (void*)return_null,
+				.create_cdp_enumerator = (void*)return_null,
+				.cache_cert = (void*)_cache_cert,
+			},
+			.add_cert = _add_cert,
 			.destroy = _destroy,
 		},
 		.dispatcher = dispatcher,
 		.creds = mem_cred_create(),
 	);
 
+	if (lib->settings->get_bool(lib->settings, "%s.cache_crls", FALSE, lib->ns))
+	{
+		this->cachecrl = TRUE;
+		DBG1(DBG_CFG, "crl caching to %s enabled", CRL_DIR);
+	}
 	lib->credmgr->add_set(lib->credmgr, &this->creds->set);
 
 	manage_commands(this, TRUE);

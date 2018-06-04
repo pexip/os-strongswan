@@ -229,8 +229,8 @@ static void request_query_ikesa(xmlTextReaderPtr reader, xmlTextWriterPtr writer
 		local = ike_sa->get_my_host(ike_sa);
 		xmlTextWriterStartElement(writer, "local");
 		xmlTextWriterWriteFormatElement(writer, "spi", "%.16llx",
-							id->is_initiator(id) ? id->get_initiator_spi(id)
-												 : id->get_responder_spi(id));
+					be64toh(id->is_initiator(id) ? id->get_initiator_spi(id)
+												 : id->get_responder_spi(id)));
 		write_id(writer, "identification", ike_sa->get_my_id(ike_sa));
 		write_address(writer, "address", local);
 		xmlTextWriterWriteFormatElement(writer, "port", "%d",
@@ -246,8 +246,8 @@ static void request_query_ikesa(xmlTextReaderPtr reader, xmlTextWriterPtr writer
 		remote = ike_sa->get_other_host(ike_sa);
 		xmlTextWriterStartElement(writer, "remote");
 		xmlTextWriterWriteFormatElement(writer, "spi", "%.16llx",
-							id->is_initiator(id) ? id->get_responder_spi(id)
-												 : id->get_initiator_spi(id));
+					be64toh(id->is_initiator(id) ? id->get_responder_spi(id)
+												 : id->get_initiator_spi(id)));
 		write_id(writer, "identification", ike_sa->get_other_id(ike_sa));
 		write_address(writer, "address", remote);
 		xmlTextWriterWriteFormatElement(writer, "port", "%d",
@@ -374,7 +374,7 @@ static void request_control_terminate(xmlTextReaderPtr reader,
 		xmlTextReaderNodeType(reader) == XML_READER_TYPE_TEXT)
 	{
 		const char *str;
-		u_int32_t id;
+		uint32_t id;
 		status_t status;
 
 		str = xmlTextReaderConstValue(reader);
@@ -488,7 +488,7 @@ static void request_control_initiate(xmlTextReaderPtr reader,
 			{
 				status = charon->controller->initiate(charon->controller,
 							peer, child, (controller_cb_t)xml_callback,
-							writer, 0);
+							writer, 0, FALSE);
 			}
 			else
 			{

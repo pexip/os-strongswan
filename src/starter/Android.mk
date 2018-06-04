@@ -14,12 +14,11 @@ LOCAL_SRC_FILES := $(filter %.c,$(starter_SOURCES))
 # build starter ----------------------------------------------------------------
 
 LOCAL_C_INCLUDES += \
-	$(strongswan_PATH)/src/libhydra \
 	$(strongswan_PATH)/src/libstrongswan \
 	$(strongswan_PATH)/src/starter \
 	$(strongswan_PATH)/src/stroke
 
-LOCAL_CFLAGS := $(strongswan_CFLAGS) -DSTART_CHARON \
+LOCAL_CFLAGS := $(strongswan_CFLAGS) \
 	-DIPSEC_SCRIPT='"ipsec"' \
 	-DPLUGINS='"$(strongswan_STARTER_PLUGINS)"'
 
@@ -33,7 +32,7 @@ LOCAL_PRELINK_MODULE := false
 
 LOCAL_REQUIRED_MODULES := stroke
 
-LOCAL_SHARED_LIBRARIES += libstrongswan libhydra
+LOCAL_SHARED_LIBRARIES += libstrongswan
 
 include $(BUILD_EXECUTABLE)
 

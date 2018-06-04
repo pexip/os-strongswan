@@ -31,13 +31,23 @@
 #include <systemd/sd-daemon.h>
 #include <systemd/sd-journal.h>
 
-#include <hydra.h>
 #include <daemon.h>
 
 #include <library.h>
 #include <utils/backtrace.h>
 #include <threading/thread.h>
 #include <threading/rwlock.h>
+
+/**
+ * Default user and group
+ */
+#ifndef IPSEC_USER
+#define IPSEC_USER NULL
+#endif
+
+#ifndef IPSEC_GROUP
+#define IPSEC_GROUP NULL
+#endif
 
 /**
  * hook in library for debugging messages
@@ -238,12 +248,16 @@ static int run()
 
 	while (TRUE)
 	{
-		int sig, error;
+		int sig;
 
-		error = sigwait(&set, &sig);
-		if (error)
+		sig = sigwaitinfo(&set, NULL);
+		if (sig == -1)
 		{
-			DBG1(DBG_DMN, "waiting for signal failed: %s", strerror(error));
+			if (errno == EINTR)
+			{	/* ignore signals we didn't wait for */
+				continue;
+			}
+			DBG1(DBG_DMN, "waiting for signal failed: %s", strerror(errno));
 			return SS_RC_INITIALIZATION_FAILED;
 		}
 		switch (sig)
@@ -254,11 +268,6 @@ static int run()
 				charon->bus->alert(charon->bus, ALERT_SHUTDOWN_SIGNAL, sig);
 				return 0;
 			}
-			default:
-			{
-				DBG1(DBG_DMN, "unknown signal %d received. Ignored", sig);
-				break;
-			}
 		}
 	}
 }
@@ -268,18 +277,20 @@ static int run()
  */
 static bool lookup_uid_gid()
 {
-#ifdef IPSEC_USER
-	if (!lib->caps->resolve_uid(lib->caps, IPSEC_USER))
+	char *name;
+
+	name = lib->settings->get_str(lib->settings, "%s.user", IPSEC_USER,
+								  lib->ns);
+	if (name && !lib->caps->resolve_uid(lib->caps, name))
 	{
 		return FALSE;
 	}
-#endif /* IPSEC_USER */
-#ifdef IPSEC_GROUP
-	if (!lib->caps->resolve_gid(lib->caps, IPSEC_GROUP))
+	name = lib->settings->get_str(lib->settings, "%s.group", IPSEC_GROUP,
+								  lib->ns);
+	if (name && !lib->caps->resolve_gid(lib->caps, name))
 	{
 		return FALSE;
 	}
-#endif /* IPSEC_GROUP */
 	return TRUE;
 }
 
@@ -314,6 +325,15 @@ static plugin_feature_t features[] = {
 };
 
 /**
+ * Add namespace alias
+ */
+static void __attribute__ ((constructor))register_namespace()
+{
+	/* inherit settings from charon */
+	library_add_namespace("charon");
+}
+
+/**
  * Main function, starts the daemon.
  */
 int main(int argc, char *argv[])
@@ -343,12 +363,6 @@ int main(int argc, char *argv[])
 		sd_notifyf(0, "STATUS=integrity check of charon-systemd failed");
 		return SS_RC_INITIALIZATION_FAILED;
 	}
-	atexit(libhydra_deinit);
-	if (!libhydra_init())
-	{
-		sd_notifyf(0, "STATUS=libhydra initialization failed");
-		return SS_RC_INITIALIZATION_FAILED;
-	}
 	atexit(libcharon_deinit);
 	if (!libcharon_init())
 	{
@@ -365,7 +379,8 @@ int main(int argc, char *argv[])
 	lib->plugins->add_static_features(lib->plugins, lib->ns, features,
 							countof(features), TRUE, journal_reload, &journal);
 
-	if (!charon->initialize(charon, PLUGINS))
+	if (!charon->initialize(charon,
+			lib->settings->get_str(lib->settings, "%s.load", PLUGINS, lib->ns)))
 	{
 		sd_notifyf(0, "STATUS=charon initialization failed");
 		return SS_RC_INITIALIZATION_FAILED;
@@ -379,7 +394,7 @@ int main(int argc, char *argv[])
 	}
 
 	/* add handler for SEGV and ILL,
-	 * INT, TERM and HUP are handled by sigwait() in run() */
+	 * INT, TERM and HUP are handled by sigwaitinfo() in run() */
 	action.sa_handler = segv_handler;
 	action.sa_flags = 0;
 	sigemptyset(&action.sa_mask);

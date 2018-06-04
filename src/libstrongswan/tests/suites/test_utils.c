@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Tobias Brunner
+ * Copyright (C) 2013-2015 Tobias Brunner
  * Hochschule fuer Technik Rapperswil
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -18,6 +18,7 @@
 #include <library.h>
 #include <utils/utils.h>
 #include <ipsec/ipsec_types.h>
+#include <credentials/keys/public_key.h>
 
 #include <time.h>
 
@@ -120,9 +121,9 @@ END_TEST
 START_TEST(test_htoun)
 {
 	chunk_t net64, expected;
-	u_int16_t host16 = 513;
-	u_int32_t net16 = 0, host32 = 67305985;
-	u_int64_t net32 = 0, host64 = 578437695752307201ULL;
+	uint16_t host16 = 513;
+	uint32_t net16 = 0, host32 = 67305985;
+	uint64_t net32 = 0, host64 = 578437695752307201ULL;
 
 	net64 = chunk_alloca(16);
 	memset(net64.ptr, 0, net64.len);
@@ -132,14 +133,14 @@ START_TEST(test_htoun)
 	ck_assert(chunk_equals(expected, chunk_from_thing(net16)));
 
 	expected = chunk_from_chars(0x00, 0x00, 0x04, 0x03, 0x02, 0x01, 0x00, 0x00);
-	htoun32((u_int16_t*)&net32 + 1, host32);
+	htoun32((uint16_t*)&net32 + 1, host32);
 	ck_assert(chunk_equals(expected, chunk_from_thing(net32)));
 
 	expected = chunk_from_chars(0x00, 0x00, 0x00, 0x00,
 								0x08, 0x07, 0x06, 0x05,
 								0x04, 0x03, 0x02, 0x01,
 								0x00, 0x00, 0x00, 0x00);
-	htoun64((u_int32_t*)net64.ptr + 1, host64);
+	htoun64((uint32_t*)net64.ptr + 1, host64);
 	ck_assert(chunk_equals(expected, net64));
 }
 END_TEST
@@ -147,9 +148,9 @@ END_TEST
 START_TEST(test_untoh)
 {
 	chunk_t net;
-	u_int16_t host16;
-	u_int32_t host32;
-	u_int64_t host64;
+	uint16_t host16;
+	uint32_t host32;
+	uint64_t host64;
 
 	net = chunk_from_chars(0x00, 0x02, 0x01, 0x00);
 	host16 = untoh16(net.ptr + 1);
@@ -196,6 +197,82 @@ START_TEST(test_round)
 END_TEST
 
 /*******************************************************************************
+ * streq
+ */
+
+static struct {
+	char *a;
+	char *b;
+	bool eq;
+	bool case_eq;
+} streq_data[] = {
+	{NULL, NULL, TRUE, TRUE},
+	{NULL, "", FALSE, FALSE},
+	{"", NULL, FALSE, FALSE},
+	{"abc", "", FALSE, FALSE},
+	{"abc", "abc", TRUE, TRUE},
+	{"abc", "ABC", FALSE, TRUE},
+};
+
+START_TEST(test_streq)
+{
+	bool eq;
+
+	ck_assert(streq(streq_data[_i].a, streq_data[_i].a));
+	ck_assert(streq(streq_data[_i].b, streq_data[_i].b));
+	eq = streq(streq_data[_i].a, streq_data[_i].b);
+	ck_assert(eq == streq_data[_i].eq);
+
+	ck_assert(strcaseeq(streq_data[_i].a, streq_data[_i].a));
+	ck_assert(strcaseeq(streq_data[_i].b, streq_data[_i].b));
+	eq = strcaseeq(streq_data[_i].a, streq_data[_i].b);
+	ck_assert(eq == streq_data[_i].case_eq);
+}
+END_TEST
+
+/*******************************************************************************
+ * strneq
+ */
+
+static struct {
+	char *a;
+	char *b;
+	size_t n;
+	bool eq;
+	bool case_eq;
+} strneq_data[] = {
+	{NULL, NULL, 0, TRUE, TRUE},
+	{NULL, NULL, 10, TRUE, TRUE},
+	{NULL, "", 0, FALSE, FALSE},
+	{"", NULL, 0, FALSE, FALSE},
+	{"abc", "", 0, TRUE, TRUE},
+	{"abc", "", 1, FALSE, FALSE},
+	{"abc", "ab", 1, TRUE, TRUE},
+	{"abc", "ab", 2, TRUE, TRUE},
+	{"abc", "ab", 3, FALSE, FALSE},
+	{"abc", "abc", 3, TRUE, TRUE},
+	{"abc", "abc", 4, TRUE, TRUE},
+	{"abc", "abC", 2, TRUE, TRUE},
+	{"abc", "abC", 3, FALSE, TRUE},
+};
+
+START_TEST(test_strneq)
+{
+	bool eq;
+
+	ck_assert(strneq(strneq_data[_i].a, strneq_data[_i].a, strneq_data[_i].n));
+	ck_assert(strneq(strneq_data[_i].b, strneq_data[_i].b, strneq_data[_i].n));
+	eq = strneq(strneq_data[_i].a, strneq_data[_i].b, strneq_data[_i].n);
+	ck_assert(eq == strneq_data[_i].eq);
+
+	ck_assert(strncaseeq(strneq_data[_i].a, strneq_data[_i].a,  strneq_data[_i].n));
+	ck_assert(strncaseeq(strneq_data[_i].b, strneq_data[_i].b,  strneq_data[_i].n));
+	eq = strncaseeq(strneq_data[_i].a, strneq_data[_i].b,  strneq_data[_i].n);
+	ck_assert(eq == strneq_data[_i].case_eq);
+}
+END_TEST
+
+/*******************************************************************************
  * strpfx
  */
 
@@ -224,6 +301,41 @@ START_TEST(test_strpfx)
 	ck_assert(prefix == strpfx_data[_i].prefix);
 	prefix = strcasepfx(strpfx_data[_i].str, strpfx_data[_i].pfx);
 	ck_assert(prefix == strpfx_data[_i].case_prefix);
+}
+END_TEST
+
+/*******************************************************************************
+ * mallac_align/free_align
+ */
+
+START_TEST(test_malloc_align)
+{
+	void *ptr[128][256];
+	int size, align;
+
+	for (size = 0; size < countof(ptr); size++)
+	{
+		for (align = 0; align < countof(ptr[0]); align++)
+		{
+			ptr[size][align] = malloc_align(size, align);
+			if (align)
+			{
+				ck_assert((uintptr_t)ptr[size][align] % align == 0);
+			}
+			if (size)
+			{
+				ck_assert(ptr[size][align]);
+				memset(ptr[size][align], 0xEF, size);
+			}
+		}
+	}
+	for (size = 0; size < countof(ptr); size++)
+	{
+		for (align = 0; align < countof(ptr[0]); align++)
+		{
+			free_align(ptr[size][align]);
+		}
+	}
 }
 END_TEST
 
@@ -272,7 +384,7 @@ END_TEST
 
 START_TEST(test_memxor_aligned)
 {
-	u_int64_t a = 0, b = 0;
+	uint64_t a = 0, b = 0;
 	chunk_t ca, cb;
 	int i;
 
@@ -302,6 +414,48 @@ START_TEST(test_memxor_aligned)
 	memxor(ca.ptr, cb.ptr + 1, 7);
 	ck_assert(chunk_equals(ca, chunk_from_chars(0x02, 0x03, 0x04, 0x05,
 												0x06, 0x07, 0x08, 0x00)));
+}
+END_TEST
+
+/*******************************************************************************
+ * memeq/const
+ */
+
+static struct {
+	char *a;
+	char *b;
+	size_t n;
+	bool res;
+} memeq_data[] = {
+	{NULL, NULL, 0, TRUE},
+	{"a", "b", 0, TRUE},
+	{"", "", 1, TRUE},
+	{"abcdefgh", "abcdefgh", 8, TRUE},
+	{"a", "b", 1, FALSE},
+	{"A", "a", 1, FALSE},
+	{"\0a", "\0b", 2, FALSE},
+	{"abc", "abd", 3, FALSE},
+	{"abc", "dbd", 3, FALSE},
+	{"abcdefgh", "abcdffgh", 8, FALSE},
+	{"abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz",
+	 "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz", 52, TRUE},
+	{"abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz",
+	 "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyy", 52, FALSE},
+	{"bbcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz",
+	 "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz", 52, FALSE},
+};
+
+START_TEST(test_memeq)
+{
+	ck_assert(memeq(memeq_data[_i].a, memeq_data[_i].b,
+					memeq_data[_i].n) == memeq_data[_i].res);
+}
+END_TEST
+
+START_TEST(test_memeq_const)
+{
+	ck_assert(memeq_const(memeq_data[_i].a, memeq_data[_i].b,
+						  memeq_data[_i].n) == memeq_data[_i].res);
 }
 END_TEST
 
@@ -695,6 +849,51 @@ START_TEST(test_mark_from_string)
 }
 END_TEST
 
+/*******************************************************************************
+ * signature_schemes_for_key
+ */
+
+static struct {
+	key_type_t type;
+	int size;
+	signature_scheme_t expected[4];
+} scheme_data[] = {
+	{KEY_RSA,   1024, { SIGN_RSA_EMSA_PKCS1_SHA2_256, SIGN_RSA_EMSA_PKCS1_SHA2_384,
+						SIGN_RSA_EMSA_PKCS1_SHA2_512, SIGN_UNKNOWN }},
+	{KEY_RSA,   2048, { SIGN_RSA_EMSA_PKCS1_SHA2_256, SIGN_RSA_EMSA_PKCS1_SHA2_384,
+						SIGN_RSA_EMSA_PKCS1_SHA2_512, SIGN_UNKNOWN }},
+	{KEY_RSA,   4096, { SIGN_RSA_EMSA_PKCS1_SHA2_384, SIGN_RSA_EMSA_PKCS1_SHA2_512,
+						SIGN_UNKNOWN }},
+	{KEY_RSA,   8192, { SIGN_RSA_EMSA_PKCS1_SHA2_512, SIGN_UNKNOWN }},
+	{KEY_ECDSA,  256, { SIGN_ECDSA_WITH_SHA256_DER, SIGN_ECDSA_WITH_SHA384_DER,
+						SIGN_ECDSA_WITH_SHA512_DER, SIGN_UNKNOWN }},
+	{KEY_ECDSA,  384, { SIGN_ECDSA_WITH_SHA384_DER, SIGN_ECDSA_WITH_SHA512_DER,
+						SIGN_UNKNOWN }},
+	{KEY_ECDSA,  512, { SIGN_ECDSA_WITH_SHA512_DER, SIGN_UNKNOWN }},
+	{KEY_BLISS,  128, { SIGN_BLISS_WITH_SHA2_256, SIGN_BLISS_WITH_SHA2_384,
+						SIGN_BLISS_WITH_SHA2_512, SIGN_UNKNOWN }},
+	{KEY_BLISS,  192, { SIGN_BLISS_WITH_SHA2_384, SIGN_BLISS_WITH_SHA2_512,
+						SIGN_UNKNOWN }},
+	{KEY_BLISS,  256, { SIGN_BLISS_WITH_SHA2_512, SIGN_UNKNOWN }},
+};
+
+START_TEST(test_signature_schemes_for_key)
+{
+	enumerator_t  *enumerator;
+	signature_scheme_t scheme;
+	int i;
+
+	enumerator = signature_schemes_for_key(scheme_data[_i].type, scheme_data[_i].size);
+	for (i = 0; scheme_data[_i].expected[i] != SIGN_UNKNOWN; i++)
+	{
+		ck_assert(enumerator->enumerate(enumerator, &scheme));
+		ck_assert_int_eq(scheme_data[_i].expected[i], scheme);
+	}
+	ck_assert(!enumerator->enumerate(enumerator, &scheme));
+	enumerator->destroy(enumerator);
+}
+END_TEST
+
 Suite *utils_suite_create()
 {
 	Suite *s;
@@ -732,12 +931,23 @@ Suite *utils_suite_create()
 	suite_add_tcase(s, tc);
 
 	tc = tcase_create("string helper");
+	tcase_add_loop_test(tc, test_streq, 0, countof(streq_data));
+	tcase_add_loop_test(tc, test_strneq, 0, countof(strneq_data));
 	tcase_add_loop_test(tc, test_strpfx, 0, countof(strpfx_data));
+	suite_add_tcase(s, tc);
+
+	tc = tcase_create("malloc_align");
+	tcase_add_test(tc, test_malloc_align);
 	suite_add_tcase(s, tc);
 
 	tc = tcase_create("memxor");
 	tcase_add_test(tc, test_memxor);
 	tcase_add_test(tc, test_memxor_aligned);
+	suite_add_tcase(s, tc);
+
+	tc = tcase_create("memeq");
+	tcase_add_loop_test(tc, test_memeq, 0, countof(memeq_data));
+	tcase_add_loop_test(tc, test_memeq_const, 0, countof(memeq_data));
 	suite_add_tcase(s, tc);
 
 	tc = tcase_create("memstr");
@@ -775,6 +985,10 @@ Suite *utils_suite_create()
 
 	tc = tcase_create("mark_from_string");
 	tcase_add_loop_test(tc, test_mark_from_string, 0, countof(mark_data));
+	suite_add_tcase(s, tc);
+
+	tc = tcase_create("signature_schemes_for_key");
+	tcase_add_loop_test(tc, test_signature_schemes_for_key, 0, countof(scheme_data));
 	suite_add_tcase(s, tc);
 
 	return s;

@@ -109,7 +109,7 @@ static size_t lookup_alg(integrity_algorithm_t algo, char **name,
 }
 
 METHOD(signer_t, get_signature, bool,
-	private_af_alg_signer_t *this, chunk_t data, u_int8_t *buffer)
+	private_af_alg_signer_t *this, chunk_t data, uint8_t *buffer)
 {
 	return this->ops->hash(this->ops, data, buffer, this->block_size);
 }
@@ -138,7 +138,7 @@ METHOD(signer_t, verify_signature, bool,
 	{
 		return FALSE;
 	}
-	return memeq(signature.ptr, sig, signature.len);
+	return memeq_const(signature.ptr, sig, signature.len);
 }
 
 METHOD(signer_t, get_key_size, size_t,
@@ -156,6 +156,7 @@ METHOD(signer_t, get_block_size, size_t,
 METHOD(signer_t, set_key, bool,
 	private_af_alg_signer_t *this, chunk_t key)
 {
+	this->ops->reset(this->ops);
 	return this->ops->set_key(this->ops, key);
 }
 

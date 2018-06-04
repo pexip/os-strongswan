@@ -42,9 +42,9 @@ connections.<conn>.remote_addrs = %any
 	be specified.
 
 connections.<conn>.local_port = 500
-	Local UPD port for IKE communication.
+	Local UDP port for IKE communication.
 
-	Local UPD port for IKE communication. By default the port of the socket
+	Local UDP port for IKE communication. By default the port of the socket
 	backend is used, which is usually _500_. If port _500_ is used, automatic
 	IKE port floating to port 4500 is used to work around NAT issues.
 
@@ -54,7 +54,7 @@ connections.<conn>.local_port = 500
 connections.<conn>.remote_port = 500
 	Remote UDP port for IKE communication.
 
-	Remote UPD port for IKE communication. If the default of port _500_ is used,
+	Remote UDP port for IKE communication. If the default of port _500_ is used,
 	automatic IKE port floating to port 4500 is used to work around NAT issues.
 
 connections.<conn>.proposals = default
@@ -139,15 +139,16 @@ connections.<conn>.dpd_timeout = 0s
 	checking. For compatibility reasons, with IKEv1 a custom interval may be
 	specified; this option has no effect on connections using IKE2.
 
-connections.<conn>.fragmentation = no
-	Use IKEv1 UDP packet fragmentation (_yes_, _no_ or _force_).
+connections.<conn>.fragmentation = yes
+	Use IKE UDP datagram fragmentation.  (_yes_, _no_ or _force_).
 
-	The default of _no_ disables IKEv1 fragmentation mechanism, _yes_ enables
-	it if support has been indicated by the peer. _force_ enforces
-	fragmentation if required even before the peer had a chance to indicate
-	support for it.
-
-	IKE fragmentation is currently not supported with IKEv2.
+	Use IKE fragmentation (proprietary IKEv1 extension or RFC 7383 IKEv2
+	fragmentation).  Acceptable  values  are _yes_ (the	default), _force_ and
+	_no_. Fragmented IKE messages sent by a peer are always accepted
+	irrespective of  the  value  of  this option. If set to _yes_, and the peer
+	supports it, oversized IKE messages will be sent in fragments.  If set  to
+	_force_  (only  supported  for IKEv1) the initial IKE message will already
+	be fragmented if required.
 
 connections.<conn>.send_certreq = yes
 	Send certificate requests payloads (_yes_ or _no_).
@@ -220,7 +221,9 @@ connections.<conn>.rekey_time = 4h
 	IKEv1 performs a reauthentication procedure instead.
 
 	With the default value IKE rekeying is scheduled every 4 hours, minus the
-	configured **rand_time**.
+	configured **rand_time**. If a **reauth_time** is configured, **rekey_time**
+	defaults to zero disabling rekeying; explicitly set both to enforce
+	rekeying and reauthentication.
 
 connections.<conn>.over_time = 10% of rekey_time/reauth_time
 	Hard IKE_SA lifetime if rekey/reauth does not complete, as time.
@@ -265,16 +268,31 @@ connections.<conn>.local<suffix> {}
 	unique suffix. To define a single authentication round, the suffix may be
 	omitted.
 
+connections.<conn>.local<suffix>.round = 0
+	Optional numeric identifier by which authentication rounds are sorted.  If
+	not specified rounds are ordered by their position in the config file/VICI
+	message.
+
 connections.<conn>.local<suffix>.certs =
 	Comma separated list of certificate candidates to use for authentication.
 
 	Comma separated list of certificate candidates to use for authentication.
 	The certificates may use a relative path from the **swanctl** _x509_
-	directory, or an absolute path.
+	directory or an absolute path.
 
 	The certificate used for authentication is selected based on the received
 	certificate request payloads. If no appropriate CA can be located, the
 	first certificate is used.
+
+connections.<conn>.local<suffix>.pubkeys =
+	Comma separated list of raw public key candidates to use for authentication.
+
+	Comma separated list of raw public key candidates to use for authentication.
+	The public keys may use a relative path from the **swanctl** _pubkey_
+	directory or an absolute path.
+
+	Even though multiple local public keys could be defined in principle, only
+	the	first public key in the list is used for authentication.
 
 connections.<conn>.local<suffix>.auth = pubkey
 	Authentication to perform locally (_pubkey_, _psk_, _xauth[-backend]_ or
@@ -296,12 +314,41 @@ connections.<conn>.local<suffix>.auth = pubkey
 	An EAP module implementing the appropriate method is selected to perform
 	the EAP conversation.
 
+	If both peers support RFC 7427 ("Signature Authentication in IKEv2")
+	specific hash algorithms to be used during IKEv2 authentication may be
+	configured. To do so use _ike:_ followed by a trust chain signature scheme
+	constraint (see description of the **remote** section's **auth** keyword).
+	For example, with _ike:pubkey-sha384-sha256_ a public key signature scheme
+	with either SHA-384 or SHA-256 would get used for authentication, in that
+	order and depending on the hash algorithms supported by the peer. If no
+	specific hash algorithms are configured, the default is to prefer an
+	algorithm that matches or exceeds the strength of the signature key.
+	If no constraints with _ike:_ prefix are configured any signature scheme
+	constraint (without _ike:_ prefix) will also apply to IKEv2 authentication,
+	unless this is disabled in **strongswan.conf**(5).
+
 connections.<conn>.local<suffix>.id =
 	IKE identity to use for authentication round.
 
 	IKE identity to use for authentication round. When using certificate
 	authentication, the IKE identity must be contained in the certificate,
 	either as subject or as subjectAltName.
+
+	The identity can be an IP address, a fully-qualified domain name, an email
+	address or a Distinguished Name for which the ID type is determined
+	automatically and the string is converted to the appropriate encoding. To
+	enforce a specific identity type, a prefix may be used, followed by a colon
+	(:). If the number sign (#) follows the colon, the remaining data is
+	interpreted as hex encoding, otherwise the string is used as-is as the
+	identification data. Note that this implies that no conversion is performed
+	for non-string identities. For example, _ipv4:10.0.0.1_ does not create a
+	valid ID_IPV4_ADDR IKE identity, as it does not get converted to binary
+	0x0a000001. Instead, one could use _ipv4:#0a000001_ to get a valid identity,
+	but just using the implicit type with automatic conversion is usually
+	simpler. The same applies to the ASN1 encoded types. The following prefixes
+	are known: _ipv4_, _ipv6_, _rfc822_, _email_, _userfqdn_, _fqdn_, _dns_,
+	_asn1dn_, _asn1gn_ and _keyid_. Custom type prefixes may be specified by
+	surrounding the numerical type value by curly brackets.
 
 connections.<conn>.local<suffix>.eap_id = id
 	Client EAP-Identity to use in EAP-Identity exchange and the EAP method.
@@ -332,12 +379,16 @@ connections.<conn>.remote<suffix> {}
 	optional unique suffix. To define a single authentication round, the suffix
 	may be omitted.
 
+connections.<conn>.remote<suffix>.round = 0
+	Optional numeric identifier by which authentication rounds are sorted.  If
+	not specified rounds are ordered by their position in the config file/VICI
+	message.
+
 connections.<conn>.remote<suffix>.id = %any
 	IKE identity to expect for authentication round.
 
-	IKE identity to expect for authentication round. When using certificate
-	authentication, the IKE identity must be contained in the certificate,
-	either as subject or as subjectAltName.
+	IKE identity to expect for authentication round. Refer to the _local_ _id_
+	section for details.
 
 connections.<conn>.remote<suffix>.groups =
 	Authorization group memberships to require.
@@ -352,14 +403,21 @@ connections.<conn>.remote<suffix>.certs =
 
 	Comma separated list of certificates to accept for authentication.
 	The certificates may use a relative path from the **swanctl** _x509_
-	directory, or an absolute path.
+	directory or an absolute path.
 
 connections.<conn>.remote<suffix>.cacerts =
 	Comma separated list of CA certificates to accept for authentication.
 
 	Comma separated list of CA certificates to accept for authentication.
 	The certificates may use a relative path from the **swanctl** _x509ca_
-	directory, or an absolute path.
+	directory or an absolute path.
+
+connections.<conn>.remote<suffix>.pubkeys =
+	Comma separated list of raw public keys to accept for authentication.
+
+	Comma separated list of raw public keys to accept for authentication.
+	The public keys may use a relative path from the **swanctl** _pubkey_
+	directory or an absolute path.
 
 connections.<conn>.remote<suffix>.revocation = relaxed
 	Certificate revocation policy, (_strict_, _ifuri_ or _relaxed_).
@@ -380,8 +438,24 @@ connections.<conn>.remote<suffix>.auth = pubkey
 	Authentication to expect from remote (_pubkey_, _psk_, _xauth[-backend]_ or
 	_eap[-method]_).
 
-	Authentication to expect from remote. See the **local** sections **auth**
+	Authentication to expect from remote. See the **local** section's **auth**
 	keyword description about the details of supported mechanisms.
+
+	To require a trustchain public key strength for the remote side, specify the
+	key type followed by the minimum strength in bits (for example _ecdsa-384_
+	or _rsa-2048-ecdsa-256_). To limit the acceptable set of hashing algorithms
+	for trustchain validation, append hash algorithms to _pubkey_ or a key
+	strength definition (for example _pubkey-sha1-sha256_ or
+	_rsa-2048-ecdsa-256-sha256-sha384-sha512_).
+	Unless disabled in **strongswan.conf**(5), or explicit IKEv2 signature
+	constraints are configured (refer to the description of the **local**
+	section's **auth** keyword for details), such key types and hash algorithms
+	are also applied as constraints against IKEv2 signature authentication
+	schemes used by the remote side.
+
+	To specify trust chain constraints for EAP-(T)TLS, append a colon to the
+	EAP method, followed by the key type/size and hash algorithm as discussed
+	above (e.g. _eap-tls:ecdsa-384-sha384_).
 
 connections.<conn>.children.<child> {}
 	CHILD_SA configuration sub-section.
@@ -398,7 +472,7 @@ connections.<conn>.children.<child>.ah_proposals =
 	For AH, this includes an integrity algorithm and an optional Diffie-Hellman
 	group. If a DH group is specified, CHILD_SA/Quick Mode rekeying and initial
 	negotiation uses a separate Diffie-Hellman exchange using the specified
-	group.
+	group (refer to _esp_proposals_ for details).
 
 	In IKEv2, multiple algorithms of the same kind can be specified in a single
 	proposal, from which one gets selected. In IKEv1, only one algorithm per
@@ -421,11 +495,18 @@ connections.<conn>.children.<child>.esp_proposals = default
 	mode algorithm is used instead of the separate encryption/integrity
 	algorithms.
 
-	If a DH group is specified, CHILD_SA/Quick Mode rekeying and initial (non
-	IKE_AUTH piggybacked) negotiation uses a separate Diffie-Hellman exchange
-	using the specified group. Extended Sequence Number support may be indicated
-	with the _esn_ and _noesn_ values, both may be included to indicate support
-	for both modes. If omitted, _noesn_ is assumed.
+	If a DH group is specified, CHILD_SA/Quick Mode rekeying and initial
+	negotiation use a separate Diffie-Hellman exchange using the specified
+	group. However, for IKEv2, the keys of the CHILD_SA created implicitly with
+	the IKE_SA will always be derived from the IKE_SA's key material. So any DH
+	group specified here will only apply when the CHILD_SA is later rekeyed or
+	is created with a separate CREATE_CHILD_SA exchange. A proposal mismatch
+	might, therefore, not immediately be noticed when the SA is established, but
+	may later cause rekeying to fail.
+
+	Extended Sequence Number support may be indicated with the _esn_ and _noesn_
+	values, both may be included to indicate support for both modes. If omitted,
+	_noesn_ is assumed.
 
 	In IKEv2, multiple algorithms of the same kind can be specified in a single
 	proposal, from which one gets selected. In IKEv1, only one algorithm per
@@ -569,8 +650,21 @@ connections.<conn>.children.<child>.mode = tunnel
 	Both _transport_ and _beet_ modes are subject to mode negotiation; _tunnel_
 	mode is negotiated if the preferred mode is not available.
 
-	_pass_ and _drop_ are used to install shunt policies, which explicitly
-	bypass the defined traffic from IPsec processing, or drop it, respectively.
+	_pass_ and _drop_ are used to install shunt policies which explicitly
+	bypass the defined traffic from IPsec processing or drop it, respectively.
+
+connections.<conn>.children.<child>.policies = yes
+	Whether to install IPsec policies or not.
+
+	Whether to install IPsec policies or not. Disabling this can be useful in
+	some scenarios e.g. MIPv6, where policies are not managed by the IKE daemon.
+
+connections.<conn>.children.<child>.policies_fwd_out = no
+	Whether to install outbound FWD IPsec policies or not.
+
+	Whether to install outbound FWD IPsec policies or not. Enabling this is
+	required in case there is a drop policy that would match and block forwarded
+	traffic for this CHILD_SA.
 
 connections.<conn>.children.<child>.dpd_action = clear
 	Action to perform on DPD timeout (_clear_, _trap_ or _restart_).
@@ -604,12 +698,23 @@ connections.<conn>.children.<child>.reqid = 0
 	not more than once. The default of _0_ uses dynamic reqids, allocated
 	incrementally.
 
+connections.<conn>.children.<child>.priority = 0
+	Optional fixed priority for IPsec policies.
+
+	Optional fixed priority for IPsec policies. This could be useful to install
+	high-priority drop policies.  The default of _0_ uses dynamically calculated
+	priorities based on the size of the traffic selectors.
+
+connections.<conn>.children.<child>.interface =
+	Optional interface name to restrict IPsec policies.
+
 connections.<conn>.children.<child>.mark_in = 0/0x00000000
 	Netfilter mark and mask for input traffic.
 
-	Netfilter mark and mask for input traffic. On Linux Netfilter may apply
-	marks to each packet coming from a tunnel having that option set. The
-	mark may then be used by Netfilter to match rules.
+	Netfilter mark and mask for input traffic. On Linux Netfilter may require
+	marks on each packet to match an SA having that option set. This allows
+	Netfilter rules to select specific tunnels for incoming traffic. The
+	special value _%unique_ sets a unique mark on each CHILD_SA instance.
 
 	An additional mask may be appended to the mark, separated by _/_. The
 	default mask if omitted is 0xffffffff.
@@ -619,7 +724,8 @@ connections.<conn>.children.<child>.mark_out = 0/0x00000000
 
 	Netfilter mark and mask for output traffic. On Linux Netfilter may require
 	marks on each packet to match a policy having that option set. This allows
-	Netfilter rules to select specific tunnels for outgoing traffic.
+	Netfilter rules to select specific tunnels for outgoing traffic. The
+	special value _%unique_ sets a unique mark on each CHILD_SA instance.
 
 	An additional mask may be appended to the mark, separated by _/_. The
 	default mask if omitted is 0xffffffff.
@@ -678,7 +784,7 @@ secrets { # }
 
 	It is not recommended to define any private key decryption passphrases,
 	as then there is no real security benefit in having encrypted keys. Either
-	store the key unencrypted, or enter the keys manually when loading
+	store the key unencrypted or enter the keys manually when loading
 	credentials.
 
 secrets.eap<suffix> { # }
@@ -699,7 +805,7 @@ secrets.eap<suffix>.secret =
 	Value of the EAP/XAuth secret.
 
 	Value of the EAP/XAuth secret. It may either be an ASCII string, a hex
-	encoded string if it has a _0x_ prefix, or a Base64 encoded string if it
+	encoded string if it has a _0x_ prefix or a Base64 encoded string if it
 	has a _0s_ prefix in its value.
 
 secrets.eap<suffix>.id<suffix> =
@@ -719,7 +825,7 @@ secrets.ike<suffix>.secret =
 	Value of the IKE preshared secret.
 
 	Value of the IKE preshared secret. It may either be an ASCII string,
-	a hex encoded string if it has a _0x_ prefix, or a Base64 encoded string if
+	a hex encoded string if it has a _0x_ prefix or a Base64 encoded string if
 	it has a _0s_ prefix in its value.
 
 secrets.ike<suffix>.id<suffix> =
@@ -728,6 +834,15 @@ secrets.ike<suffix>.id<suffix> =
 	IKE identity the IKE preshared secret belongs to. Multiple unique identities
 	may be specified, each having an _id_ prefix, if a secret is shared between
 	multiple peers.
+
+secrets.private<suffix> { # }
+	Private key decryption passphrase for a key in the _private_ folder.
+
+secrets.private<suffix>.file =
+	File name in the _private_ folder for which this passphrase should be used.
+
+secrets.private<suffix>.secret
+	Value of decryption passphrase for private key.
 
 secrets.rsa<suffix> { # }
 	Private key decryption passphrase for a key in the _rsa_ folder.
@@ -756,6 +871,15 @@ secrets.pkcs8<suffix>.file =
 secrets.pkcs8<suffix>.secret
 	Value of decryption passphrase for PKCS#8 key.
 
+secrets.pkcs12<suffix> { # }
+	PKCS#12 decryption passphrase for a container in the _pkcs12_ folder.
+
+secrets.pkcs12<suffix>.file =
+	File name in the _pkcs12_ folder for which this passphrase should be used.
+
+secrets.pkcs12<suffix>.secret
+	Value of decryption passphrase for PKCS#12 container.
+
 pools { # }
 	Section defining named pools.
 
@@ -767,11 +891,11 @@ pools.<name> { # }
 	Section defining a single pool with a unique name.
 
 pools.<name>.addrs =
-	Subnet defining addresses allocated in pool.
+	Addresses allocated in pool.
 
-	Subnet defining addresses allocated in pool. Accepts a single CIDR subnet
-	defining the pool to allocate addresses from. Pools must be unique and
-	non-overlapping.
+	Subnet or range defining addresses allocated in pool. Accepts a single CIDR
+	subnet defining the pool to allocate addresses from or an address range
+	(<from>-<to>).  Pools must be unique and non-overlapping.
 
 pools.<name>.<attr> =
 	Comma separated list of additional attributes from type <attr>.
@@ -782,3 +906,35 @@ pools.<name>.<attr> =
 	subnets for the corresponding attribute types. Alternatively, **<attr>** can
 	be a numerical identifier, for which string attribute values are accepted
 	as well.
+
+authorities { # }
+	Section defining attributes of certification authorities.
+
+authorities.<name> { # }
+	Section defining a certification authority with a unique name.
+
+authorities.<name>.cacert =
+	CA certificate belonging to the certification authority.
+
+	The certificates may use a relative path from the **swanctl** _x509ca_
+	directory or an absolute path.
+
+authorities.<name>.crl_uris =
+	Comma-separated list of CRL distribution points
+
+	Comma-separated list of CRL distribution points (ldap, http, or file URI)
+
+authorities.<name>.ocsp_uris =
+	Comma-separated list of OCSP URIs
+
+	Comma-separated list of OCSP URIs
+
+authorities.<name>.cert_uri_base =
+	Defines the base URI for the Hash and URL feature supported by IKEv2.
+
+	Defines the base URI for the Hash and URL feature supported by IKEv2.
+	Instead of exchanging complete certificates, IKEv2 allows one to send an
+	URI that resolves to the DER encoded certificate. The certificate URIs are
+	built by appending the SHA1 hash of the DER encoded certificates to this
+	base URI.
+

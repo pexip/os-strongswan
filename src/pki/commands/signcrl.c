@@ -117,7 +117,7 @@ static int sign_crl()
 	certificate_t *ca = NULL, *crl = NULL;
 	crl_t *lastcrl = NULL;
 	x509_t *x509;
-	hash_algorithm_t digest = HASH_SHA1;
+	hash_algorithm_t digest = HASH_UNKNOWN;
 	char *arg, *cacert = NULL, *cakey = NULL, *lastupdate = NULL, *error = NULL;
 	char *basecrl = NULL;
 	char serial[512], *keyid = NULL;
@@ -330,6 +330,10 @@ static int sign_crl()
 		error = "loading CA private key failed";
 		goto error;
 	}
+	if (digest == HASH_UNKNOWN)
+	{
+		digest = get_default_digest(private);
+	}
 	if (!private->belongs_to(private, public))
 	{
 		error = "CA private key does not match CA certificate";
@@ -365,18 +369,22 @@ static int sign_crl()
 	}
 	else
 	{
-		crl_serial = chunk_from_chars(0x00);
+		if (!crl_serial.ptr)
+		{
+			crl_serial = chunk_from_chars(0x00);
+		}
 		lastenum = enumerator_create_empty();
 	}
 
-	/* remove superfluous leading zeros */
-	while (crl_serial.len > 1 && crl_serial.ptr[0] == 0x00 &&
-		  (crl_serial.ptr[1] & 0x80) == 0x00)
-	{
-		crl_serial = chunk_skip_zero(crl_serial);
+	if (!crl_serial.len || crl_serial.ptr[0] & 0x80)
+	{	/* add leading 0x00 to handle potential overflow if serial is encoded
+		 * incorrectly */
+		crl_serial = chunk_cat("cc", chunk_from_chars(0x00), crl_serial);
 	}
-	crl_serial = chunk_clone(crl_serial);
-
+	else
+	{
+		crl_serial = chunk_clone(crl_serial);
+	}
 	/* increment the serial number by one */
 	chunk_increment(crl_serial);
 
@@ -447,7 +455,7 @@ static void __attribute__ ((constructor))reg()
 		 "  [[--reason key-compromise|ca-compromise|affiliation-changed|",
 		 "             superseded|cessation-of-operation|certificate-hold]",
 		 "   [--date timestamp] --cert file|--serial hex]*",
-		 "  [--digest md5|sha1|sha224|sha256|sha384|sha512]",
+		 "  [--digest md5|sha1|sha224|sha256|sha384|sha512|sha3_224|sha3_256|sha3_384|sha3_512]",
 		 "  [--outform der|pem]"},
 		{
 			{"help",		'h', 0, "show usage information"},
@@ -465,7 +473,7 @@ static void __attribute__ ((constructor))reg()
 			{"serial",		's', 1, "hex encoded certificate serial number to revoke"},
 			{"reason",		'r', 1, "reason for certificate revocation"},
 			{"date",		'd', 1, "revocation date as unix timestamp, default: now"},
-			{"digest",		'g', 1, "digest for signature creation, default: sha1"},
+			{"digest",		'g', 1, "digest for signature creation, default: key-specific"},
 			{"outform",		'f', 1, "encoding of generated crl, default: der"},
 		}
 	});

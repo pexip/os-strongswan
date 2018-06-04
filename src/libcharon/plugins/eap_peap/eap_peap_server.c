@@ -167,7 +167,7 @@ METHOD(tls_application_t, process, status_t,
 	eap_payload_t *in;
 	eap_code_t code;
 	eap_type_t type = EAP_NAK, received_type;
-	u_int32_t vendor, received_vendor;
+	uint32_t vendor, received_vendor;
 
 	status = this->avp->process(this->avp, reader, &data,
 							this->ph1_method->get_identifier(this->ph1_method));
@@ -211,7 +211,7 @@ METHOD(tls_application_t, process, status_t,
 	{
 		DBG1(DBG_IKE, "received tunneled EAP-PEAP AVP [EAP/%N]",
 								eap_code_short_names, code);
-
+		in->destroy(in);
 		/* if EAP_SUCCESS check if to continue phase2 with EAP-TNC */
 		return (this->phase2_result == EAP_SUCCESS && code == EAP_SUCCESS) ?
 			   start_phase2_tnc(this) : FAILED;
@@ -250,6 +250,7 @@ METHOD(tls_application_t, process, status_t,
 			{
 				DBG1(DBG_IKE, "%N method not available",
 							   eap_type_names, EAP_IDENTITY);
+				in->destroy(in);
 				return FAILED;
 			}
 		}
@@ -258,6 +259,7 @@ METHOD(tls_application_t, process, status_t,
 		{
 
 			DBG1(DBG_IKE, "%N method failed", eap_type_names, EAP_IDENTITY);
+			in->destroy(in);
 			return FAILED;
 		}
 
@@ -336,7 +338,7 @@ METHOD(tls_application_t, build, status_t,
 	chunk_t data;
 	eap_code_t code;
 	eap_type_t type;
-	u_int32_t vendor;
+	uint32_t vendor;
 
 	if (this->ph2_method == NULL && this->start_phase2 && this->start_phase2_id)
 	{

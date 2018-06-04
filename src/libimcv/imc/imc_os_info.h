@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2014 Andreas Steffen
+ * Copyright (C) 2012-2015 Andreas Steffen
  * HSR Hochschule fuer Technik Rapperswil
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -54,8 +54,8 @@ struct imc_os_info_t {
 	 * @param major				OS major version number
 	 * @param minor				OS minor version number
 	 */
-	void (*get_numeric_version)(imc_os_info_t *this, u_int32_t *major,
-												 u_int32_t *minor);
+	void (*get_numeric_version)(imc_os_info_t *this, uint32_t *major,
+												 uint32_t *minor);
 
 	/**
 	 * Get the OS version or release
@@ -70,6 +70,13 @@ struct imc_os_info_t {
 	 * @return					IP forwarding status
 	 */
 	os_fwd_status_t (*get_fwd_status)(imc_os_info_t *this);
+
+	/**
+	 * Get the default password status
+	 *
+	 * @return					TRUE if enabled, FALSE otherwise
+	 */
+	bool (*get_default_pwd_status)(imc_os_info_t *this);
 
 	/**
 	 * Get the OS uptime in seconds

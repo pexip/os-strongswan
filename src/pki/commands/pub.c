@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2009 Martin Willi
- * Hochschule fuer Technik Rapperswil
+ * Copyright (C) 2015 Andreas Steffen
+ * HSR Hochschule fuer Technik Rapperswil
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -27,7 +28,7 @@ static int pub()
 {
 	cred_encoding_type_t form = PUBKEY_SPKI_ASN1_DER;
 	credential_type_t type = CRED_PRIVATE_KEY;
-	int subtype = KEY_RSA;
+	int subtype = KEY_ANY;
 	certificate_t *cert;
 	private_key_t *private;
 	public_key_t *public;
@@ -52,6 +53,16 @@ static int pub()
 				{
 					type = CRED_PRIVATE_KEY;
 					subtype = KEY_ECDSA;
+				}
+				else if (streq(arg, "bliss"))
+				{
+					type = CRED_PRIVATE_KEY;
+					subtype = KEY_BLISS;
+				}
+				else if (streq(arg, "priv"))
+				{
+					type = CRED_PRIVATE_KEY;
+					subtype = KEY_ANY;
 				}
 				else if (streq(arg, "pub"))
 				{
@@ -183,13 +194,13 @@ static void __attribute__ ((constructor))reg()
 	command_register((command_t) {
 		pub, 'p', "pub",
 		"extract the public key from a private key/certificate",
-		{"[--in file|--keyid hex] [--type rsa|ecdsa|pub|pkcs10|x509]",
+		{"[--in file|--keyid hex] [--type rsa|ecdsa|bliss|priv|pub|pkcs10|x509]",
 		 "[--outform der|pem|dnskey|sshkey]"},
 		{
 			{"help",	'h', 0, "show usage information"},
 			{"in",		'i', 1, "input file, default: stdin"},
 			{"keyid",	'x', 1, "keyid on smartcard of private key"},
-			{"type",	't', 1, "type of credential, default: rsa"},
+			{"type",	't', 1, "type of credential, default: priv"},
 			{"outform",	'f', 1, "encoding of extracted public key, default: der"},
 		}
 	});

@@ -2,6 +2,9 @@
  * Copyright (C) 2014 Martin Willi
  * Copyright (C) 2014 revosec AG
  *
+ * Copyright (C) 2016 Andreas Steffen
+ * HSR Hochschule fuer Technik Rapperswil
+
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
  * Free Software Foundation; either version 2 of the License, or (at your
@@ -11,6 +14,28 @@
  * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
  * or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * for more details.
+ */
+
+/*
+ * Copyright (C) 2014 Timo Teräs <timo.teras@iki.fi>
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
  */
 
 #define _GNU_SOURCE
@@ -86,8 +111,8 @@ CALLBACK(child_sas, int,
 	ret = vici_parse_cb(res, NULL, sa_values, sa_list, child);
 	if (ret == 0)
 	{
-		printf("  %s: #%s, %s, %s%s, %s:",
-			name, child->get(child, "reqid"),
+		printf("  %s: #%s, reqid %s, %s, %s%s, %s:",
+			name, child->get(child, "uniqueid"), child->get(child, "reqid"),
 			child->get(child, "state"), child->get(child, "mode"),
 			child->get(child, "encap") ? "-in-UDP" : "",
 			child->get(child, "protocol"));
@@ -122,11 +147,11 @@ CALLBACK(child_sas, int,
 		}
 		if (child->get(child, "esn"))
 		{
-			printf("/%s", child->get(child, "esn"));
+			printf("/ESN");
 		}
 		printf("\n");
 
-		printf("    installed %s ago", child->get(child, "install-time"));
+		printf("    installed %ss ago", child->get(child, "install-time"));
 		if (child->get(child, "rekey-time"))
 		{
 			printf(", rekeying in %ss", child->get(child, "rekey-time"));
@@ -171,15 +196,26 @@ CALLBACK(ike_sa, int,
 {
 	if (streq(name, "child-sas"))
 	{
-		printf("%s: #%s, %s, IKEv%s, %s:%s\n",
+		bool is_initiator = streq(ike->get(ike, "initiator"), "yes");
+
+		printf("%s: #%s, %s, IKEv%s, %s_i%s %s_r%s\n",
 			ike->get(ike, "name"), ike->get(ike, "uniqueid"),
 			ike->get(ike, "state"), ike->get(ike, "version"),
-			ike->get(ike, "initiator-spi"), ike->get(ike, "responder-spi"));
+			ike->get(ike, "initiator-spi"), is_initiator ? "*" : "",
+			ike->get(ike, "responder-spi"), is_initiator ? "" : "*");
 
-		printf("  local  '%s' @ %s\n",
-			ike->get(ike, "local-id"), ike->get(ike, "local-host"));
-		printf("  remote '%s' @ %s",
-			ike->get(ike, "remote-id"), ike->get(ike, "remote-host"));
+		printf("  local  '%s' @ %s[%s]",
+			ike->get(ike, "local-id"), ike->get(ike, "local-host"),
+			ike->get(ike, "local-port"));
+		if (ike->get(ike, "local-vips"))
+		{
+			printf(" [%s]", ike->get(ike, "local-vips"));
+		}
+		printf("\n");
+
+		printf("  remote '%s' @ %s[%s]",
+			ike->get(ike, "remote-id"), ike->get(ike, "remote-host"),
+			ike->get(ike, "remote-port"));
 		if (ike->get(ike, "remote-eap-id"))
 		{
 			printf(" EAP: '%s'", ike->get(ike, "remote-eap-id"));
@@ -187,6 +223,10 @@ CALLBACK(ike_sa, int,
 		if (ike->get(ike, "remote-xauth-id"))
 		{
 			printf(" XAuth: '%s'", ike->get(ike, "remote-xauth-id"));
+		}
+		if (ike->get(ike, "remote-vips"))
+		{
+			printf(" [%s]", ike->get(ike, "remote-vips"));
 		}
 		printf("\n");
 
@@ -262,9 +302,12 @@ CALLBACK(ike_sas, int,
 CALLBACK(list_cb, void,
 	command_format_options_t *format, char *name, vici_res_t *res)
 {
+	char buf[256];
+
 	if (*format & COMMAND_FORMAT_RAW)
 	{
-		vici_dump(res, "list-sa event", *format & COMMAND_FORMAT_PRETTY,
+		snprintf(buf, sizeof(buf), "%s event", name);
+		vici_dump(res, buf, *format & COMMAND_FORMAT_PRETTY,
 				  stdout);
 	}
 	else
@@ -348,6 +391,50 @@ static int list_sas(vici_conn_t *conn)
 	return 0;
 }
 
+static int monitor_sas(vici_conn_t *conn)
+{
+	command_format_options_t format = COMMAND_FORMAT_NONE;
+	char *arg;
+
+	while (TRUE)
+	{
+		switch (command_getopt(&arg))
+		{
+			case 'h':
+				return command_usage(NULL);
+			case 'P':
+				format |= COMMAND_FORMAT_PRETTY;
+				/* fall through to raw */
+			case 'r':
+				format |= COMMAND_FORMAT_RAW;
+				continue;
+			case EOF:
+				break;
+			default:
+				return command_usage("invalid --monitor-sa option");
+		}
+		break;
+	}
+	if (vici_register(conn, "ike-updown", list_cb, &format) != 0)
+	{
+		fprintf(stderr, "registering for IKE_SAs failed: %s\n",
+				strerror(errno));
+		return errno;
+	}
+	if (vici_register(conn, "child-updown", list_cb, &format) != 0)
+	{
+		fprintf(stderr, "registering for CHILD_SAs failed: %s\n",
+				strerror(errno));
+		return errno;
+	}
+
+	wait_sigint();
+
+	fprintf(stderr, "disconnecting...\n");
+
+	return 0;
+}
+
 /**
  * Register the command.
  */
@@ -361,6 +448,19 @@ static void __attribute__ ((constructor))reg()
 			{"ike",			'i', 1, "filter IKE_SAs by name"},
 			{"ike-id",		'I', 1, "filter IKE_SAs by unique identifier"},
 			{"noblock",		'n', 0, "don't wait for IKE_SAs in use"},
+			{"raw",			'r', 0, "dump raw response message"},
+			{"pretty",		'P', 0, "dump raw response message in pretty print"},
+		}
+	});
+}
+
+static void __attribute__ ((constructor))reg_monitor_sa()
+{
+	command_register((command_t) {
+		monitor_sas, 'm', "monitor-sa", "monitor for IKE_SA and CHILD_SA changes",
+		{"[--raw|--pretty]"},
+		{
+			{"help",		'h', 0, "show usage information"},
 			{"raw",			'r', 0, "dump raw response message"},
 			{"pretty",		'P', 0, "dump raw response message in pretty print"},
 		}

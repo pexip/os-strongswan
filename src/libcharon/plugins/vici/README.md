@@ -145,25 +145,25 @@ the following C array:
 
 	char msg[] = {
 		/* key1 = value1 */
-		2, 4,'k','e','y','1', 0,6,'v','a','l','u','e','1',
+		3, 4,'k','e','y','1', 0,6,'v','a','l','u','e','1',
 		/* section1 */
-		0, 8,'s','e','c','t','i','o','n','1',
+		1, 8,'s','e','c','t','i','o','n','1',
 		/* sub-section */
-		0, 11,'s','u','b','-','s','e','c','t','i','o','n',
+		1, 11,'s','u','b','-','s','e','c','t','i','o','n',
 		/* key2 = value2 */
-		2, 4,'k','e','y','2', 0,6,'v','a','l','u','e','2',
+		3, 4,'k','e','y','2', 0,6,'v','a','l','u','e','2',
 		/* sub-section end */
-		1,
+		2,
 		/* list1 */
-		3, 5, 'l','i','s','t','1',
+		4, 5, 'l','i','s','t','1',
 		/* item1 */
-		4, 0,5,'i','t','e','m','1',
+		5, 0,5,'i','t','e','m','1',
 		/* item2 */
-		4, 0,5,'i','t','e','m','2',
+		5, 0,5,'i','t','e','m','2',
 		/* list1 end */
-		5,
+		6,
 		/* section1 end */
-		1,
+		2,
 	};
 
 ## Client-initiated commands ##
@@ -258,12 +258,17 @@ Initiates an SA while streaming _control-log_ events.
 
 	{
 		child = <CHILD_SA configuration name to initiate>
-		timeout = <timeout in seconds before returning>
+		ike = <optional IKE_SA configuraiton name to find child under>
+		timeout = <timeout in ms before returning>
+		init-limits = <whether limits may prevent initiating the CHILD_SA>
 		loglevel = <loglevel to issue "control-log" events for>
 	} => {
 		success = <yes or no>
 		errmsg = <error string on failure or timeout>
 	}
+
+The default timeout of 0 waits indefinitely for a result, and a timeout value
+of -1 returns a result immediately.
 
 ### terminate() ###
 
@@ -272,13 +277,33 @@ Terminates an SA while streaming _control-log_ events.
 	{
 		child = <terminate a CHILD_SA by configuration name>
 		ike = <terminate an IKE_SA by configuration name>
-		child_id = <terminate a CHILD_SA by its reqid>
-		ike_id = <terminate an IKE_SA by its unique id>
-		timeout = <timeout in seconds before returning>
+		child-id = <terminate a CHILD_SA by its reqid>
+		ike-id = <terminate an IKE_SA by its unique id>
+		timeout = <timeout in ms before returning>
 		loglevel = <loglevel to issue "control-log" events for>
 	} => {
 		success = <yes or no>
 		errmsg = <error string on failure or timeout>
+	}
+
+The default timeout of 0 waits indefinitely for a result, and a timeout value
+of -1 returns a result immediately.
+
+### redirect() ###
+
+Redirect a client-initiated IKE_SA to another gateway.  Only for IKEv2 and if
+supported by the peer.
+
+	{
+		ike = <redirect an IKE_SA by configuration name>
+		ike-id = <redirect an IKE_SA by its unique id>
+		peer-ip = <redirect an IKE_SA with matching peer IP, may also be a
+				   subnet in CIDR notation or an IP range>
+		peer-id = <redirect an IKE_SA with matching peer identity, may contain
+				   wildcards>
+	} => {
+		success = <yes or no>
+		errmsg = <error string on failure>
 	}
 
 ### install() ###
@@ -287,6 +312,7 @@ Install a trap, drop or bypass policy defined by a CHILD_SA config.
 
 	{
 		child = <CHILD_SA configuration name to install>
+		ike = <optional IKE_SA configuraiton name to find child under>
 	} => {
 		success = <yes or no>
 		errmsg = <error string on failure>
@@ -311,7 +337,7 @@ events.
 	{
 		noblock = <use non-blocking mode if key is set>
 		ike = <filter listed IKE_SAs by its name>
-		ike_id = <filter listed IKE_SA by its unique id>
+		ike-id = <filter listed IKE_SA by its unique id>
 	} => {
 		# completes after streaming list-sa events
 	}
@@ -360,10 +386,33 @@ call includes all certificates known by the daemon, not only those loaded
 over vici.
 
 	{
-		type = <certificate type to filter for, or ANY>
+		type = <certificate type to filter for, X509|X509_AC|X509_CRL|
+												OCSP_RESPONSE|PUBKEY  or ANY>
+		flag = <X.509 certificate flag to filter for, NONE|CA|AA|OCSP or ANY>
 		subject = <set to list only certificates having subject>
 	} => {
 		# completes after streaming list-cert events
+	}
+
+### list-authorities() ###
+
+List currently loaded certification authority information by streaming
+_list-authority_ events.
+
+	{
+		name = <list certification authority of a given name>
+	} => {
+		# completes after streaming list-authority events
+	}
+
+### get-authorities() ###
+
+Return a list of currently loaded certification authority names.
+
+	{} => {
+		authorities = [
+			<list of certification authority names>
+		]
 	}
 
 ### load-conn() ###
@@ -397,7 +446,8 @@ Unload a previously loaded connection definition by name.
 Load a certificate into the daemon.
 
 	{
-		type = <certificate type, X509|X509CA|X509AA|X509CRL|X509AC>
+		type = <certificate type, X509|X509_AC|X509_CRL>
+		flag = <X.509 certificate flag, NONE|CA|AA|OCSP>
 		data = <PEM or DER encoded certificate data>
 	} => {
 		success = <yes or no>
@@ -431,6 +481,19 @@ Load a shared IKE PSK, EAP or XAuth secret into the daemon.
 		errmsg = <error string on failure>
 	}
 
+### flush-certs() ###
+
+Flushes the certificate cache. The optional type argument allows to flush
+only certificates of a given type, e.g. all cached CRLs.
+
+	{
+		type = <certificate type to filter for, X509|X509_AC|X509_CRL|
+												OCSP_RESPONSE|PUBKEY or ANY>
+	} => {
+		success = <yes or no>
+		errmsg = <error string on failure>
+	}
+
 ### clear-creds() ###
 
 Clear all loaded certificate, private key and shared key credentials. This
@@ -438,6 +501,32 @@ affects only credentials loaded over vici, but additionally flushes the
 credential cache.
 
 	{} => {
+		success = <yes or no>
+		errmsg = <error string on failure>
+	}
+
+### load-authority() ###
+
+Load a single certification authority definition into the daemon. An existing
+authority with the same name gets replaced.
+
+	{
+		<certification authority name> = {
+			# certification authority parameters
+			# refer to swanctl.conf(5) for details.
+		} => {
+			success = <yes or no>
+			errmsg = <error string on failure>
+		}
+	}
+
+### unload-authority() ###
+
+Unload a previously loaded certification authority definition by name.
+
+	{
+		name = <certification authority name>
+	} => {
 		success = <yes or no>
 		errmsg = <error string on failure>
 	}
@@ -478,12 +567,31 @@ Unloading fails for pools with leases currently online.
 
 List the currently loaded pools.
 
-	{} => {
+	{
+		leases = <set to yes to include leases>
+	} => {
 		<pool name>* = {
 			base = <virtual IP pool base address>
 			size = <total number of addresses in the pool>
 			online = <number of leases online>
 			offline = <number of leases offline>
+			leases = {
+				<zero-based index>* = {
+					address = <IP address>
+					identity = <assigned identity>
+					status = <online|offline>
+				}
+			}
+		}
+	}
+
+### get-algorithms() ###
+
+List currently loaded algorithms and their implementation.
+
+	{} => {
+		<algorithm type> = {
+			<algorithm> = <plugin providing the implementation>
 		}
 	}
 
@@ -531,14 +639,20 @@ command.
 			version = <IKE version, 1 or 2>
 			state = <IKE_SA state name>
 			local-host = <local IKE endpoint address>
+			local-port = <local IKE endpoint port>
 			local-id = <local IKE identity>
 			remote-host = <remote IKE endpoint address>
+			remote-port = <remote IKE endpoint port>
 			remote-id = <remote IKE identity>
 			remote-xauth-id = <remote XAuth identity, if XAuth-authenticated>
 			remote-eap-id = <remote EAP identity, if EAP-authenticated>
 			initiator = <yes, if initiator of IKE_SA>
 			initiator-spi = <hex encoded initiator SPI / cookie>
 			responder-spi = <hex encoded responder SPI / cookie>
+			nat-local = <yes, if local endpoint is behind a NAT>
+			nat-remote = <yes, if remote endpoint is behind a NAT>
+			nat-fake = <yes, if NAT situation has been faked as responder>
+			nat-any = <yes, if any endpoint is behind a NAT (also if faked)>
 			encr-alg = <IKE encryption algorithm string>
 			encr-keysize = <key size for encr-alg, if applicable>
 			integ-alg = <IKE integrity algorithm string>
@@ -548,6 +662,12 @@ command.
 			established = <seconds the IKE_SA has been established>
 			rekey-time = <seconds before IKE_SA gets rekeyed>
 			reauth-time = <seconds before IKE_SA gets re-authenticated>
+			local-vips = [
+				<list of virtual IPs assigned by the remote peer, installed locally>
+			]
+			remote-vips = [
+				<list of virtual IPs assigned to the remote peer>
+			]
 			tasks-queued = [
 				<list of currently queued tasks for execution>
 			]
@@ -559,6 +679,7 @@ command.
 			]
 			child-sas = {
 				<child-sa-name>* = {
+					uniqueid = <unique CHILD_SA identifier>
 					reqid = <reqid of CHILD_SA>
 					state = <state string of CHILD_SA>
 					mode = <IPsec mode, tunnel|transport|beet>
@@ -626,6 +747,8 @@ _list-conns_ command.
 				<list of valid remote IKE endpoint addresses>
 			]
 			version = <IKE version as string, IKEv1|IKEv2 or 0 for any>
+			reauth_time = <IKE_SA reauthentication interval in seconds>
+			rekey_time = <IKE_SA rekeying interval in seconds>
 
 			local*, remote* = { # multiple local and remote auth sections
 				class = <authentication type>
@@ -650,6 +773,9 @@ _list-conns_ command.
 			children = {
 				<CHILD_SA config name>* = {
 					mode = <IPsec mode>
+					rekey_time = <CHILD_SA rekeying interval in seconds>
+					rekey_bytes = <CHILD_SA rekeying interval in bytes>
+					rekey_packets = <CHILD_SA rekeying interval in packets>
 					local-ts = [
 						<list of local traffic selectors>
 					]
@@ -667,11 +793,91 @@ The _list-cert_ event is issued to stream loaded certificates during an active
 _list-certs_ command.
 
 	{
-		type = <certificate type>
+		type = <certificate type, X509|X509_AC|X509_CRL|OCSP_RESPONSE|PUBKEY>
+		flag = <X.509 certificate flag, NONE|CA|AA|OCSP>
 		has_privkey = <set if a private key for the certificate is available>
 		data = <ASN1 encoded certificate data>
+		subject = <subject string if defined and certificate type is PUBKEY>
+		not-before = <time string if defined and certificate type is PUBKEY>
+		not-after  = <time string if defined and certificate type is PUBKEY>
 	}
 
+### list-authority ###
+
+The _list-authority_ event is issued to stream loaded certification authority
+information during an active_list-authorities_ command.
+
+	{
+		<certification authority name> = {
+			cacert = <subject distinguished name of CA certificate>
+			crl_uris = [
+				<CRL URI (http, ldap or file)>
+			]
+			ocsp_uris = [
+				<OCSP URI (http)>
+			]
+			cert_uri_base = <base URI for download of hash-and-URL certificates>
+		}
+	}
+
+### ike-updown ###
+
+The _ike-updown_ event is issued when an IKE_SA is established or terminated.
+
+	{
+		up = <set if up event>
+		<IKE_SA config name> = {
+			<same data as in the list-sas event, but without child-sas section>
+		}
+	}
+
+### ike-rekey ###
+
+The _ike-rekey_ event is issued when an IKE_SA is rekeyed.
+
+	{
+		<IKE_SA config name> = {
+			old = {
+				<same data as in the list-sas event, but without child-sas section>
+			}
+			new = {
+				<same data as in the list-sas event, but without child-sas section>
+			}
+		}
+	}
+
+### child-updown ###
+
+The _child-updown_ event is issued when a CHILD_SA is established or terminated.
+
+	{
+		up = <set if up event>
+		<IKE_SA config name> = {
+			<same data as in the list-sas event, but with only the affected
+			 CHILD_SA in the child-sas section>
+		}
+	}
+
+### child-rekey ###
+
+The _child-rekey_ event is issued when a CHILD_SA is rekeyed.
+
+	{
+		<IKE_SA config name> = {
+			<same data as in the list-sas event, but with the child-sas section
+			 as follows>
+			child-sas = {
+				<child-sa-name> = {
+					old = {
+						<same data as in the list-sas event>
+					}
+					new = {
+						<same data as in the list-sas event>
+					}
+				}
+			}
+		}
+	}
 
 # libvici C client library #
 
@@ -820,9 +1026,9 @@ during encoding.
 
 ## Connecting to the daemon ##
 
-To create a connection to the daemon, a socket must be passed to the
-_Connection_ constructor. There is no default, but on Unix systems usually
-a Unix socket over _/var/run/charon.vici_ is used:
+To create a connection to the daemon, a socket can be passed to the
+_Connection_ constructor. If none is passed, a default Unix socket at
+_/var/run/charon.vici_ is used:
 
 	require "vici"
 	require "socket"
@@ -854,3 +1060,113 @@ _list-conns_ command and implicitly the _list-conn_ event:
 
 For more details about the ruby gem refer to the comments in the gem source
 code or the generated documentation.
+
+# vici Python egg #
+
+The _vici Python egg_ is a pure Python implementation of the VICI protocol to
+implement client applications. It is provided in the _python_ subdirectory, and
+gets built and installed if strongSwan has been _./configure_'d with
+_--enable-vici_ and _--enable-python-eggs_.
+
+The _vici_ module provides a _Session()_ constructor for a high level interface,
+the underlying classes are usually not required to build Python applications
+using VICI. The _Session_ class provides methods for the supported VICI
+commands.
+
+To represent the VICI message data tree, the library converts the binary
+encoding to Python data types. The _Session_ class takes and returns Python
+objects for the exchanged message data:
+ * Sections get encoded as OrderedDict, containing other sections, or
+ * Key/Values, where the values are strings as dictionary values
+ * Lists get encoded as Python Lists with string values
+Values that do not conform to Python dict or list get converted to strings using
+str().
+
+## Connecting to the daemon ##
+
+To create a connection to the daemon, a socket can be passed to the _Session_
+constructor. If none is passed, a default Unix socket at _/var/run/charon.vici_
+is used:
+
+	import vici
+	import socket
+
+	s = socket.socket(socket.AF_UNIX)
+	s.connect("/var/run/charon.vici")
+	v = vici.Session(s)
+
+## A simple client request ##
+
+An example to print the daemon version information is as simple as:
+
+	ver = v.version()
+
+	print "{daemon} {version} ({sysname}, {release}, {machine})".format(**ver)
+
+## A request with response iteration ##
+
+The _Session_ class returns an iterable Python generator for streamed events to
+continuously stream objects to the caller. The following example lists all
+loaded connections using the _list-conns_ command and implicitly the _list-conn_
+event:
+
+	for conn in v.list_conns():
+		for key in conn:
+			print key
+
+Please note that if the returned generator is not iterated completely, it must
+be closed using _close()_. This is implicitly done when breaking from a loop,
+but an explicit call may be required when directly iterating the generator with
+_next()_.
+
+## Sorting in dictionaries ##
+
+In VICI, in some message trees the order of objects in dictionary matters. In
+contrast to ruby Hashes, Python dictionaries do not preserve order of added
+objects. It is therefore recommended to use OrderedDicts instead of the default
+dictionaries. Objects returned by the library use OrderedDicts.
+
+## API documentation ##
+
+For more details about the Python egg refer to the comments in the Python source
+code.
+
+# Vici::Session Perl CPAN module #
+
+The _Vici::Session Perl CPAN module_ is a pure Perl implementation of the VICI
+protocol to implement client applications. It is provided in the _perl_
+subdirectory, and gets built and installed if strongSwan has been
+ _./configure_'d with_--enable-vici_ and _--enable-perl-cpan_.
+
+The _Vici::Session_ module provides a _new()_ constructor for a high level
+interface, the underlying _Vici::Packet_ and _Vici::Transport_ classes are
+usually not required to build Perl applications using VICI. The _Vici::Session_
+class provides methods for the supported VICI commands. The auxiliare
+ _Vici::Message_ class is used to encode configuration parameters sent to
+the daemon and decode data returned by the daemon.
+
+## Connecting to the daemon ##
+
+	use IO::Socket::UNIX;
+	use Vici::Session;
+	use Vici::Message;
+
+	my $socket = IO::Socket::UNIX->new(
+			Type => SOCK_STREAM,
+			Peer => '/var/run/charon.vici',
+	) or die "Vici socket: $!";
+
+	my $session = Vici::Session->new($socket);
+
+## A simple client request ##
+
+An example to print the daemon version information is as simple as:
+
+	my $version = $session->version()->hash();
+
+	foreach my $key ('daemon', 'version', 'sysname', 'release', 'machine' ) {
+		print $version->{$key}, " ";
+	}
+
+The _Vici::Session_ methods are explained in the perl/Vici-Session/README.pod
+document.

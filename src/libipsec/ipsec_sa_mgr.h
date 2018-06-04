@@ -45,12 +45,11 @@ struct ipsec_sa_mgr_t {
 	 * @param src			source address of the SA
 	 * @param dst			destination address of the SA
 	 * @param protocol		protocol of the SA (only ESP supported)
-	 * @param reqid			reqid for the SA
 	 * @param spi			the allocated SPI
 	 * @return				SUCCESS of operation successful
 	 */
 	status_t (*get_spi)(ipsec_sa_mgr_t *this, host_t *src, host_t *dst,
-						u_int8_t protocol, u_int32_t reqid, u_int32_t *spi);
+						uint8_t protocol, uint32_t *spi);
 
 	/**
 	 * Add a new SA
@@ -74,18 +73,16 @@ struct ipsec_sa_mgr_t {
 	 * @param encap			enable UDP encapsulation (must be TRUE)
 	 * @param esn			Extended Sequence Numbers (currently not supported)
 	 * @param inbound		TRUE if this is an inbound SA, FALSE otherwise
-	 * @param src_ts		source traffic selector
-	 * @param dst_ts		destination traffic selector
+	 * @param update		TRUE if an SPI has already been allocated for SA
 	 * @return				SUCCESS if operation completed
 	 */
 	status_t (*add_sa)(ipsec_sa_mgr_t *this, host_t *src, host_t *dst,
-					   u_int32_t spi, u_int8_t protocol, u_int32_t reqid,
-					   mark_t mark, u_int32_t tfc,	lifetime_cfg_t *lifetime,
-					   u_int16_t enc_alg, chunk_t enc_key, u_int16_t int_alg,
-					   chunk_t int_key, ipsec_mode_t mode, u_int16_t ipcomp,
-					   u_int16_t cpi, bool initiator, bool encap, bool esn,
-					   bool inbound, traffic_selector_t *src_ts,
-					   traffic_selector_t *dst_ts);
+					   uint32_t spi, uint8_t protocol, uint32_t reqid,
+					   mark_t mark, uint32_t tfc,	lifetime_cfg_t *lifetime,
+					   uint16_t enc_alg, chunk_t enc_key, uint16_t int_alg,
+					   chunk_t int_key, ipsec_mode_t mode, uint16_t ipcomp,
+					   uint16_t cpi, bool initiator, bool encap, bool esn,
+					   bool inbound, bool update);
 
 	/**
 	 * Update the hosts on an installed SA.
@@ -103,7 +100,7 @@ struct ipsec_sa_mgr_t {
 	 * @return				SUCCESS if operation completed
 	 */
 	status_t (*update_sa)(ipsec_sa_mgr_t *this,
-						  u_int32_t spi, u_int8_t protocol, u_int16_t cpi,
+						  uint32_t spi, uint8_t protocol, uint16_t cpi,
 						  host_t *src, host_t *dst,
 						  host_t *new_src, host_t *new_dst,
 						  bool encap, bool new_encap, mark_t mark);
@@ -122,8 +119,8 @@ struct ipsec_sa_mgr_t {
 	 * @return				SUCCESS if operation completed
 	 */
 	status_t (*query_sa)(ipsec_sa_mgr_t *this, host_t *src, host_t *dst,
-						 u_int32_t spi, u_int8_t protocol, mark_t mark,
-						 u_int64_t *bytes, u_int64_t *packets, time_t *time);
+						 uint32_t spi, uint8_t protocol, mark_t mark,
+						 uint64_t *bytes, uint64_t *packets, time_t *time);
 
 	/**
 	 * Delete a previously added SA
@@ -137,7 +134,7 @@ struct ipsec_sa_mgr_t {
 	 * @return				SUCCESS if operation completed
 	 */
 	status_t (*del_sa)(ipsec_sa_mgr_t *this, host_t *src, host_t *dst,
-					   u_int32_t spi, u_int8_t protocol, u_int16_t cpi,
+					   uint32_t spi, uint8_t protocol, uint16_t cpi,
 					   mark_t mark);
 
 	/**
@@ -162,7 +159,7 @@ struct ipsec_sa_mgr_t {
 	 * @param dst			destination address (e.g. of an inbound packet)
 	 * @return				the matching IPsec SA, or NULL if none is found
 	 */
-	ipsec_sa_t *(*checkout_by_spi)(ipsec_sa_mgr_t *this, u_int32_t spi,
+	ipsec_sa_t *(*checkout_by_spi)(ipsec_sa_mgr_t *this, uint32_t spi,
 								   host_t *dst);
 
 	/**
@@ -180,7 +177,7 @@ struct ipsec_sa_mgr_t {
 	 * @param inbound		TRUE for an inbound SA, FALSE for an outbound SA
 	 * @return				the matching IPsec SA, or NULL if none is found
 	 */
-	ipsec_sa_t *(*checkout_by_reqid)(ipsec_sa_mgr_t *this, u_int32_t reqid,
+	ipsec_sa_t *(*checkout_by_reqid)(ipsec_sa_mgr_t *this, uint32_t reqid,
 									 bool inbound);
 
 	/**

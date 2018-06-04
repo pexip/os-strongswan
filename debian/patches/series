@@ -1,13 +1,8 @@
 01_fix-manpages.patch
-02_chunk-endianness.patch
 03_systemd-service.patch
 04_disable-libtls-tests.patch
-CVE-2014-9221_modp_custom.patch
-CVE-2015-4171_enforce_remote_auth.patch
-CVE-2015-8023_eap_mschapv2_state.patch
 CVE-2017-9022_insufficient_input_validation_gmp_plugin.patch
 CVE-2017-9023_incorrect_handling_of_choice_types_in_asn1_parser.patch
-0001-openssl-Don-t-pre-initialize-OpenSSL-HMAC-with-an-em.patch
 CVE-2017-11185.patch
 CVE-2018-10811.patch
 CVE-2018-5388.patch

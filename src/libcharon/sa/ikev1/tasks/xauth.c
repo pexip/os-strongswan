@@ -16,7 +16,6 @@
 #include "xauth.h"
 
 #include <daemon.h>
-#include <hydra.h>
 #include <encoding/payloads/cp_payload.h>
 #include <processing/jobs/adopt_children_job.h>
 #include <sa/ikev1/tasks/mode_config.h>
@@ -69,7 +68,7 @@ struct private_xauth_t {
 	/**
 	 * received identifier
 	 */
-	u_int16_t identifier;
+	uint16_t identifier;
 
 	/**
 	 * status of Xauth exchange
@@ -271,7 +270,10 @@ static bool add_auth_cfg(private_xauth_t *this, identification_t *id, bool local
 
 	auth = auth_cfg_create();
 	auth->add(auth, AUTH_RULE_AUTH_CLASS, AUTH_CLASS_XAUTH);
-	auth->add(auth, AUTH_RULE_XAUTH_IDENTITY, id->clone(id));
+	if (id)
+	{
+		auth->add(auth, AUTH_RULE_XAUTH_IDENTITY, id->clone(id));
+	}
 	auth->merge(auth, this->ike_sa->get_auth_cfg(this->ike_sa, local), FALSE);
 	this->ike_sa->add_auth_cfg(this->ike_sa, local, auth);
 
@@ -342,7 +344,10 @@ METHOD(task_t, build_i, status_t,
 				break;
 			case SUCCESS:
 				DESTROY_IF(cp);
-				this->status = XAUTH_OK;
+				if (add_auth_cfg(this, NULL, FALSE) && allowed(this))
+				{
+					this->status = XAUTH_OK;
+				}
 				this->public.task.process = _process_i_status;
 				return build_i_status(this, message);
 			default:

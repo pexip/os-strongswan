@@ -34,6 +34,7 @@ enum transform_type_t {
 	RANDOM_NUMBER_GENERATOR = 243,
 	AEAD_ALGORITHM = 244,
 	COMPRESSION_ALGORITHM = 245,
+	EXTENDED_OUTPUT_FUNCTION = 246,
 	ENCRYPTION_ALGORITHM = 1,
 	PSEUDO_RANDOM_FUNCTION = 2,
 	INTEGRITY_ALGORITHM = 3,
@@ -45,6 +46,14 @@ enum transform_type_t {
  * enum names for transform_type_t.
  */
 extern enum_name_t *transform_type_names;
+
+/**
+ * Get the enum names for a specific transform type.
+ *
+ * @param type		type of transform to get enum names for
+ * @return			enum names
+ */
+enum_name_t *transform_get_enum_names(transform_type_t type);
 
 /**
  * Extended sequence numbers, as in IKEv2 RFC 3.3.2.

@@ -9,11 +9,14 @@ pluginstemplatedir = $(templatesdir)/plugins
 
 options = \
 	options/aikgen.opt \
+	options/aikpub2.opt \
 	options/attest.opt \
 	options/charon.opt \
 	options/charon-logging.opt \
+	options/charon-nm.opt \
 	options/charon-systemd.opt \
 	options/imcv.opt \
+	options/imv_policy_manager.opt \
 	options/manager.opt \
 	options/medsrv.opt \
 	options/pacman.opt \
@@ -28,6 +31,7 @@ plugins = \
 	plugins/android_log.opt \
 	plugins/attr.opt \
 	plugins/attr-sql.opt \
+	plugins/bliss.opt \
 	plugins/certexpire.opt \
 	plugins/coupling.opt \
 	plugins/dhcp.opt \
@@ -46,9 +50,11 @@ plugins = \
 	plugins/eap-ttls.opt \
 	plugins/error-notify.opt \
 	plugins/ext-auth.opt \
+	plugins/forecast.opt \
 	plugins/gcrypt.opt \
 	plugins/ha.opt \
 	plugins/imc-attestation.opt \
+	plugins/imc-hcd.opt \
 	plugins/imc-os.opt \
 	plugins/imc-scanner.opt \
 	plugins/imc-swid.opt \
@@ -62,11 +68,14 @@ plugins = \
 	plugins/led.opt \
 	plugins/kernel-libipsec.opt \
 	plugins/kernel-netlink.opt \
+	plugins/kernel-pfkey.opt \
 	plugins/kernel-pfroute.opt \
 	plugins/load-tester.opt \
 	plugins/lookip.opt \
 	plugins/ntru.opt \
 	plugins/openssl.opt \
+	plugins/osx-attr.opt \
+	plugins/p-cscf.opt \
 	plugins/pkcs11.opt \
 	plugins/radattr.opt \
 	plugins/random.opt \

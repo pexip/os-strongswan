@@ -59,6 +59,7 @@ static bool is_file_list_key(char *key)
 	char *keys[] = {
 		"certs",
 		"cacerts",
+		"pubkeys"
 	};
 	int i;
 
@@ -93,11 +94,12 @@ static void add_list_key(vici_req_t *req, char *key, char *value)
 /**
  * Add a vici list of blobs from a comma separated file list
  */
-static void add_file_list_key(vici_req_t *req, char *key, char *value)
+static bool add_file_list_key(vici_req_t *req, char *key, char *value)
 {
 	enumerator_t *enumerator;
 	chunk_t *map;
 	char *token, buf[PATH_MAX];
+	bool ret = TRUE;
 
 	vici_begin_list(req, key);
 	enumerator = enumerator_create_token(value, ",", " ");
@@ -111,10 +113,16 @@ static void add_file_list_key(vici_req_t *req, char *key, char *value)
 						 SWANCTL_X509DIR, DIRECTORY_SEPARATOR, token);
 				token = buf;
 			}
-			if (streq(key, "cacerts"))
+			else if (streq(key, "cacerts"))
 			{
 				snprintf(buf, sizeof(buf), "%s%s%s",
 						 SWANCTL_X509CADIR, DIRECTORY_SEPARATOR, token);
+				token = buf;
+			}
+			else if (streq(key, "pubkeys"))
+			{
+				snprintf(buf, sizeof(buf), "%s%s%s",
+						 SWANCTL_PUBKEYDIR, DIRECTORY_SEPARATOR, token);
 				token = buf;
 			}
 		}
@@ -127,21 +135,26 @@ static void add_file_list_key(vici_req_t *req, char *key, char *value)
 		}
 		else
 		{
-			fprintf(stderr, "loading certificate '%s' failed: %s\n",
-					token, strerror(errno));
+			fprintf(stderr, "loading %s certificate '%s' failed: %s\n",
+					key, token, strerror(errno));
+			ret = FALSE;
+			break;
 		}
 	}
 	enumerator->destroy(enumerator);
 	vici_end_list(req);
+
+	return ret;
 }
 
 /**
  * Translate setting key/values from a section into vici key-values/lists
  */
-static void add_key_values(vici_req_t *req, settings_t *cfg, char *section)
+static bool add_key_values(vici_req_t *req, settings_t *cfg, char *section)
 {
 	enumerator_t *enumerator;
 	char *key, *value;
+	bool ret = TRUE;
 
 	enumerator = cfg->create_key_value_enumerator(cfg, section);
 	while (enumerator->enumerate(enumerator, &key, &value))
@@ -152,34 +165,51 @@ static void add_key_values(vici_req_t *req, settings_t *cfg, char *section)
 		}
 		else if (is_file_list_key(key))
 		{
-			add_file_list_key(req, key, value);
+			ret = add_file_list_key(req, key, value);
 		}
 		else
 		{
 			vici_add_key_valuef(req, key, "%s", value);
 		}
+		if (!ret)
+		{
+			break;
+		}
 	}
 	enumerator->destroy(enumerator);
+
+	return ret;
 }
 
 /**
  * Translate a settings section to a vici section
  */
-static void add_sections(vici_req_t *req, settings_t *cfg, char *section)
+static bool add_sections(vici_req_t *req, settings_t *cfg, char *section)
 {
 	enumerator_t *enumerator;
 	char *name, buf[256];
+	bool ret = TRUE;
 
 	enumerator = cfg->create_section_enumerator(cfg, section);
 	while (enumerator->enumerate(enumerator, &name))
 	{
 		vici_begin_section(req, name);
 		snprintf(buf, sizeof(buf), "%s.%s", section, name);
-		add_key_values(req, cfg, buf);
-		add_sections(req, cfg, buf);
+		ret = add_key_values(req, cfg, buf);
+		if (!ret)
+		{
+			break;
+		}
+		ret = add_sections(req, cfg, buf);
+		if (!ret)
+		{
+			break;
+		}
 		vici_end_section(req);
 	}
 	enumerator->destroy(enumerator);
+
+	return ret;
 }
 
 /**
@@ -191,15 +221,19 @@ static bool load_conn(vici_conn_t *conn, settings_t *cfg,
 	vici_req_t *req;
 	vici_res_t *res;
 	bool ret = TRUE;
-	char buf[128];
+	char buf[BUF_LEN];
 
 	snprintf(buf, sizeof(buf), "%s.%s", "connections", section);
 
 	req = vici_begin("load-conn");
 
 	vici_begin_section(req, section);
-	add_key_values(req, cfg, buf);
-	add_sections(req, cfg, buf);
+	if (!add_key_values(req, cfg, buf) ||
+		!add_sections(req, cfg, buf))
+	{
+		vici_free_req(req);
+		return FALSE;
+	}
 	vici_end_section(req);
 
 	res = vici_submit(req, conn);
@@ -362,7 +396,7 @@ int load_conns_cfg(vici_conn_t *conn, command_format_options_t format,
 	}
 	if (found == 0)
 	{
-		printf("no connections found, %u unloaded\n", unloaded);
+		fprintf(stderr, "no connections found, %u unloaded\n", unloaded);
 		return 0;
 	}
 	if (loaded == found)

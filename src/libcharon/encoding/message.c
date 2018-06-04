@@ -180,6 +180,7 @@ static payload_order_t ike_sa_init_r_order[] = {
  */
 static payload_rule_t ike_auth_i_rules[] = {
 /*	payload type					min	max						encr	suff */
+	{PLV2_FRAGMENT,					0,	1,						TRUE,	TRUE},
 	{PLV2_NOTIFY,					0,	MAX_NOTIFY_PAYLOADS,	TRUE,	FALSE},
 	{PLV2_EAP,						0,	1,						TRUE,	TRUE},
 	{PLV2_AUTH,						0,	1,						TRUE,	TRUE},
@@ -227,6 +228,7 @@ static payload_order_t ike_auth_i_order[] = {
 	{PLV2_NOTIFY,					NO_ADDITIONAL_ADDRESSES},
 	{PLV2_NOTIFY,					0},
 	{PLV2_VENDOR_ID,				0},
+	{PLV2_FRAGMENT,					0},
 };
 
 /**
@@ -234,6 +236,7 @@ static payload_order_t ike_auth_i_order[] = {
  */
 static payload_rule_t ike_auth_r_rules[] = {
 /*	payload type					min	max						encr	suff */
+	{PLV2_FRAGMENT,					0,	1,						TRUE,	TRUE},
 	{PLV2_NOTIFY,					0,	MAX_NOTIFY_PAYLOADS,	TRUE,	TRUE},
 	{PLV2_EAP,						0,	1,						TRUE,	TRUE},
 	{PLV2_AUTH,						0,	1,						TRUE,	TRUE},
@@ -270,6 +273,7 @@ static payload_order_t ike_auth_r_order[] = {
 	{PLV2_NOTIFY,					NO_ADDITIONAL_ADDRESSES},
 	{PLV2_NOTIFY,					0},
 	{PLV2_VENDOR_ID,				0},
+	{PLV2_FRAGMENT,					0},
 };
 
 /**
@@ -277,6 +281,7 @@ static payload_order_t ike_auth_r_order[] = {
  */
 static payload_rule_t informational_i_rules[] = {
 /*	payload type					min	max						encr	suff */
+	{PLV2_FRAGMENT,					0,	1,						TRUE,	TRUE},
 	{PLV2_NOTIFY,					0,	MAX_NOTIFY_PAYLOADS,	TRUE,	FALSE},
 	{PLV2_CONFIGURATION,			0,	1,						TRUE,	FALSE},
 	{PLV2_DELETE,					0,	MAX_DELETE_PAYLOADS,	TRUE,	FALSE},
@@ -295,6 +300,7 @@ static payload_order_t informational_i_order[] = {
 	{PLV2_NOTIFY,					0},
 	{PLV2_DELETE,					0},
 	{PLV2_CONFIGURATION,			0},
+	{PLV2_FRAGMENT,					0},
 };
 
 /**
@@ -302,6 +308,7 @@ static payload_order_t informational_i_order[] = {
  */
 static payload_rule_t informational_r_rules[] = {
 /*	payload type					min	max						encr	suff */
+	{PLV2_FRAGMENT,					0,	1,						TRUE,	TRUE},
 	{PLV2_NOTIFY,					0,	MAX_NOTIFY_PAYLOADS,	TRUE,	FALSE},
 	{PLV2_CONFIGURATION,			0,	1,						TRUE,	FALSE},
 	{PLV2_DELETE,					0,	MAX_DELETE_PAYLOADS,	TRUE,	FALSE},
@@ -320,6 +327,7 @@ static payload_order_t informational_r_order[] = {
 	{PLV2_NOTIFY,					0},
 	{PLV2_DELETE,					0},
 	{PLV2_CONFIGURATION,			0},
+	{PLV2_FRAGMENT,					0},
 };
 
 /**
@@ -327,6 +335,7 @@ static payload_order_t informational_r_order[] = {
  */
 static payload_rule_t create_child_sa_i_rules[] = {
 /*	payload type					min	max						encr	suff */
+	{PLV2_FRAGMENT,					0,	1,						TRUE,	TRUE},
 	{PLV2_NOTIFY,					0,	MAX_NOTIFY_PAYLOADS,	TRUE,	FALSE},
 	{PLV2_SECURITY_ASSOCIATION,		1,	1,						TRUE,	FALSE},
 	{PLV2_NONCE,					1,	1,						TRUE,	FALSE},
@@ -353,6 +362,7 @@ static payload_order_t create_child_sa_i_order[] = {
 	{PLV2_TS_INITIATOR,				0},
 	{PLV2_TS_RESPONDER,				0},
 	{PLV2_NOTIFY,					0},
+	{PLV2_FRAGMENT,					0},
 };
 
 /**
@@ -360,6 +370,7 @@ static payload_order_t create_child_sa_i_order[] = {
  */
 static payload_rule_t create_child_sa_r_rules[] = {
 /*	payload type					min	max						encr	suff */
+	{PLV2_FRAGMENT,					0,	1,						TRUE,	TRUE},
 	{PLV2_NOTIFY,					0,	MAX_NOTIFY_PAYLOADS,	TRUE,	TRUE},
 	{PLV2_SECURITY_ASSOCIATION,		1,	1,						TRUE,	FALSE},
 	{PLV2_NONCE,					1,	1,						TRUE,	FALSE},
@@ -386,6 +397,7 @@ static payload_order_t create_child_sa_r_order[] = {
 	{PLV2_TS_RESPONDER,				0},
 	{PLV2_NOTIFY,					ADDITIONAL_TS_POSSIBLE},
 	{PLV2_NOTIFY,					0},
+	{PLV2_FRAGMENT,					0},
 };
 
 #ifdef ME
@@ -523,7 +535,7 @@ static payload_rule_t aggressive_i_rules[] = {
 	{PLV1_NAT_D,					0,	MAX_NAT_D_PAYLOADS,		FALSE,	FALSE},
 	{PLV1_NAT_D_DRAFT_00_03,		0,	MAX_NAT_D_PAYLOADS,		FALSE,	FALSE},
 	{PLV1_ID,						0,	1,						FALSE,	FALSE},
-	{PLV1_CERTIFICATE,				0,	1,						TRUE,	FALSE},
+	{PLV1_CERTIFICATE,				0,	MAX_CERT_PAYLOADS,		TRUE,	FALSE},
 	{PLV1_SIGNATURE,				0,	1,						TRUE,	FALSE},
 	{PLV1_HASH,						0,	1,						TRUE,	FALSE},
 	{PLV1_FRAGMENT,					0,	1,						FALSE,	TRUE},
@@ -539,13 +551,13 @@ static payload_order_t aggressive_i_order[] = {
 	{PLV1_NONCE,					0},
 	{PLV1_ID,						0},
 	{PLV1_CERTIFICATE,				0},
+	{PLV1_CERTREQ,					0},
+	{PLV1_NOTIFY,					0},
+	{PLV1_VENDOR_ID,				0},
 	{PLV1_NAT_D,					0},
 	{PLV1_NAT_D_DRAFT_00_03,		0},
 	{PLV1_SIGNATURE,				0},
 	{PLV1_HASH,						0},
-	{PLV1_CERTREQ,					0},
-	{PLV1_NOTIFY,					0},
-	{PLV1_VENDOR_ID,				0},
 	{PLV1_FRAGMENT,					0},
 };
 
@@ -563,7 +575,7 @@ static payload_rule_t aggressive_r_rules[] = {
 	{PLV1_NAT_D,					0,	MAX_NAT_D_PAYLOADS,		FALSE,	FALSE},
 	{PLV1_NAT_D_DRAFT_00_03,		0,	MAX_NAT_D_PAYLOADS,		FALSE,	FALSE},
 	{PLV1_ID,						0,	1,						FALSE,	FALSE},
-	{PLV1_CERTIFICATE,				0,	1,						FALSE,	FALSE},
+	{PLV1_CERTIFICATE,				0,	MAX_CERT_PAYLOADS,		FALSE,	FALSE},
 	{PLV1_SIGNATURE,				0,	1,						FALSE,	FALSE},
 	{PLV1_HASH,						0,	1,						FALSE,	FALSE},
 	{PLV1_FRAGMENT,					0,	1,						FALSE,	TRUE},
@@ -579,13 +591,13 @@ static payload_order_t aggressive_r_order[] = {
 	{PLV1_NONCE,					0},
 	{PLV1_ID,						0},
 	{PLV1_CERTIFICATE,				0},
+	{PLV1_CERTREQ,					0},
+	{PLV1_NOTIFY,					0},
+	{PLV1_VENDOR_ID,				0},
 	{PLV1_NAT_D,					0},
 	{PLV1_NAT_D_DRAFT_00_03,		0},
 	{PLV1_SIGNATURE,				0},
 	{PLV1_HASH,						0},
-	{PLV1_CERTREQ,					0},
-	{PLV1_NOTIFY,					0},
-	{PLV1_VENDOR_ID,				0},
 	{PLV1_FRAGMENT,					0},
 };
 
@@ -817,7 +829,7 @@ typedef struct {
 	 * fragments we expect.
 	 * For IKEv2 we store the total number of fragment we received last.
 	 */
-	u_int16_t last;
+	uint16_t last;
 
 	/**
 	 * Length of all currently received fragments.
@@ -846,12 +858,12 @@ struct private_message_t {
 	/**
 	 * Minor version of message.
 	 */
-	u_int8_t major_version;
+	uint8_t major_version;
 
 	/**
 	 * Major version of message.
 	 */
-	u_int8_t minor_version;
+	uint8_t minor_version;
 
 	/**
 	 * First Payload in message.
@@ -891,7 +903,7 @@ struct private_message_t {
 	/**
 	 * Message ID of this message.
 	 */
-	u_int32_t message_id;
+	uint32_t message_id;
 
 	/**
 	 * ID of assigned IKE_SA.
@@ -941,7 +953,7 @@ struct private_message_t {
 typedef struct {
 
 	/** fragment number */
-	u_int8_t num;
+	uint8_t num;
 
 	/** fragment data */
 	chunk_t data;
@@ -1012,48 +1024,48 @@ METHOD(message_t, get_ike_sa_id, ike_sa_id_t*,
 }
 
 METHOD(message_t, set_message_id, void,
-	private_message_t *this,u_int32_t message_id)
+	private_message_t *this,uint32_t message_id)
 {
 	this->message_id = message_id;
 }
 
-METHOD(message_t, get_message_id, u_int32_t,
+METHOD(message_t, get_message_id, uint32_t,
 	private_message_t *this)
 {
 	return this->message_id;
 }
 
-METHOD(message_t, get_initiator_spi, u_int64_t,
+METHOD(message_t, get_initiator_spi, uint64_t,
 	private_message_t *this)
 {
 	return (this->ike_sa_id->get_initiator_spi(this->ike_sa_id));
 }
 
-METHOD(message_t, get_responder_spi, u_int64_t,
+METHOD(message_t, get_responder_spi, uint64_t,
 	private_message_t *this)
 {
 	return (this->ike_sa_id->get_responder_spi(this->ike_sa_id));
 }
 
 METHOD(message_t, set_major_version, void,
-	private_message_t *this, u_int8_t major_version)
+	private_message_t *this, uint8_t major_version)
 {
 	this->major_version = major_version;
 }
 
-METHOD(message_t, get_major_version, u_int8_t,
+METHOD(message_t, get_major_version, uint8_t,
 	private_message_t *this)
 {
 	return this->major_version;
 }
 
 METHOD(message_t, set_minor_version, void,
-	private_message_t *this,u_int8_t minor_version)
+	private_message_t *this,uint8_t minor_version)
 {
 	this->minor_version = minor_version;
 }
 
-METHOD(message_t, get_minor_version, u_int8_t,
+METHOD(message_t, get_minor_version, uint8_t,
 	private_message_t *this)
 {
 	return this->minor_version;
@@ -1319,7 +1331,7 @@ static char* get_string(private_message_t *this, char *buf, int len)
 		if (payload->get_type(payload) == PLV2_EAP)
 		{
 			eap_payload_t *eap = (eap_payload_t*)payload;
-			u_int32_t vendor;
+			uint32_t vendor;
 			eap_type_t type;
 			char method[64] = "";
 
@@ -1398,6 +1410,55 @@ static char* get_string(private_message_t *this, char *buf, int len)
 				pos += written;
 				len -= written;
 			}
+		}
+		if (payload->get_type(payload) == PLV1_FRAGMENT)
+		{
+			fragment_payload_t *frag;
+
+			frag = (fragment_payload_t*)payload;
+			if (frag->is_last(frag))
+			{
+				written = snprintf(pos, len, "(%u/%u)",
+							frag->get_number(frag), frag->get_number(frag));
+			}
+			else
+			{
+				written = snprintf(pos, len, "(%u)", frag->get_number(frag));
+			}
+			if (written >= len || written < 0)
+			{
+				return buf;
+			}
+			pos += written;
+			len -= written;
+		}
+		if (payload->get_type(payload) == PLV2_FRAGMENT)
+		{
+			encrypted_fragment_payload_t *frag;
+
+			frag = (encrypted_fragment_payload_t*)payload;
+			written = snprintf(pos, len, "(%u/%u)",
+							   frag->get_fragment_number(frag),
+							   frag->get_total_fragments(frag));
+			if (written >= len || written < 0)
+			{
+				return buf;
+			}
+			pos += written;
+			len -= written;
+		}
+		if (payload->get_type(payload) == PL_UNKNOWN)
+		{
+			unknown_payload_t *unknown;
+
+			unknown = (unknown_payload_t*)payload;
+			written = snprintf(pos, len, "(%d)", unknown->get_type(unknown));
+			if (written >= len || written < 0)
+			{
+				return buf;
+			}
+			pos += written;
+			len -= written;
 		}
 	}
 	enumerator->destroy(enumerator);
@@ -1729,7 +1790,7 @@ static status_t finalize_message(private_message_t *this, keymat_t *keymat,
 {
 	keymat_v1_t *keymat_v1 = (keymat_v1_t*)keymat;
 	chunk_t chunk;
-	u_int32_t *lenpos;
+	uint32_t *lenpos;
 
 	if (encrypted)
 	{
@@ -1832,7 +1893,7 @@ static message_t *clone_message(private_message_t *this)
  * Create a single fragment with the given data
  */
 static message_t *create_fragment(private_message_t *this, payload_type_t next,
-								  u_int16_t num, u_int16_t count, chunk_t data)
+								  uint16_t num, uint16_t count, chunk_t data)
 {
 	enumerator_t *enumerator;
 	payload_t *fragment, *payload;
@@ -1911,11 +1972,11 @@ METHOD(message_t, fragment, status_t,
 	message_t *fragment;
 	packet_t *packet;
 	payload_type_t next = PL_NONE;
-	u_int16_t num, count;
+	uint16_t num, count;
 	host_t *src, *dst;
 	chunk_t data;
 	status_t status;
-	u_int32_t *lenpos;
+	uint32_t *lenpos;
 	size_t len;
 
 	src = this->packet->get_source(this->packet);
@@ -2143,6 +2204,8 @@ METHOD(message_t, parse_header, status_t,
 	}
 	ike_header->destroy(ike_header);
 
+	this->parser->set_major_version(this->parser, this->major_version);
+
 	DBG2(DBG_ENC, "parsed a %N %s header", exchange_type_names,
 		 this->exchange_type, this->major_version == IKEV1_MAJOR_VERSION ?
 		 "message" : (this->is_request ? "request" : "response"));
@@ -2223,9 +2286,16 @@ static status_t parse_payloads(private_message_t *this)
 			payload->destroy(payload);
 			return VERIFY_ERROR;
 		}
-
-		DBG2(DBG_ENC, "%N payload verified, adding to payload list",
-			 payload_type_names, type);
+		if (payload->get_type(payload) == PL_UNKNOWN)
+		{
+			DBG2(DBG_ENC, "%N payload unknown or not allowed",
+				 payload_type_names, type);
+		}
+		else
+		{
+			DBG2(DBG_ENC, "%N payload verified, adding to payload list",
+				 payload_type_names, type);
+		}
 		this->payloads->insert_last(this->payloads, payload);
 
 		/* an encrypted (fragment) payload MUST be the last one, so STOP here.
@@ -2463,7 +2533,7 @@ static status_t decrypt_payloads(private_message_t *this, keymat_t *keymat)
 			was_encrypted = "encrypted fragment payload";
 		}
 
-		if (payload_is_known(type) && !was_encrypted &&
+		if (type != PL_UNKNOWN && !was_encrypted &&
 			!is_connectivity_check(this, payload) &&
 			this->exchange_type != AGGRESSIVE)
 		{
@@ -2611,7 +2681,7 @@ METHOD(message_t, parse_body, status_t,
 			other_hash = hash_payload->get_hash(hash_payload);
 			DBG3(DBG_ENC, "HASH received %B\nHASH expected %B",
 				 &other_hash, &hash);
-			if (!chunk_equals(hash, other_hash))
+			if (!chunk_equals_const(hash, other_hash))
 			{
 				DBG1(DBG_ENC, "received HASH payload does not match");
 				chunk_free(&hash);
@@ -2633,7 +2703,7 @@ METHOD(message_t, parse_body, status_t,
 /**
  * Store the fragment data for the fragment with the given fragment number.
  */
-static status_t add_fragment(private_message_t *this, u_int16_t num,
+static status_t add_fragment(private_message_t *this, uint16_t num,
 							 chunk_t data)
 {
 	fragment_t *fragment;
@@ -2707,7 +2777,7 @@ METHOD(message_t, add_fragment_v1, status_t,
 {
 	fragment_payload_t *payload;
 	chunk_t data;
-	u_int8_t num;
+	uint8_t num;
 	status_t status;
 
 	if (!this->frag)
@@ -2770,7 +2840,7 @@ METHOD(message_t, add_fragment_v2, status_t,
 	payload_t *payload;
 	enumerator_t *enumerator;
 	chunk_t data;
-	u_int16_t total, num;
+	uint16_t total, num;
 	status_t status;
 
 	if (!this->frag)

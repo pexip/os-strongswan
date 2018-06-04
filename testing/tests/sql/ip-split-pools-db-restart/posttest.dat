@@ -1,7 +1,5 @@
-carol::ipsec stop
-dave::ipsec stop
-moon::ipsec stop
-moon::rm /etc/ipsec.d/ipsec.*
-carol::rm /etc/ipsec.d/ipsec.*
-dave::rm /etc/ipsec.d/ipsec.*
-~
+carol::swanctl --terminate --ike home
+dave::swanctl --terminate --ike home
+carol::service charon stop 2> /dev/null
+dave::service charon stop 2> /dev/null
+moon::service charon stop 2> /dev/null

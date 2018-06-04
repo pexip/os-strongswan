@@ -55,12 +55,12 @@ struct private_eap_radius_t {
 	/**
 	 * EAP vendor, if any
 	 */
-	u_int32_t vendor;
+	uint32_t vendor;
 
 	/**
 	 * EAP message identifier
 	 */
-	u_int8_t identifier;
+	uint8_t identifier;
 
 	/**
 	 * RADIUS client instance
@@ -86,15 +86,15 @@ static void add_eap_identity(private_eap_radius_t *this,
 {
 	struct {
 		/** EAP code (REQUEST/RESPONSE) */
-		u_int8_t code;
+		uint8_t code;
 		/** unique message identifier */
-		u_int8_t identifier;
+		uint8_t identifier;
 		/** length of whole message */
-		u_int16_t length;
+		uint16_t length;
 		/** EAP type */
-		u_int8_t type;
+		uint8_t type;
 		/** identity data */
-		u_int8_t data[];
+		uint8_t data[];
 	} __attribute__((__packed__)) *hdr;
 	chunk_t id, prefix;
 	size_t len;
@@ -156,7 +156,7 @@ void eap_radius_build_attributes(radius_message_t *request)
 	ike_sa_t *ike_sa;
 	host_t *host;
 	char buf[40], *station_id_fmt;;
-	u_int32_t value;
+	uint32_t value;
 	chunk_t chunk;
 
 	/* virtual NAS-Port-Type */
@@ -314,8 +314,8 @@ static void process_filter_id(radius_message_t *msg)
 {
 	enumerator_t *enumerator;
 	int type;
-	u_int8_t tunnel_tag;
-	u_int32_t tunnel_type;
+	uint8_t tunnel_tag;
+	uint32_t tunnel_type;
 	chunk_t filter_id = chunk_empty, data;
 	bool is_esp_tunnel = FALSE;
 
@@ -395,7 +395,7 @@ static void process_timeout(radius_message_t *msg)
 /**
  * Add a Cisco Unity configuration attribute
  */
-static void add_unity_attribute(eap_radius_provider_t *provider, u_int32_t id,
+static void add_unity_attribute(eap_radius_provider_t *provider, uint32_t id,
 								int type, chunk_t data)
 {
 	switch (type)
@@ -417,7 +417,7 @@ static void add_unity_attribute(eap_radius_provider_t *provider, u_int32_t id,
  * Add a DNS/NBNS configuration attribute
  */
 static void add_nameserver_attribute(eap_radius_provider_t *provider,
-									 u_int32_t id, int type, chunk_t data)
+									 uint32_t id, int type, chunk_t data)
 {
 	/* these are from different vendors, but there is currently no conflict */
 	switch (type)
@@ -434,6 +434,9 @@ static void add_nameserver_attribute(eap_radius_provider_t *provider,
 		case 31: /* MS-Secondary-NBNS-Server */
 			provider->add_attribute(provider, id, INTERNAL_IP4_NBNS, data);
 			break;
+		case RAT_FRAMED_IPV6_DNS_SERVER:
+			provider->add_attribute(provider, id, INTERNAL_IP6_DNS, data);
+			break;
 	}
 }
 
@@ -441,7 +444,7 @@ static void add_nameserver_attribute(eap_radius_provider_t *provider,
  * Add a UNITY_LOCAL_LAN or UNITY_SPLIT_INCLUDE attribute
  */
 static void add_unity_split_attribute(eap_radius_provider_t *provider,
-							u_int32_t id, configuration_attribute_type_t type,
+							uint32_t id, configuration_attribute_type_t type,
 							chunk_t data)
 {
 	enumerator_t *enumerator;
@@ -515,9 +518,10 @@ static void process_cfg_attributes(radius_message_t *msg)
 		enumerator = msg->create_enumerator(msg);
 		while (enumerator->enumerate(enumerator, &type, &data))
 		{
-			if (type == RAT_FRAMED_IP_ADDRESS && data.len == 4)
+			if ((type == RAT_FRAMED_IP_ADDRESS && data.len == 4) ||
+				(type == RAT_FRAMED_IPV6_ADDRESS && data.len == 16))
 			{
-				host = host_create_from_chunk(AF_INET, data, 0);
+				host = host_create_from_chunk(AF_UNSPEC, data, 0);
 				if (host)
 				{
 					provider->add_framed_ip(provider,
@@ -528,6 +532,11 @@ static void process_cfg_attributes(radius_message_t *msg)
 			{
 				provider->add_attribute(provider, ike_sa->get_unique_id(ike_sa),
 										INTERNAL_IP4_NETMASK, data);
+			}
+			else if (type == RAT_FRAMED_IPV6_DNS_SERVER && data.len == 16)
+			{
+				add_nameserver_attribute(provider,
+									ike_sa->get_unique_id(ike_sa), type, data);
 			}
 		}
 		enumerator->destroy(enumerator);
@@ -692,7 +701,7 @@ METHOD(eap_method_t, process, status_t,
 }
 
 METHOD(eap_method_t, get_type, eap_type_t,
-	private_eap_radius_t *this, u_int32_t *vendor)
+	private_eap_radius_t *this, uint32_t *vendor)
 {
 	*vendor = this->vendor;
 	return this->type;
@@ -712,14 +721,14 @@ METHOD(eap_method_t, get_msk, status_t,
 	return FAILED;
 }
 
-METHOD(eap_method_t, get_identifier, u_int8_t,
+METHOD(eap_method_t, get_identifier, uint8_t,
 	private_eap_radius_t *this)
 {
 	return this->identifier;
 }
 
 METHOD(eap_method_t, set_identifier, void,
-	private_eap_radius_t *this, u_int8_t identifier)
+	private_eap_radius_t *this, uint8_t identifier)
 {
 	this->identifier = identifier;
 }
