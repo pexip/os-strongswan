@@ -1,3 +1,18 @@
+strongswan (5.2.1-6+deb8u6pexip1) pexip; urgency=medium
+
+  * New upstream release.
+
+ -- John-Mark Bell <jmb@pexip.com>  Thu, 05 Jul 2018 10:12:16 +0100
+
+strongswan (5.2.1-6+deb8u6) jessie-security; urgency=medium
+
+  * d/p/CVE-2018-10811.patch added, fix missing initialization of a variable
+    in IKEv2 key derivation (CVE-2018-10811)
+  * d/p/CVE-2018-5388 added, fix insufficient validation in the stroke plugin
+    (CVE-2018-5388)
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Thu, 14 Jun 2018 10:13:44 +0200
+
 strongswan (5.2.1-6+deb8u5pexip2) pexip; urgency=medium
 
   * Reinstate systemd support
