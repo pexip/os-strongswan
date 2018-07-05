@@ -23,7 +23,6 @@
 #include <utils/identification.h>
 #include <config/peer_cfg.h>
 #include <credentials/certificates/x509.h>
-#include <networking/tun_device.h>
 
 #include <stdio.h>
 
@@ -43,8 +42,6 @@ typedef struct {
 	nm_creds_t *creds;
 	/* attribute handler for DNS/NBNS server information */
 	nm_handler_t *handler;
-	/* dummy TUN device */
-	tun_device_t *tun;
 	/* name of the connection */
 	char *name;
 } NMStrongswanPluginPrivate;
@@ -68,7 +65,7 @@ static GValue* handler_to_val(nm_handler_t *handler,
 	array = g_array_new (FALSE, TRUE, sizeof (guint32));
 	while (enumerator->enumerate(enumerator, &chunk))
 	{
-		g_array_append_val (array, *(u_int32_t*)chunk.ptr);
+		g_array_append_val (array, *(uint32_t*)chunk.ptr);
 	}
 	enumerator->destroy(enumerator);
 	val = g_slice_new0 (GValue);
@@ -88,19 +85,18 @@ static void signal_ipv4_config(NMVPNPlugin *plugin,
 	GValue *val;
 	GHashTable *config;
 	enumerator_t *enumerator;
-	host_t *me;
+	host_t *me, *other;
 	nm_handler_t *handler;
 
 	config = g_hash_table_new(g_str_hash, g_str_equal);
 	handler = priv->handler;
 
-	/* NM requires a tundev, but netkey does not use one. Passing the physical
-	 * interface does not work, as NM fiddles around with it. So we pass a dummy
-	 * TUN device along for NM to play with... */
+	/* NM apparently requires to know the gateway */
 	val = g_slice_new0 (GValue);
-	g_value_init (val, G_TYPE_STRING);
-	g_value_set_string (val, priv->tun->get_name(priv->tun));
-	g_hash_table_insert (config, NM_VPN_PLUGIN_IP4_CONFIG_TUNDEV, val);
+	g_value_init (val, G_TYPE_UINT);
+	other = ike_sa->get_other_host(ike_sa);
+	g_value_set_uint (val, *(uint32_t*)other->get_address(other).ptr);
+	g_hash_table_insert (config, NM_VPN_PLUGIN_IP4_CONFIG_EXT_GATEWAY, val);
 
 	/* NM installs this IP address on the interface above, so we use the VIP if
 	 * we got one.
@@ -113,7 +109,7 @@ static void signal_ipv4_config(NMVPNPlugin *plugin,
 	enumerator->destroy(enumerator);
 	val = g_slice_new0(GValue);
 	g_value_init(val, G_TYPE_UINT);
-	g_value_set_uint(val, *(u_int32_t*)me->get_address(me).ptr);
+	g_value_set_uint(val, *(uint32_t*)me->get_address(me).ptr);
 	g_hash_table_insert(config, NM_VPN_PLUGIN_IP4_CONFIG_ADDRESS, val);
 
 	val = g_slice_new0(GValue);
@@ -289,7 +285,7 @@ static gboolean connect_(NMVPNPlugin *plugin, NMConnection *connection,
 	NMSettingVPN *vpn;
 	identification_t *user = NULL, *gateway = NULL;
 	const char *address, *str;
-	bool virtual, encap, ipcomp;
+	bool virtual, encap;
 	ike_cfg_t *ike_cfg;
 	peer_cfg_t *peer_cfg;
 	child_cfg_t *child_cfg;
@@ -300,12 +296,23 @@ static gboolean connect_(NMVPNPlugin *plugin, NMConnection *connection,
 	certificate_t *cert = NULL;
 	x509_t *x509;
 	bool agent = FALSE, smartcard = FALSE, loose_gateway_id = FALSE;
-	lifetime_cfg_t lifetime = {
-		.time = {
-			.life = 10800 /* 3h */,
-			.rekey = 10200 /* 2h50min */,
-			.jitter = 300 /* 5min */
-		}
+	peer_cfg_create_t peer = {
+		.cert_policy = CERT_SEND_IF_ASKED,
+		.unique = UNIQUE_REPLACE,
+		.keyingtries = 1,
+		.rekey_time = 36000, /* 10h */
+		.jitter_time = 600, /* 10min */
+		.over_time = 600, /* 10min */
+	};
+	child_cfg_create_t child = {
+		.lifetime = {
+			.time = {
+				.life = 10800 /* 3h */,
+				.rekey = 10200 /* 2h50min */,
+				.jitter = 300 /* 5min */
+			},
+		},
+		.mode = MODE_TUNNEL,
 	};
 
 	/**
@@ -325,12 +332,6 @@ static gboolean connect_(NMVPNPlugin *plugin, NMConnection *connection,
 		 priv->name);
 	DBG4(DBG_CFG, "%s",
 		 nm_setting_to_string(NM_SETTING(vpn)));
-	if (!priv->tun)
-	{
-		g_set_error(err, NM_VPN_PLUGIN_ERROR, NM_VPN_PLUGIN_ERROR_LAUNCH_FAILED,
-					"Failed to create dummy TUN device.");
-		return FALSE;
-	}
 	address = nm_setting_vpn_get_data_item(vpn, "address");
 	if (!address || !*address)
 	{
@@ -339,32 +340,29 @@ static gboolean connect_(NMVPNPlugin *plugin, NMConnection *connection,
 		return FALSE;
 	}
 	str = nm_setting_vpn_get_data_item(vpn, "virtual");
-	virtual = str && streq(str, "yes");
+	virtual = streq(str, "yes");
 	str = nm_setting_vpn_get_data_item(vpn, "encap");
-	encap = str && streq(str, "yes");
+	encap = streq(str, "yes");
 	str = nm_setting_vpn_get_data_item(vpn, "ipcomp");
-	ipcomp = str && streq(str, "yes");
+	child.ipcomp = streq(str, "yes");
 	str = nm_setting_vpn_get_data_item(vpn, "method");
-	if (str)
+	if (streq(str, "psk"))
 	{
-		if (streq(str, "psk"))
-		{
-			auth_class = AUTH_CLASS_PSK;
-		}
-		else if (streq(str, "agent"))
-		{
-			auth_class = AUTH_CLASS_PUBKEY;
-			agent = TRUE;
-		}
-		else if (streq(str, "key"))
-		{
-			auth_class = AUTH_CLASS_PUBKEY;
-		}
-		else if (streq(str, "smartcard"))
-		{
-			auth_class = AUTH_CLASS_PUBKEY;
-			smartcard = TRUE;
-		}
+		auth_class = AUTH_CLASS_PSK;
+	}
+	else if (streq(str, "agent"))
+	{
+		auth_class = AUTH_CLASS_PUBKEY;
+		agent = TRUE;
+	}
+	else if (streq(str, "key"))
+	{
+		auth_class = AUTH_CLASS_PUBKEY;
+	}
+	else if (streq(str, "smartcard"))
+	{
+		auth_class = AUTH_CLASS_PUBKEY;
+		smartcard = TRUE;
 	}
 
 	/**
@@ -398,7 +396,8 @@ static gboolean connect_(NMVPNPlugin *plugin, NMConnection *connection,
 	else
 	{
 		/* no certificate defined, fall back to system-wide CA certificates */
-		priv->creds->load_ca_dir(priv->creds, NM_CA_DIR);
+		priv->creds->load_ca_dir(priv->creds, lib->settings->get_str(
+								 lib->settings, "charon-nm.ca_dir", NM_CA_DIR));
 	}
 	if (!gateway)
 	{
@@ -420,6 +419,16 @@ static gboolean connect_(NMVPNPlugin *plugin, NMConnection *connection,
 		{
 			user = identification_create_from_string((char*)str);
 			str = nm_setting_vpn_get_secret(vpn, "password");
+			if (auth_class == AUTH_CLASS_PSK &&
+				strlen(str) < 20)
+			{
+				g_set_error(err, NM_VPN_PLUGIN_ERROR,
+							NM_VPN_PLUGIN_ERROR_BAD_ARGUMENTS,
+							"pre-shared key is too short.");
+				gateway->destroy(gateway);
+				user->destroy(user);
+				return FALSE;
+			}
 			priv->creds->set_username_password(priv->creds, user, (char*)str);
 		}
 	}
@@ -530,16 +539,11 @@ static gboolean connect_(NMVPNPlugin *plugin, NMConnection *connection,
 	ike_cfg = ike_cfg_create(IKEV2, TRUE, encap, "0.0.0.0",
 							 charon->socket->get_port(charon->socket, FALSE),
 							(char*)address, IKEV2_UDP_PORT,
-							 FRAGMENTATION_NO, 0);
+							 FRAGMENTATION_YES, 0);
 	ike_cfg->add_proposal(ike_cfg, proposal_create_default(PROTO_IKE));
 	ike_cfg->add_proposal(ike_cfg, proposal_create_default_aead(PROTO_IKE));
-	peer_cfg = peer_cfg_create(priv->name, ike_cfg,
-					CERT_SEND_IF_ASKED, UNIQUE_REPLACE, 1, /* keyingtries */
-					36000, 0, /* rekey 10h, reauth none */
-					600, 600, /* jitter, over 10min */
-					TRUE, FALSE, TRUE, /* mobike, aggressive, pull */
-					0, 0, /* DPD delay, timeout */
-					FALSE, NULL, NULL); /* mediation */
+
+	peer_cfg = peer_cfg_create(priv->name, ike_cfg, &peer);
 	if (virtual)
 	{
 		peer_cfg->add_virtual_ip(peer_cfg, host_create_from_string("0.0.0.0", 0));
@@ -561,10 +565,7 @@ static gboolean connect_(NMVPNPlugin *plugin, NMConnection *connection,
 	auth->add(auth, AUTH_RULE_IDENTITY_LOOSE, loose_gateway_id);
 	peer_cfg->add_auth_cfg(peer_cfg, auth, FALSE);
 
-	child_cfg = child_cfg_create(priv->name, &lifetime,
-								 NULL, TRUE, MODE_TUNNEL, /* updown, hostaccess */
-								 ACTION_NONE, ACTION_NONE, ACTION_NONE, ipcomp,
-								 0, 0, NULL, NULL, 0);
+	child_cfg = child_cfg_create(priv->name, &child);
 	child_cfg->add_proposal(child_cfg, proposal_create_default(PROTO_ESP));
 	child_cfg->add_proposal(child_cfg, proposal_create_default_aead(PROTO_ESP));
 	ts = traffic_selector_create_dynamic(0, 0, 65535);
@@ -722,25 +723,7 @@ static void nm_strongswan_plugin_init(NMStrongswanPlugin *plugin)
 	memset(&priv->listener, 0, sizeof(listener_t));
 	priv->listener.child_updown = child_updown;
 	priv->listener.ike_rekey = ike_rekey;
-	priv->tun = tun_device_create(NULL);
 	priv->name = NULL;
-}
-
-/**
- * Destructor
- */
-static void nm_strongswan_plugin_dispose(GObject *obj)
-{
-	NMStrongswanPlugin *plugin;
-	NMStrongswanPluginPrivate *priv;
-
-	plugin = NM_STRONGSWAN_PLUGIN(obj);
-	priv = NM_STRONGSWAN_PLUGIN_GET_PRIVATE(plugin);
-	if (priv->tun)
-	{
-		priv->tun->destroy(priv->tun);
-		priv->tun = NULL;
-	}
 }
 
 /**
@@ -756,7 +739,6 @@ static void nm_strongswan_plugin_class_init(
 	parent_class->connect = connect_;
 	parent_class->need_secrets = need_secrets;
 	parent_class->disconnect = disconnect;
-	G_OBJECT_CLASS(strongswan_class)->dispose = nm_strongswan_plugin_dispose;
 }
 
 /**

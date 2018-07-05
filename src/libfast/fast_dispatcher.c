@@ -21,6 +21,7 @@
 #include <fcgiapp.h>
 #include <signal.h>
 #include <unistd.h>
+#include <errno.h>
 
 #include <utils/debug.h>
 #include <threading/thread.h>
@@ -383,14 +384,16 @@ METHOD(fast_dispatcher_t, waitsignal, void,
 	private_fast_dispatcher_t *this)
 {
 	sigset_t set;
-	int sig;
 
 	sigemptyset(&set);
 	sigaddset(&set, SIGINT);
 	sigaddset(&set, SIGTERM);
 	sigaddset(&set, SIGHUP);
 	sigprocmask(SIG_BLOCK, &set, NULL);
-	sigwait(&set, &sig);
+	while (sigwaitinfo(&set, NULL) == -1 && errno == EINTR)
+	{
+		/* wait for signal */
+	}
 }
 
 METHOD(fast_dispatcher_t, destroy, void,

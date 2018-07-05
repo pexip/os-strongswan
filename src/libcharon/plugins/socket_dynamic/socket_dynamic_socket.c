@@ -36,7 +36,6 @@
 #include <netinet/udp.h>
 #include <net/if.h>
 
-#include <hydra.h>
 #include <daemon.h>
 #include <threading/thread.h>
 #include <threading/rwlock.h>
@@ -108,7 +107,7 @@ struct dynsock_t {
 	/**
 	 * Bound source port
 	 */
-	u_int16_t port;
+	uint16_t port;
 };
 
 /**
@@ -325,7 +324,7 @@ METHOD(socket_t, receiver, status_t,
 /**
  * Get the port allocated dynamically using bind()
  */
-static bool get_dynamic_port(int fd, int family, u_int16_t *port)
+static bool get_dynamic_port(int fd, int family, uint16_t *port)
 {
 	union {
 		struct sockaddr_storage ss;
@@ -368,7 +367,7 @@ static bool get_dynamic_port(int fd, int family, u_int16_t *port)
  * open a socket to send and receive packets
  */
 static int open_socket(private_socket_dynamic_socket_t *this,
-					   int family, u_int16_t *port)
+					   int family, uint16_t *port)
 {
 	union {
 		struct sockaddr_storage ss;
@@ -438,15 +437,13 @@ static int open_socket(private_socket_dynamic_socket_t *this,
 		return 0;
 	}
 
-	if (!hydra->kernel_interface->bypass_socket(hydra->kernel_interface,
-												fd, family))
+	if (!charon->kernel->bypass_socket(charon->kernel, fd, family))
 	{
 		DBG1(DBG_NET, "installing IKE bypass policy failed");
 	}
 
 	/* enable UDP decapsulation on each socket */
-	if (!hydra->kernel_interface->enable_udp_decap(hydra->kernel_interface,
-												   fd, family, *port))
+	if (!charon->kernel->enable_udp_decap(charon->kernel, fd, family, *port))
 	{
 		DBG1(DBG_NET, "enabling UDP decapsulation for %s on port %d failed",
 			 family == AF_INET ? "IPv4" : "IPv6", *port);
@@ -484,7 +481,7 @@ static dynsock_t *get_any_socket(private_socket_dynamic_socket_t *this,
  * Find/Create a socket to send from host
  */
 static dynsock_t *find_socket(private_socket_dynamic_socket_t *this,
-							  int family, u_int16_t port)
+							  int family, uint16_t port)
 {
 	dynsock_t *skt, lookup = {
 		.family = family,
@@ -527,6 +524,62 @@ static dynsock_t *find_socket(private_socket_dynamic_socket_t *this,
 	return skt;
 }
 
+/**
+ * Generic function to send a message.
+ */
+static ssize_t send_msg_generic(int skt, struct msghdr *msg)
+{
+	return sendmsg(skt, msg, 0);
+}
+
+/**
+ * Send a message with the IPv4 source address set.
+ */
+static ssize_t send_msg_v4(int skt, struct msghdr *msg, host_t *src)
+{
+	char buf[CMSG_SPACE(sizeof(struct in_pktinfo))] = {};
+	struct cmsghdr *cmsg;
+	struct in_addr *addr;
+	struct in_pktinfo *pktinfo;
+	struct sockaddr_in *sin;
+
+	msg->msg_control = buf;
+	msg->msg_controllen = sizeof(buf);
+	cmsg = CMSG_FIRSTHDR(msg);
+	cmsg->cmsg_level = SOL_IP;
+	cmsg->cmsg_type = IP_PKTINFO;
+	cmsg->cmsg_len = CMSG_LEN(sizeof(struct in_pktinfo));
+
+	pktinfo = (struct in_pktinfo*)CMSG_DATA(cmsg);
+	addr = &pktinfo->ipi_spec_dst;
+
+	sin = (struct sockaddr_in*)src->get_sockaddr(src);
+	memcpy(addr, &sin->sin_addr, sizeof(struct in_addr));
+	return send_msg_generic(skt, msg);
+}
+
+/**
+ * Send a message with the IPv6 source address set.
+ */
+static ssize_t send_msg_v6(int skt, struct msghdr *msg, host_t *src)
+{
+	char buf[CMSG_SPACE(sizeof(struct in6_pktinfo))] = {};
+	struct cmsghdr *cmsg;
+	struct in6_pktinfo *pktinfo;
+	struct sockaddr_in6 *sin;
+
+	msg->msg_control = buf;
+	msg->msg_controllen = sizeof(buf);
+	cmsg = CMSG_FIRSTHDR(msg);
+	cmsg->cmsg_level = SOL_IPV6;
+	cmsg->cmsg_type = IPV6_PKTINFO;
+	cmsg->cmsg_len = CMSG_LEN(sizeof(struct in6_pktinfo));
+	pktinfo = (struct in6_pktinfo*)CMSG_DATA(cmsg);
+	sin = (struct sockaddr_in6*)src->get_sockaddr(src);
+	memcpy(&pktinfo->ipi6_addr, &sin->sin6_addr, sizeof(struct in6_addr));
+	return send_msg_generic(skt, msg);
+}
+
 METHOD(socket_t, sender, status_t,
 	private_socket_dynamic_socket_t *this, packet_t *packet)
 {
@@ -536,7 +589,6 @@ METHOD(socket_t, sender, status_t,
 	ssize_t len;
 	chunk_t data;
 	struct msghdr msg;
-	struct cmsghdr *cmsg;
 	struct iovec iov;
 
 	src = packet->get_source(packet);
@@ -564,43 +616,18 @@ METHOD(socket_t, sender, status_t,
 	{
 		if (family == AF_INET)
 		{
-			struct in_addr *addr;
-			struct sockaddr_in *sin;
-			char buf[CMSG_SPACE(sizeof(struct in_pktinfo))];
-			struct in_pktinfo *pktinfo;
-
-			memset(buf, 0, sizeof(buf));
-			msg.msg_control = buf;
-			msg.msg_controllen = sizeof(buf);
-			cmsg = CMSG_FIRSTHDR(&msg);
-			cmsg->cmsg_level = SOL_IP;
-			cmsg->cmsg_type = IP_PKTINFO;
-			cmsg->cmsg_len = CMSG_LEN(sizeof(struct in_pktinfo));
-			pktinfo = (struct in_pktinfo*)CMSG_DATA(cmsg);
-			addr = &pktinfo->ipi_spec_dst;
-			sin = (struct sockaddr_in*)src->get_sockaddr(src);
-			memcpy(addr, &sin->sin_addr, sizeof(struct in_addr));
+			len = send_msg_v4(skt->fd, &msg, src);
 		}
 		else
 		{
-			char buf[CMSG_SPACE(sizeof(struct in6_pktinfo))];
-			struct in6_pktinfo *pktinfo;
-			struct sockaddr_in6 *sin;
-
-			memset(buf, 0, sizeof(buf));
-			msg.msg_control = buf;
-			msg.msg_controllen = sizeof(buf);
-			cmsg = CMSG_FIRSTHDR(&msg);
-			cmsg->cmsg_level = SOL_IPV6;
-			cmsg->cmsg_type = IPV6_PKTINFO;
-			cmsg->cmsg_len = CMSG_LEN(sizeof(struct in6_pktinfo));
-			pktinfo = (struct in6_pktinfo*)CMSG_DATA(cmsg);
-			sin = (struct sockaddr_in6*)src->get_sockaddr(src);
-			memcpy(&pktinfo->ipi6_addr, &sin->sin6_addr, sizeof(struct in6_addr));
+			len = send_msg_v6(skt->fd, &msg, src);
 		}
 	}
+	else
+	{
+		len = send_msg_generic(skt->fd, &msg);
+	}
 
-	len = sendmsg(skt->fd, &msg, 0);
 	if (len != data.len)
 	{
 		DBG1(DBG_NET, "error writing to socket: %s", strerror(errno));
@@ -609,7 +636,7 @@ METHOD(socket_t, sender, status_t,
 	return SUCCESS;
 }
 
-METHOD(socket_t, get_port, u_int16_t,
+METHOD(socket_t, get_port, uint16_t,
 	private_socket_dynamic_socket_t *this, bool nat_t)
 {
 	/* we return 0 here for users that have no explicit port configured, the

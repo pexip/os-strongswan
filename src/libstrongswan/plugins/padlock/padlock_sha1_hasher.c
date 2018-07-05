@@ -16,7 +16,6 @@
 
 #include <string.h>
 #include <arpa/inet.h>
-#include <byteswap.h>
 
 #include "padlock_sha1_hasher.h"
 
@@ -54,9 +53,9 @@ static void padlock_sha1(int len, u_char *in, u_char *out)
 /**
  * sha1() a buffer of data into digest
  */
-static void sha1(chunk_t data, u_int32_t *digest)
+static void sha1(chunk_t data, uint32_t *digest)
 {
-	u_int32_t hash[128] PADLOCK_ALIGN;
+	uint32_t hash[128] PADLOCK_ALIGN;
 
 	hash[0] = 0x67452301;
 	hash[1] = 0xefcdab89;
@@ -66,11 +65,11 @@ static void sha1(chunk_t data, u_int32_t *digest)
 
 	padlock_sha1(data.len, data.ptr, (u_char*)hash);
 
-	digest[0] = bswap_32(hash[0]);
-	digest[1] = bswap_32(hash[1]);
-	digest[2] = bswap_32(hash[2]);
-	digest[3] = bswap_32(hash[3]);
-	digest[4] = bswap_32(hash[4]);
+	digest[0] = __builtin_bswap32(hash[0]);
+	digest[1] = __builtin_bswap32(hash[1]);
+	digest[2] = __builtin_bswap32(hash[2]);
+	digest[3] = __builtin_bswap32(hash[3]);
+	digest[4] = __builtin_bswap32(hash[4]);
 }
 
 /**
@@ -91,18 +90,18 @@ METHOD(hasher_t, reset, bool,
 }
 
 METHOD(hasher_t, get_hash, bool,
-	private_padlock_sha1_hasher_t *this, chunk_t chunk, u_int8_t *hash)
+	private_padlock_sha1_hasher_t *this, chunk_t chunk, uint8_t *hash)
 {
 	if (hash)
 	{
 		if (this->data.len)
 		{
 			append_data(this, chunk);
-			sha1(this->data, (u_int32_t*)hash);
+			sha1(this->data, (uint32_t*)hash);
 		}
 		else
 		{   /* hash directly if no previous data found */
-			sha1(chunk, (u_int32_t*)hash);
+			sha1(chunk, (uint32_t*)hash);
 		}
 		reset(this);
 	}

@@ -2,6 +2,9 @@
  * Copyright (C) 2008 Martin Willi
  * Hochschule fuer Technik Rapperswil
  *
+ * Copyright (C) 2015 Andreas Steffen
+ * HSR Hochschule fuer Technik Rapperswil
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
  * Free Software Foundation; either version 2 of the License, or (at your
@@ -23,22 +26,12 @@
 #include <malloc.h>
 #endif /* HAVE_MALLINFO */
 
-#include <hydra.h>
 #include <daemon.h>
 #include <collections/linked_list.h>
 #include <plugins/plugin.h>
 #include <credentials/certificates/x509.h>
-#include <credentials/certificates/ac.h>
-#include <credentials/certificates/crl.h>
-#include <credentials/certificates/pgp_certificate.h>
+#include <credentials/certificates/certificate_printer.h>
 #include <config/peer_cfg.h>
-#include <asn1/asn1.h>
-#include <asn1/oid.h>
-
-/* warning intervals for list functions */
-#define CERT_WARNING_INTERVAL  30	/* days */
-#define CRL_WARNING_INTERVAL	7	/* days */
-#define AC_WARNING_INTERVAL		1	/* day */
 
 typedef struct private_stroke_list_t private_stroke_list_t;
 
@@ -67,6 +60,11 @@ struct private_stroke_list_t {
 	 */
 	stroke_attribute_t *attribute;
 };
+
+/**
+ * Static certificate printer object
+ */
+static certificate_printer_t *cert_printer = NULL;
 
 /**
  * Log tasks of a specific queue to out
@@ -139,8 +137,10 @@ static void log_ike_sa(FILE *out, ike_sa_t *ike_sa, bool all)
 		fprintf(out, "%12s[%d]: %N SPIs: %.16"PRIx64"_i%s %.16"PRIx64"_r%s",
 				ike_sa->get_name(ike_sa), ike_sa->get_unique_id(ike_sa),
 				ike_version_names, ike_sa->get_version(ike_sa),
-				id->get_initiator_spi(id), id->is_initiator(id) ? "*" : "",
-				id->get_responder_spi(id), id->is_initiator(id) ? "" : "*");
+				be64toh(id->get_initiator_spi(id)),
+				id->is_initiator(id) ? "*" : "",
+				be64toh(id->get_responder_spi(id)),
+				id->is_initiator(id) ? "" : "*");
 
 
 		if (ike_sa->get_state(ike_sa) == IKE_ESTABLISHED)
@@ -206,7 +206,7 @@ static void log_ike_sa(FILE *out, ike_sa_t *ike_sa, bool all)
 static void log_child_sa(FILE *out, child_sa_t *child_sa, bool all)
 {
 	time_t use_in, use_out, rekey, now;
-	u_int64_t bytes_in, bytes_out, packets_in, packets_out;
+	uint64_t bytes_in, bytes_out, packets_in, packets_out;
 	proposal_t *proposal;
 	linked_list_t *my_ts, *other_ts;
 	child_cfg_t *config;
@@ -214,11 +214,12 @@ static void log_child_sa(FILE *out, child_sa_t *child_sa, bool all)
 	config = child_sa->get_config(child_sa);
 	now = time_monotonic(NULL);
 
-	fprintf(out, "%12s{%d}:  %N, %N%s",
-			child_sa->get_name(child_sa), child_sa->get_reqid(child_sa),
+	fprintf(out, "%12s{%d}:  %N, %N%s, reqid %u",
+			child_sa->get_name(child_sa), child_sa->get_unique_id(child_sa),
 			child_sa_state_names, child_sa->get_state(child_sa),
 			ipsec_mode_names, child_sa->get_mode(child_sa),
-			config->use_proxy_mode(config) ? "_PROXY" : "");
+			config->use_proxy_mode(config) ? "_PROXY" : "",
+			child_sa->get_reqid(child_sa));
 
 	if (child_sa->get_state(child_sa) == CHILD_INSTALLED)
 	{
@@ -238,45 +239,41 @@ static void log_child_sa(FILE *out, child_sa_t *child_sa, bool all)
 		if (all)
 		{
 			fprintf(out, "\n%12s{%d}:  ", child_sa->get_name(child_sa),
-					child_sa->get_reqid(child_sa));
+					child_sa->get_unique_id(child_sa));
 
 			proposal = child_sa->get_proposal(child_sa);
 			if (proposal)
 			{
-				u_int16_t encr_alg = ENCR_UNDEFINED, int_alg = AUTH_UNDEFINED;
-				u_int16_t encr_size = 0, int_size = 0;
-				u_int16_t esn = NO_EXT_SEQ_NUMBERS;
+				uint16_t alg, ks;
 				bool first = TRUE;
 
-				proposal->get_algorithm(proposal, ENCRYPTION_ALGORITHM,
-										&encr_alg, &encr_size);
-				proposal->get_algorithm(proposal, INTEGRITY_ALGORITHM,
-										&int_alg, &int_size);
-				proposal->get_algorithm(proposal, EXTENDED_SEQUENCE_NUMBERS,
-										&esn, NULL);
-
-				if (encr_alg != ENCR_UNDEFINED)
+				if (proposal->get_algorithm(proposal, ENCRYPTION_ALGORITHM,
+											&alg, &ks) && alg != ENCR_UNDEFINED)
 				{
-					fprintf(out, "%N", encryption_algorithm_names, encr_alg);
+					fprintf(out, "%N", encryption_algorithm_names, alg);
 					first = FALSE;
-					if (encr_size)
+					if (ks)
 					{
-						fprintf(out, "_%u", encr_size);
+						fprintf(out, "_%u", ks);
 					}
 				}
-				if (int_alg != AUTH_UNDEFINED)
+				if (proposal->get_algorithm(proposal, INTEGRITY_ALGORITHM,
+											&alg, &ks) && alg != AUTH_UNDEFINED)
 				{
-					if (!first)
+					fprintf(out, "%s%N", first ? "" : "/",
+							integrity_algorithm_names, alg);
+					if (ks)
 					{
-						fprintf(out, "/");
-					}
-					fprintf(out, "%N", integrity_algorithm_names, int_alg);
-					if (int_size)
-					{
-						fprintf(out, "_%u", int_size);
+						fprintf(out, "_%u", ks);
 					}
 				}
-				if (esn == EXT_SEQ_NUMBERS)
+				if (proposal->get_algorithm(proposal, DIFFIE_HELLMAN_GROUP,
+											&alg, NULL))
+				{
+					fprintf(out, "/%N", diffie_hellman_group_names, alg);
+				}
+				if (proposal->get_algorithm(proposal, EXTENDED_SEQUENCE_NUMBERS,
+											&alg, NULL) && alg == EXT_SEQ_NUMBERS)
 				{
 					fprintf(out, "/ESN");
 				}
@@ -289,7 +286,7 @@ static void log_child_sa(FILE *out, child_sa_t *child_sa, bool all)
 			{
 				fprintf(out, " (%" PRIu64 " pkt%s, %" PRIu64 "s ago)",
 						packets_in, (packets_in == 1) ? "": "s",
-						(u_int64_t)(now - use_in));
+						(uint64_t)(now - use_in));
 			}
 
 			child_sa->get_usestats(child_sa, FALSE,
@@ -299,7 +296,7 @@ static void log_child_sa(FILE *out, child_sa_t *child_sa, bool all)
 			{
 				fprintf(out, " (%" PRIu64 " pkt%s, %" PRIu64 "s ago)",
 						packets_out, (packets_out == 1) ? "": "s",
-						(u_int64_t)(now - use_out));
+						(uint64_t)(now - use_out));
 			}
 			fprintf(out, ", rekeying ");
 
@@ -322,7 +319,8 @@ static void log_child_sa(FILE *out, child_sa_t *child_sa, bool all)
 
 		}
 	}
-	else if (child_sa->get_state(child_sa) == CHILD_REKEYING)
+	else if (child_sa->get_state(child_sa) == CHILD_REKEYING ||
+			 child_sa->get_state(child_sa) == CHILD_REKEYED)
 	{
 		rekey = child_sa->get_lifetime(child_sa, TRUE);
 		fprintf(out, ", expires in %V", &now, &rekey);
@@ -332,8 +330,8 @@ static void log_child_sa(FILE *out, child_sa_t *child_sa, bool all)
 							child_sa->create_ts_enumerator(child_sa, TRUE));
 	other_ts = linked_list_create_from_enumerator(
 							child_sa->create_ts_enumerator(child_sa, FALSE));
-	fprintf(out, "\n%12s{%d}:   %#R=== %#R\n",
-			child_sa->get_name(child_sa), child_sa->get_reqid(child_sa),
+	fprintf(out, "\n%12s{%d}:   %#R === %#R\n",
+			child_sa->get_name(child_sa), child_sa->get_unique_id(child_sa),
 			my_ts, other_ts);
 	my_ts->destroy(my_ts);
 	other_ts->destroy(other_ts);
@@ -476,7 +474,7 @@ METHOD(stroke_list_t, status, void,
 		ike_version_t ike_version;
 		char *pool;
 		host_t *host;
-		u_int32_t dpd;
+		uint32_t dpd;
 		time_t since, now;
 		u_int size, online, offline, i;
 		struct utsname utsname;
@@ -496,7 +494,7 @@ METHOD(stroke_list_t, status, void,
 		{
 			struct mallinfo mi = mallinfo();
 
-			fprintf(out, "  malloc: sbrk %d, mmap %d, used %d, free %d\n",
+			fprintf(out, "  malloc: sbrk %u, mmap %u, used %u, free %u\n",
 				    mi.arena, mi.hblkhd, mi.uordblks, mi.fordblks);
 		}
 #endif /* HAVE_MALLINFO */
@@ -536,8 +534,8 @@ METHOD(stroke_list_t, status, void,
 		}
 		enumerator->destroy(enumerator);
 
-		enumerator = hydra->kernel_interface->create_address_enumerator(
-								hydra->kernel_interface, ADDR_TYPE_REGULAR);
+		enumerator = charon->kernel->create_address_enumerator(charon->kernel,
+															ADDR_TYPE_REGULAR);
 		fprintf(out, "Listening IP addresses:\n");
 		while (enumerator->enumerate(enumerator, (void**)&host))
 		{
@@ -584,7 +582,7 @@ METHOD(stroke_list_t, status, void,
 			{
 				my_ts = child_cfg->get_traffic_selectors(child_cfg, TRUE, NULL, NULL);
 				other_ts = child_cfg->get_traffic_selectors(child_cfg, FALSE, NULL, NULL);
-				fprintf(out, "%12s:   child:  %#R=== %#R%N",
+				fprintf(out, "%12s:   child:  %#R === %#R %N",
 						child_cfg->get_name(child_cfg),	my_ts, other_ts,
 						ipsec_mode_names, child_cfg->get_mode(child_cfg));
 				my_ts->destroy_offset(my_ts, offsetof(traffic_selector_t, destroy));
@@ -618,7 +616,7 @@ METHOD(stroke_list_t, status, void,
 		}
 		my_ts = child_cfg->get_traffic_selectors(child_cfg, TRUE, NULL, NULL);
 		other_ts = child_cfg->get_traffic_selectors(child_cfg, FALSE, NULL, NULL);
-		fprintf(out, "%12s:  %#R=== %#R%N\n",
+		fprintf(out, "%12s:  %#R === %#R %N\n",
 				child_cfg->get_name(child_cfg),	my_ts, other_ts,
 				ipsec_mode_names, child_cfg->get_mode(child_cfg));
 		my_ts->destroy_offset(my_ts, offsetof(traffic_selector_t, destroy));
@@ -645,7 +643,7 @@ METHOD(stroke_list_t, status, void,
 	enumerator->destroy(enumerator);
 
 	half_open = charon->ike_sa_manager->get_half_open_count(
-												charon->ike_sa_manager, NULL);
+										charon->ike_sa_manager, NULL, FALSE);
 	fprintf(out, "Security Associations (%u up, %u connecting):\n",
 		charon->ike_sa_manager->get_count(charon->ike_sa_manager) - half_open,
 		half_open);
@@ -736,14 +734,20 @@ static linked_list_t* create_unique_cert_list(certificate_type_t type)
 }
 
 /**
- * Print a single public key.
+ * Is there a matching private key?
  */
-static void list_public_key(public_key_t *public, FILE *out)
+static bool has_privkey(certificate_t *cert)
 {
+	public_key_t *public;
 	private_key_t *private = NULL;
 	chunk_t keyid;
 	identification_t *id;
 
+	public = cert->get_public_key(cert);
+	if (!public)
+	{
+		return FALSE;
+	}
 	if (public->get_fingerprint(public, KEYID_PUBKEY_SHA1, &keyid))
 	{
 		id = identification_create_from_encoding(ID_KEY_ID, keyid);
@@ -751,521 +755,56 @@ static void list_public_key(public_key_t *public, FILE *out)
 									public->get_type(public), id, NULL);
 		id->destroy(id);
 	}
-
-	fprintf(out, "  pubkey:    %N %d bits%s\n",
-			key_type_names, public->get_type(public),
-			public->get_keysize(public),
-			private ? ", has private key" : "");
-	if (public->get_fingerprint(public, KEYID_PUBKEY_INFO_SHA1, &keyid))
-	{
-		fprintf(out, "  keyid:     %#B\n", &keyid);
-	}
-	if (public->get_fingerprint(public, KEYID_PUBKEY_SHA1, &keyid))
-	{
-		fprintf(out, "  subjkey:   %#B\n", &keyid);
-	}
+	public->destroy(public);
 	DESTROY_IF(private);
-}
 
-/**
- * list all raw public keys
- */
-static void stroke_list_pubkeys(linked_list_t *list, bool utc, FILE *out)
-{
-	bool first = TRUE;
-	time_t now = time(NULL), notBefore, notAfter;
-	enumerator_t *enumerator;
-	certificate_t *cert;
-
-	enumerator = list->create_enumerator(list);
-	while (enumerator->enumerate(enumerator, (void**)&cert))
-	{
-		identification_t *subject = cert->get_subject(cert);
-		public_key_t *public = cert->get_public_key(cert);
-
-		if (public)
-		{
-			if (first)
-			{
-				fprintf(out, "\n");
-				fprintf(out, "List of Raw Public Keys:\n");
-				first = FALSE;
-			}
-			fprintf(out, "\n");
-
-			/* list subject if available */
-			if (subject->get_type(subject) != ID_KEY_ID)
-			{
-				fprintf(out, "  subject:   %#Y\n", subject);
-			}
-
-			/* list validity if available*/
-			cert->get_validity(cert, &now, &notBefore, &notAfter);
-			if (notBefore != UNDEFINED_TIME && notAfter != UNDEFINED_TIME)
-			{
-				fprintf(out, "  validity:  not before %T, ", &notBefore, utc);
-				if (now < notBefore)
-				{
-					fprintf(out, "not valid yet (valid in %V)\n", &now, &notBefore);
-				}
-				else
-				{
-					fprintf(out, "ok\n");
-				}
-				fprintf(out, "             not after  %T, ", &notAfter, utc);
-				if (now > notAfter)
-				{
-					fprintf(out, "expired (%V ago)\n", &now, &notAfter);
-				}
-				else
-				{
-					fprintf(out, "ok");
-					if (now > notAfter - CERT_WARNING_INTERVAL * 60 * 60 * 24)
-					{
-						fprintf(out, " (expires in %V)", &now, &notAfter);
-					}
-					fprintf(out, " \n");
-				}
-			}
-
-			list_public_key(public, out);
-			public->destroy(public);
-		}
-	}
-	enumerator->destroy(enumerator);
-}
-
-/**
- * list OpenPGP certificates
- */
-static void stroke_list_pgp(linked_list_t *list,bool utc, FILE *out)
-{
-	bool first = TRUE;
-	time_t now = time(NULL);
-	enumerator_t *enumerator = list->create_enumerator(list);
-	certificate_t *cert;
-
-	while (enumerator->enumerate(enumerator, (void**)&cert))
-	{
-		time_t created, until;
-		public_key_t *public;
-		pgp_certificate_t *pgp_cert = (pgp_certificate_t*)cert;
-		chunk_t fingerprint = pgp_cert->get_fingerprint(pgp_cert);
-
-		if (first)
-		{
-
-			fprintf(out, "\n");
-				fprintf(out, "List of PGP End Entity Certificates:\n");
-				first = FALSE;
-		}
-		fprintf(out, "\n");
-		fprintf(out, "  userid:   '%Y'\n", cert->get_subject(cert));
-
-		fprintf(out, "  digest:    %#B\n", &fingerprint);
-
-		/* list validity */
-		cert->get_validity(cert, &now, &created, &until);
-		fprintf(out, "  created:   %T\n", &created, utc);
-		fprintf(out, "  until:     %T%s\n", &until, utc,
-			(until == TIME_32_BIT_SIGNED_MAX) ? " (expires never)":"");
-
-		public = cert->get_public_key(cert);
-		if (public)
-		{
-			list_public_key(public, out);
-			public->destroy(public);
-		}
-	}
-	enumerator->destroy(enumerator);
+	return (private != NULL);
 }
 
 /**
  * list all X.509 certificates matching the flags
  */
-static void stroke_list_certs(linked_list_t *list, char *label,
-							  x509_flag_t flags, bool utc, FILE *out)
+static void stroke_list_x509_certs(linked_list_t *list, x509_flag_t flag)
 {
-	bool first = TRUE;
-	time_t now = time(NULL);
 	enumerator_t *enumerator;
 	certificate_t *cert;
-	x509_flag_t flag_mask;
-
-	/* mask all auxiliary flags */
-	flag_mask = ~(X509_SERVER_AUTH | X509_CLIENT_AUTH | X509_IKE_INTERMEDIATE |
-				  X509_SELF_SIGNED | X509_IP_ADDR_BLOCKS);
 
 	enumerator = list->create_enumerator(list);
 	while (enumerator->enumerate(enumerator, (void**)&cert))
 	{
 		x509_t *x509 = (x509_t*)cert;
-		x509_flag_t x509_flags = x509->get_flags(x509) & flag_mask;
+		x509_flag_t flags = x509->get_flags(x509) & X509_ANY;
 
 		/* list only if flag is set or flag == 0 */
-		if ((x509_flags & flags) || (x509_flags == flags))
+		if ((flags & flag) || flags == flag)
 		{
-			enumerator_t *enumerator;
-			identification_t *altName;
-			bool first_altName = TRUE;
-			u_int pathlen;
-			chunk_t serial, authkey;
-			time_t notBefore, notAfter;
-			public_key_t *public;
-
-			if (first)
-			{
-				fprintf(out, "\n");
-				fprintf(out, "List of %s:\n", label);
-				first = FALSE;
-			}
-			fprintf(out, "\n");
-
-			/* list subjectAltNames */
-			enumerator = x509->create_subjectAltName_enumerator(x509);
-			while (enumerator->enumerate(enumerator, (void**)&altName))
-			{
-				if (first_altName)
-				{
-					fprintf(out, "  altNames:  ");
-					first_altName = FALSE;
-				}
-				else
-				{
-					fprintf(out, ", ");
-				}
-				fprintf(out, "%Y", altName);
-			}
-			if (!first_altName)
-			{
-				fprintf(out, "\n");
-			}
-			enumerator->destroy(enumerator);
-
-			fprintf(out, "  subject:  \"%Y\"\n", cert->get_subject(cert));
-			fprintf(out, "  issuer:   \"%Y\"\n", cert->get_issuer(cert));
-			serial = chunk_skip_zero(x509->get_serial(x509));
-			fprintf(out, "  serial:    %#B\n", &serial);
-
-			/* list validity */
-			cert->get_validity(cert, &now, &notBefore, &notAfter);
-			fprintf(out, "  validity:  not before %T, ", &notBefore, utc);
-			if (now < notBefore)
-			{
-				fprintf(out, "not valid yet (valid in %V)\n", &now, &notBefore);
-			}
-			else
-			{
-				fprintf(out, "ok\n");
-			}
-			fprintf(out, "             not after  %T, ", &notAfter, utc);
-			if (now > notAfter)
-			{
-				fprintf(out, "expired (%V ago)\n", &now, &notAfter);
-			}
-			else
-			{
-				fprintf(out, "ok");
-				if (now > notAfter - CERT_WARNING_INTERVAL * 60 * 60 * 24)
-				{
-					fprintf(out, " (expires in %V)", &now, &notAfter);
-				}
-				fprintf(out, " \n");
-			}
-
-			public = cert->get_public_key(cert);
-			if (public)
-			{
-				list_public_key(public, out);
-				public->destroy(public);
-			}
-
-			/* list optional authorityKeyIdentifier */
-			authkey = x509->get_authKeyIdentifier(x509);
-			if (authkey.ptr)
-			{
-				fprintf(out, "  authkey:   %#B\n", &authkey);
-			}
-
-			/* list optional pathLenConstraint */
-			pathlen = x509->get_constraint(x509, X509_PATH_LEN);
-			if (pathlen != X509_NO_CONSTRAINT)
-			{
-				fprintf(out, "  pathlen:   %u\n", pathlen);
-			}
-
-			/* list optional ipAddrBlocks */
-			if (x509->get_flags(x509) & X509_IP_ADDR_BLOCKS)
-			{
-				traffic_selector_t *ipAddrBlock;
-				bool first_ipAddrBlock = TRUE;
-
-				fprintf(out, "  addresses: ");
-				enumerator = x509->create_ipAddrBlock_enumerator(x509);
-				while (enumerator->enumerate(enumerator, &ipAddrBlock))
-				{
-					if (first_ipAddrBlock)
-					{
-						first_ipAddrBlock = FALSE;
-					}
-					else
-					{
-						fprintf(out, ", ");
-					}
-					fprintf(out, "%R", ipAddrBlock);
-				}
-				enumerator->destroy(enumerator);
-				fprintf(out, "\n");
-			}
+			cert_printer->print_caption(cert_printer, CERT_X509, flag);
+			cert_printer->print(cert_printer, cert, has_privkey(cert));
 		}
 	}
 	enumerator->destroy(enumerator);
 }
 
 /**
- * list all X.509 attribute certificates
+ * list all other certificates types
  */
-static void stroke_list_acerts(linked_list_t *list, bool utc, FILE *out)
+static void stroke_list_other_certs(certificate_type_t type)
 {
-	bool first = TRUE;
-	time_t notBefore, notAfter, now = time(NULL);
 	enumerator_t *enumerator;
 	certificate_t *cert;
+	linked_list_t *list;
+
+	list = create_unique_cert_list(type);
 
 	enumerator = list->create_enumerator(list);
 	while (enumerator->enumerate(enumerator, &cert))
 	{
-		ac_t *ac = (ac_t*)cert;
-		ac_group_type_t type;
-		identification_t *id;
-		enumerator_t *groups;
-		chunk_t chunk;
-		bool firstgroup = TRUE;
-
-		if (first)
-		{
-			fprintf(out, "\n");
-			fprintf(out, "List of X.509 Attribute Certificates:\n");
-			first = FALSE;
-		}
-		fprintf(out, "\n");
-
-		id = cert->get_subject(cert);
-		if (id)
-		{
-			fprintf(out, "  holder:   \"%Y\"\n", id);
-		}
-		id = ac->get_holderIssuer(ac);
-		if (id)
-		{
-			fprintf(out, "  hissuer:  \"%Y\"\n", id);
-		}
-		chunk = chunk_skip_zero(ac->get_holderSerial(ac));
-		if (chunk.ptr)
-		{
-			fprintf(out, "  hserial:   %#B\n", &chunk);
-		}
-		groups = ac->create_group_enumerator(ac);
-		while (groups->enumerate(groups, &type, &chunk))
-		{
-			int oid;
-			char *str;
-
-			if (firstgroup)
-			{
-				fprintf(out, "  groups:    ");
-				firstgroup = FALSE;
-			}
-			else
-			{
-				fprintf(out, "             ");
-			}
-			switch (type)
-			{
-				case AC_GROUP_TYPE_STRING:
-					fprintf(out, "%.*s", (int)chunk.len, chunk.ptr);
-					break;
-				case AC_GROUP_TYPE_OID:
-					oid = asn1_known_oid(chunk);
-					if (oid == OID_UNKNOWN)
-					{
-						str = asn1_oid_to_string(chunk);
-						if (str)
-						{
-							fprintf(out, "%s", str);
-							free(str);
-						}
-						else
-						{
-							fprintf(out, "OID:%#B", &chunk);
-						}
-					}
-					else
-					{
-						fprintf(out, "%s", oid_names[oid].name);
-					}
-					break;
-				case AC_GROUP_TYPE_OCTETS:
-					fprintf(out, "%#B", &chunk);
-					break;
-			}
-			fprintf(out, "\n");
-		}
-		groups->destroy(groups);
-		fprintf(out, "  issuer:   \"%Y\"\n", cert->get_issuer(cert));
-		chunk  = chunk_skip_zero(ac->get_serial(ac));
-		fprintf(out, "  serial:    %#B\n", &chunk);
-
-		/* list validity */
-		cert->get_validity(cert, &now, &notBefore, &notAfter);
-		fprintf(out, "  validity:  not before %T, ", &notBefore, utc);
-		if (now < notBefore)
-		{
-			fprintf(out, "not valid yet (valid in %V)\n", &now, &notBefore);
-		}
-		else
-		{
-			fprintf(out, "ok\n");
-		}
-		fprintf(out, "             not after  %T, ", &notAfter, utc);
-		if (now > notAfter)
-		{
-			fprintf(out, "expired (%V ago)\n", &now, &notAfter);
-		}
-		else
-		{
-			fprintf(out, "ok");
-			if (now > notAfter - AC_WARNING_INTERVAL * 60 * 60 * 24)
-			{
-				fprintf(out, " (expires in %V)", &now, &notAfter);
-			}
-			fprintf(out, " \n");
-		}
-
-		/* list optional authorityKeyIdentifier */
-		chunk = ac->get_authKeyIdentifier(ac);
-		if (chunk.ptr)
-		{
-			fprintf(out, "  authkey:   %#B\n", &chunk);
-		}
+		cert_printer->print_caption(cert_printer, cert->get_type(cert), X509_NONE);
+		cert_printer->print(cert_printer, cert, has_privkey(cert));
 	}
 	enumerator->destroy(enumerator);
-}
 
-/**
- * list all X.509 CRLs
- */
-static void stroke_list_crls(linked_list_t *list, bool utc, FILE *out)
-{
-	bool first = TRUE;
-	time_t thisUpdate, nextUpdate, now = time(NULL);
-	enumerator_t *enumerator = list->create_enumerator(list);
-	certificate_t *cert;
-
-	while (enumerator->enumerate(enumerator, (void**)&cert))
-	{
-		crl_t *crl = (crl_t*)cert;
-		chunk_t chunk;
-
-		if (first)
-		{
-			fprintf(out, "\n");
-			fprintf(out, "List of X.509 CRLs:\n");
-			first = FALSE;
-		}
-		fprintf(out, "\n");
-
-		fprintf(out, "  issuer:   \"%Y\"\n", cert->get_issuer(cert));
-
-		/* list optional crlNumber */
-		chunk = chunk_skip_zero(crl->get_serial(crl));
-		if (chunk.ptr)
-		{
-			fprintf(out, "  serial:    %#B\n", &chunk);
-		}
-		if (crl->is_delta_crl(crl, &chunk))
-		{
-			chunk = chunk_skip_zero(chunk);
-			fprintf(out, "  delta for: %#B\n", &chunk);
-		}
-
-		/* count the number of revoked certificates */
-		{
-			int count = 0;
-			enumerator_t *enumerator = crl->create_enumerator(crl);
-
-			while (enumerator->enumerate(enumerator, NULL, NULL, NULL))
-			{
-				count++;
-			}
-			fprintf(out, "  revoked:   %d certificate%s\n", count,
-							(count == 1)? "" : "s");
-			enumerator->destroy(enumerator);
-		}
-
-		/* list validity */
-		cert->get_validity(cert, &now, &thisUpdate, &nextUpdate);
-		fprintf(out, "  updates:   this %T\n",  &thisUpdate, utc);
-		fprintf(out, "             next %T, ", &nextUpdate, utc);
-		if (now > nextUpdate)
-		{
-			fprintf(out, "expired (%V ago)\n", &now, &nextUpdate);
-		}
-		else
-		{
-			fprintf(out, "ok");
-			if (now > nextUpdate - CRL_WARNING_INTERVAL * 60 * 60 * 24)
-			{
-				fprintf(out, " (expires in %V)", &now, &nextUpdate);
-			}
-			fprintf(out, " \n");
-		}
-
-		/* list optional authorityKeyIdentifier */
-		chunk = crl->get_authKeyIdentifier(crl);
-		if (chunk.ptr)
-		{
-			fprintf(out, "  authkey:   %#B\n", &chunk);
-		}
-	}
-	enumerator->destroy(enumerator);
-}
-
-/**
- * list all OCSP responses
- */
-static void stroke_list_ocsp(linked_list_t* list, bool utc, FILE *out)
-{
-	bool first = TRUE, ok;
-	enumerator_t *enumerator = list->create_enumerator(list);
-	certificate_t *cert;
-	time_t produced, usable, now = time(NULL);
-
-	while (enumerator->enumerate(enumerator, (void**)&cert))
-	{
-		if (first)
-		{
-			fprintf(out, "\n");
-			fprintf(out, "List of OCSP responses:\n");
-			fprintf(out, "\n");
-			first = FALSE;
-		}
-		fprintf(out, "  signer:   \"%Y\"\n", cert->get_issuer(cert));
-
-		/* check validity */
-		ok = cert->get_validity(cert, &now, &produced, &usable);
-		fprintf(out, "  validity:  produced at %T\n", &produced, utc);
-		fprintf(out, "             usable till %T, ", &usable, utc);
-		if (ok)
-		{
-			fprintf(out, "ok\n");
-		}
-		else
-		{
-			fprintf(out, "expired (%V ago)\n", &now, &usable);
-		}
-	}
-	enumerator->destroy(enumerator);
+	list->destroy_offset(list, offsetof(certificate_t, destroy));
 }
 
 /**
@@ -1305,6 +844,7 @@ static void list_algs(FILE *out)
 	integrity_algorithm_t integrity;
 	hash_algorithm_t hash;
 	pseudo_random_function_t prf;
+	ext_out_function_t xof;
 	diffie_hellman_group_t group;
 	rng_quality_t quality;
 	const char *plugin_name;
@@ -1350,6 +890,14 @@ static void list_algs(FILE *out)
 	while (enumerator->enumerate(enumerator, &prf, &plugin_name))
 	{
 		print_alg(out, &len, pseudo_random_function_names, prf, plugin_name);
+	}
+	enumerator->destroy(enumerator);
+	fprintf(out, "\n  xof:       ");
+	len = 13;
+	enumerator = lib->crypto->create_xof_enumerator(lib->crypto);
+	while (enumerator->enumerate(enumerator, &xof, &plugin_name))
+	{
+		print_alg(out, &len, ext_out_function_names, xof, plugin_name);
 	}
 	enumerator->destroy(enumerator);
 	fprintf(out, "\n  dh-group:  ");
@@ -1437,19 +985,15 @@ METHOD(stroke_list_t, list, void,
 {
 	linked_list_t *cert_list = NULL;
 
+	cert_printer = certificate_printer_create(out, TRUE, msg->list.utc);
+
 	if (msg->list.flags & LIST_PUBKEYS)
 	{
-		linked_list_t *pubkey_list = create_unique_cert_list(CERT_TRUSTED_PUBKEY);
-
-		stroke_list_pubkeys(pubkey_list, msg->list.utc, out);
-		pubkey_list->destroy_offset(pubkey_list, offsetof(certificate_t, destroy));
+		stroke_list_other_certs(CERT_TRUSTED_PUBKEY);
 	}
 	if (msg->list.flags & LIST_CERTS)
 	{
-		linked_list_t *pgp_list = create_unique_cert_list(CERT_GPG);
-
-		stroke_list_pgp(pgp_list, msg->list.utc, out);
-		pgp_list->destroy_offset(pgp_list, offsetof(certificate_t, destroy));
+		stroke_list_other_certs(CERT_GPG);
 	}
 	if (msg->list.flags & (LIST_CERTS | LIST_CACERTS | LIST_OCSPCERTS | LIST_AACERTS))
 	{
@@ -1457,47 +1001,33 @@ METHOD(stroke_list_t, list, void,
 	}
 	if (msg->list.flags & LIST_CERTS)
 	{
-		stroke_list_certs(cert_list, "X.509 End Entity Certificates",
-						  X509_NONE, msg->list.utc, out);
+		stroke_list_x509_certs(cert_list, X509_NONE);
 	}
 	if (msg->list.flags & LIST_CACERTS)
 	{
-		stroke_list_certs(cert_list, "X.509 CA Certificates",
-						  X509_CA, msg->list.utc, out);
+		stroke_list_x509_certs(cert_list, X509_CA);
 	}
 	if (msg->list.flags & LIST_OCSPCERTS)
 	{
-		stroke_list_certs(cert_list, "X.509 OCSP Signer Certificates",
-						  X509_OCSP_SIGNER, msg->list.utc, out);
+		stroke_list_x509_certs(cert_list, X509_OCSP_SIGNER);
 	}
 	if (msg->list.flags & LIST_AACERTS)
 	{
-		stroke_list_certs(cert_list, "X.509 AA Certificates",
-						  X509_AA, msg->list.utc, out);
+		stroke_list_x509_certs(cert_list, X509_AA);
 	}
 	DESTROY_OFFSET_IF(cert_list, offsetof(certificate_t, destroy));
 
 	if (msg->list.flags & LIST_ACERTS)
 	{
-		linked_list_t *ac_list = create_unique_cert_list(CERT_X509_AC);
-
-		stroke_list_acerts(ac_list, msg->list.utc, out);
-		ac_list->destroy_offset(ac_list, offsetof(certificate_t, destroy));
+		stroke_list_other_certs(CERT_X509_AC);
 	}
 	if (msg->list.flags & LIST_CRLS)
 	{
-		linked_list_t *crl_list = create_unique_cert_list(CERT_X509_CRL);
-
-		stroke_list_crls(crl_list, msg->list.utc, out);
-		crl_list->destroy_offset(crl_list, offsetof(certificate_t, destroy));
+		stroke_list_other_certs(CERT_X509_CRL);
 	}
 	if (msg->list.flags & LIST_OCSP)
 	{
-		linked_list_t *ocsp_list = create_unique_cert_list(CERT_X509_OCSP_RESPONSE);
-
-		stroke_list_ocsp(ocsp_list, msg->list.utc, out);
-
-		ocsp_list->destroy_offset(ocsp_list, offsetof(certificate_t, destroy));
+		stroke_list_other_certs(CERT_X509_OCSP_RESPONSE);
 	}
 	if (msg->list.flags & LIST_ALGS)
 	{
@@ -1507,6 +1037,8 @@ METHOD(stroke_list_t, list, void,
 	{
 		list_plugins(out);
 	}
+	cert_printer->destroy(cert_printer);
+	cert_printer = NULL;
 }
 
 /**

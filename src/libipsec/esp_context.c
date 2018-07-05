@@ -49,7 +49,7 @@ struct private_esp_context_t {
 	 * The highest sequence number that was successfully verified
 	 * and authenticated, or assigned in an outbound context
 	 */
-	u_int32_t last_seqno;
+	uint32_t last_seqno;
 
 	/**
 	 * The bit in the window of the highest authenticated sequence number
@@ -103,7 +103,7 @@ static inline bool get_window_bit(private_esp_context_t *this, u_int index)
 /**
  * Returns TRUE if the supplied seqno is not already marked in the window
  */
-static bool check_window(private_esp_context_t *this, u_int32_t seqno)
+static bool check_window(private_esp_context_t *this, uint32_t seqno)
 {
 	u_int offset;
 
@@ -113,7 +113,7 @@ static bool check_window(private_esp_context_t *this, u_int32_t seqno)
 }
 
 METHOD(esp_context_t, verify_seqno, bool,
-	private_esp_context_t *this, u_int32_t seqno)
+	private_esp_context_t *this, uint32_t seqno)
 {
 	if (!this->inbound)
 	{
@@ -145,7 +145,7 @@ METHOD(esp_context_t, verify_seqno, bool,
 }
 
 METHOD(esp_context_t, set_authenticated_seqno, void,
-	private_esp_context_t *this, u_int32_t seqno)
+	private_esp_context_t *this, uint32_t seqno)
 {
 	u_int i, shift;
 
@@ -173,14 +173,14 @@ METHOD(esp_context_t, set_authenticated_seqno, void,
 	}
 }
 
-METHOD(esp_context_t, get_seqno, u_int32_t,
+METHOD(esp_context_t, get_seqno, uint32_t,
 	private_esp_context_t *this)
 {
 	return this->last_seqno;
 }
 
 METHOD(esp_context_t, next_seqno, bool,
-	private_esp_context_t *this, u_int32_t *seqno)
+	private_esp_context_t *this, uint32_t *seqno)
 {
 	if (this->inbound || this->last_seqno == UINT32_MAX)
 	{	/* inbound or segno would cycle */
@@ -215,6 +215,7 @@ static bool create_aead(private_esp_context_t *this, int alg,
 		case ENCR_AES_GCM_ICV8:
 		case ENCR_AES_GCM_ICV12:
 		case ENCR_AES_GCM_ICV16:
+		case ENCR_CHACHA20_POLY1305:
 			/* the key includes a 4 byte salt */
 			this->aead = lib->crypto->create_aead(lib->crypto, alg,
 												  key.len - 4, 4);
@@ -244,8 +245,21 @@ static bool create_traditional(private_esp_context_t *this, int enc_alg,
 {
 	crypter_t *crypter = NULL;
 	signer_t *signer = NULL;
+	iv_gen_t *ivg;
 
-	crypter = lib->crypto->create_crypter(lib->crypto, enc_alg, enc_key.len);
+	switch (enc_alg)
+	{
+		case ENCR_AES_CTR:
+		case ENCR_CAMELLIA_CTR:
+			/* the key includes a 4 byte salt */
+			crypter = lib->crypto->create_crypter(lib->crypto, enc_alg,
+												  enc_key.len - 4);
+			break;
+		default:
+			crypter = lib->crypto->create_crypter(lib->crypto, enc_alg,
+												  enc_key.len);
+			break;
+	}
 	if (!crypter)
 	{
 		DBG1(DBG_ESP, "failed to create ESP context: unsupported encryption "
@@ -272,7 +286,13 @@ static bool create_traditional(private_esp_context_t *this, int enc_alg,
 			 "failed");
 		goto failed;
 	}
-	this->aead = aead_create(crypter, signer);
+	ivg = iv_gen_create_for_alg(enc_alg);
+	if (!ivg)
+	{
+		DBG1(DBG_ESP, "failed to create ESP context: creating iv gen failed");
+		goto failed;
+	}
+	this->aead = aead_create(crypter, signer, ivg);
 	return TRUE;
 
 failed:

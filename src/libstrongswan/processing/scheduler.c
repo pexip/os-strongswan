@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Tobias Brunner
+ * Copyright (C) 2008-2015 Tobias Brunner
  * Copyright (C) 2005-2006 Martin Willi
  * Copyright (C) 2005 Jan Hutter
  * Hochschule fuer Technik Rapperswil
@@ -276,7 +276,7 @@ METHOD(scheduler_t, schedule_job_tv, void,
 }
 
 METHOD(scheduler_t, schedule_job, void,
-	private_scheduler_t *this, job_t *job, u_int32_t s)
+	private_scheduler_t *this, job_t *job, uint32_t s)
 {
 	timeval_t tv;
 
@@ -287,7 +287,7 @@ METHOD(scheduler_t, schedule_job, void,
 }
 
 METHOD(scheduler_t, schedule_job_ms, void,
-	private_scheduler_t *this, job_t *job, u_int32_t ms)
+	private_scheduler_t *this, job_t *job, uint32_t ms)
 {
 	timeval_t tv, add;
 
@@ -300,16 +300,26 @@ METHOD(scheduler_t, schedule_job_ms, void,
 	schedule_job_tv(this, job, tv);
 }
 
-METHOD(scheduler_t, destroy, void,
+METHOD(scheduler_t, flush, void,
 	private_scheduler_t *this)
 {
 	event_t *event;
-	this->condvar->destroy(this->condvar);
-	this->mutex->destroy(this->mutex);
+
+	this->mutex->lock(this->mutex);
 	while ((event = remove_event(this)) != NULL)
 	{
 		event_destroy(event);
 	}
+	this->condvar->signal(this->condvar);
+	this->mutex->unlock(this->mutex);
+}
+
+METHOD(scheduler_t, destroy, void,
+	private_scheduler_t *this)
+{
+	flush(this);
+	this->condvar->destroy(this->condvar);
+	this->mutex->destroy(this->mutex);
 	free(this->heap);
 	free(this);
 }
@@ -328,6 +338,7 @@ scheduler_t * scheduler_create()
 			.schedule_job = _schedule_job,
 			.schedule_job_ms = _schedule_job_ms,
 			.schedule_job_tv = _schedule_job_tv,
+			.flush = _flush,
 			.destroy = _destroy,
 		},
 		.heap_size = HEAP_SIZE_DEFAULT,

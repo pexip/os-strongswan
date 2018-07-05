@@ -64,7 +64,7 @@ struct private_eap_sim_peer_t {
 	/**
 	 * EAP message identifier
 	 */
-	u_int8_t identifier;
+	uint8_t identifier;
 
 	/**
 	 * EAP-SIM crypto helper
@@ -99,7 +99,7 @@ struct private_eap_sim_peer_t {
 	/**
 	 * Counter value if reauthentication is used
 	 */
-	u_int16_t counter;
+	uint16_t counter;
 };
 
 /* version of SIM protocol we speak */
@@ -130,7 +130,7 @@ static bool create_client_error(private_eap_sim_peer_t *this,
 								simaka_client_error_t code, eap_payload_t **out)
 {
 	simaka_message_t *message;
-	u_int16_t encoded;
+	uint16_t encoded;
 
 	DBG1(DBG_IKE, "sending client error '%N'", simaka_client_error_names, code);
 
@@ -310,7 +310,7 @@ static status_t process_challenge(private_eap_sim_peer_t *this,
 	/* excepting two or three RAND, each 16 bytes. We require two valid
 	 * and different RANDs */
 	if ((rands.len != 2 * SIM_RAND_LEN && rands.len != 3 * SIM_RAND_LEN) ||
-		memeq(rands.ptr, rands.ptr + SIM_RAND_LEN, SIM_RAND_LEN))
+		memeq_const(rands.ptr, rands.ptr + SIM_RAND_LEN, SIM_RAND_LEN))
 	{
 		DBG1(DBG_IKE, "no valid AT_RAND received");
 		if (!create_client_error(this, SIM_INSUFFICIENT_CHALLENGES, out))
@@ -404,7 +404,7 @@ static status_t process_challenge(private_eap_sim_peer_t *this,
  */
 static bool counter_too_small(private_eap_sim_peer_t *this, chunk_t chunk)
 {
-	u_int16_t counter;
+	uint16_t counter;
 
 	memcpy(&counter, chunk.ptr, sizeof(counter));
 	counter = htons(counter);
@@ -540,7 +540,7 @@ static status_t process_notification(private_eap_sim_peer_t *this,
 	{
 		if (type == AT_NOTIFICATION)
 		{
-			u_int16_t code;
+			uint16_t code;
 
 			memcpy(&code, data.ptr, sizeof(code));
 			code = ntohs(code);
@@ -650,7 +650,7 @@ METHOD(eap_method_t, initiate, status_t,
 }
 
 METHOD(eap_method_t, get_type, eap_type_t,
-	private_eap_sim_peer_t *this, u_int32_t *vendor)
+	private_eap_sim_peer_t *this, uint32_t *vendor)
 {
 	*vendor = 0;
 	return EAP_SIM;
@@ -667,14 +667,14 @@ METHOD(eap_method_t, get_msk, status_t,
 	return FAILED;
 }
 
-METHOD(eap_method_t, get_identifier, u_int8_t,
+METHOD(eap_method_t, get_identifier, uint8_t,
 	private_eap_sim_peer_t *this)
 {
 	return this->identifier;
 }
 
 METHOD(eap_method_t, set_identifier, void,
-	private_eap_sim_peer_t *this, u_int8_t identifier)
+	private_eap_sim_peer_t *this, uint8_t identifier)
 {
 	this->identifier = identifier;
 }
@@ -734,4 +734,3 @@ eap_sim_peer_t *eap_sim_peer_create(identification_t *server,
 
 	return &this->public;
 }
-

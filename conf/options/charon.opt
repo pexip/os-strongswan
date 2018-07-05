@@ -30,6 +30,12 @@ charon.cert_cache = yes
 	Whether relations in validated certificate chains should be cached in
 	memory.
 
+charon.cache_crls = no
+	Whether Certicate Revocation Lists (CRLs) fetched via HTTP or LDAP should
+	be saved under a unique file name derived from the public key of the
+	Certification Authority (CA) to **/etc/ipsec.d/crls** (stroke) or
+	**/etc/swanctl/x509crl** (vici), respectively.
+
 charon.cisco_unity = no
 	Send Cisco Unity vendor ID payload (IKEv1 only).
 
@@ -61,9 +67,21 @@ charon.crypto_test.required = no
 charon.crypto_test.rng_true = no
 	Whether to test RNG with TRUE quality; requires a lot of entropy.
 
+charon.delete_rekeyed = no
+	Delete CHILD_SAs right after they got successfully rekeyed (IKEv1 only).
+
+	Delete CHILD_SAs right after they got successfully rekeyed (IKEv1 only).
+	Reduces the number of stale CHILD_SAs in scenarios with a lot of rekeyings.
+	However, this might cause problems with implementations that continue to
+	use rekeyed SAs until they expire.
+
 charon.dh_exponent_ansi_x9_42 = yes
 	Use ANSI X9.42 DH exponent size or optimum size matched to cryptographic
 	strength.
+
+charon.dlopen_use_rtld_now = no
+	Use RTLD_NOW with dlopen when loading plugins and IMV/IMCs to reveal missing
+	symbols immediately.
 
 charon.dns1
 	DNS server assigned to peer via configuration payload (CP).
@@ -85,11 +103,15 @@ charon.flush_auth_cfg = no
 	this might conflict with plugins that later need access to e.g. the used
 	certificates.
 
-charon.fragment_size = 0
+charon.follow_redirects = yes
+	Whether to follow IKEv2 redirects (RFC 5685).
+
+charon.fragment_size = 1280
 	Maximum size (complete IP datagram size in bytes) of a sent IKE fragment
-	when using proprietary IKEv1 or standardized IKEv2 fragmentation (0 for
-	address family specific	default values). If specified this limit is used
-	for both IPv4 and IPv6.
+	when using proprietary IKEv1 or standardized IKEv2 fragmentation, defaults
+	to 1280 (use 0 for address family specific default values, which uses a
+	lower value for IPv4).  If specified this limit is used for both IPv4 and
+	IPv6.
 
 charon.group
 	Name of the group the daemon changes to after startup.
@@ -116,6 +138,17 @@ charon.i_dont_care_about_security_and_use_aggressive_mode_psk = no
 
 charon.ignore_routing_tables
 	A space-separated list of routing tables to be excluded from route lookups.
+
+charon.ignore_acquire_ts = no
+	Whether to ignore the traffic selectors from the kernel's acquire events for
+	IKEv2 connections (they are not used for IKEv1).
+
+	If this is disabled the traffic selectors from the kernel's acquire events,
+	which are derived from the triggering packet, are prepended to the traffic
+	selectors from the configuration for IKEv2 connection. By enabling this,
+	such specific traffic selectors will be ignored and only the ones in the
+	config will	be sent. This always happens for IKEv1 connections as the
+	protocol only supports one set of traffic selectors per CHILD_SA.
 
 charon.ikesa_limit = 0
 	Maximum number of IKE_SAs that can be established at the same time before
@@ -193,8 +226,22 @@ charon.load_modular = no
 	plugin list is preserved. Enabled plugins not found in that list are ordered
 	alphabetically before other plugins with the same priority.
 
+charon.max_ikev1_exchanges = 3
+	Maximum number of IKEv1 phase 2 exchanges per IKE_SA to keep state about and
+	track concurrently.
+
 charon.max_packet = 10000
 	Maximum packet size accepted by charon.
+
+charon.make_before_break = no
+	Initiate IKEv2 reauthentication with a make-before-break scheme.
+
+	Initiate IKEv2 reauthentication with a make-before-break instead of a
+	break-before-make scheme. Make-before-break uses overlapping IKE and
+	CHILD_SA during reauthentication by first recreating all new SAs before
+	deleting the old ones. This behavior can be beneficial to avoid connectivity
+	gaps during reauthentication, but requires support for overlapping SAs by
+	the peer. strongSwan can handle such overlapping SAs since version 5.3.0.
 
 charon.multiple_authentication = yes
 	Enable multiple authentication exchanges (RFC 4739).
@@ -212,6 +259,11 @@ charon.port_nat_t = 4500
 	UDP port used locally in case of NAT-T. If set to 0 a random port will be
 	allocated.  Has to be different from **charon.port**, otherwise a random
 	port will be allocated.
+
+charon.prefer_configured_proposals = yes
+	Prefer locally configured proposals for	IKE/IPsec over supplied ones as
+	responder (disabling this can avoid keying retries due to INVALID_KE_PAYLOAD
+	notifies).
 
 charon.prefer_temporary_addrs = no
 	By default public IPv6 addresses are preferred over temporary ones (RFC
@@ -250,11 +302,11 @@ charon.retransmit_tries = 5
 	Number of times to retransmit a packet before giving up.
 
 charon.retry_initiate_interval = 0
-	Interval to use when retrying to initiate an IKE_SA (e.g. if DNS resolution
-	failed), 0 to disable retries.
+	Interval in seconds to use when retrying to initiate an IKE_SA (e.g. if DNS
+	resolution failed), 0 to disable retries.
 
 charon.reuse_ikesa = yes
-	Initiate CHILD_SA within existing IKE_SAs.
+	Initiate CHILD_SA within existing IKE_SAs (always enabled for IKEv1).
 
 charon.routing_table
 	Numerical routing table to install routes to.
@@ -276,6 +328,17 @@ charon.send_delay_type = 0
 
 charon.send_vendor_id = no
 	Send strongSwan vendor ID payload
+
+charon.signature_authentication = yes
+	Whether to enable Signature Authentication as per RFC 7427.
+
+charon.signature_authentication_constraints = yes
+	Whether to enable constraints against IKEv2 signature schemes.
+
+	If enabled, signature schemes configured in _rightauth_, in addition to
+	getting used as constraints against signature schemes employed in the
+	certificate chain, are also used as constraints against the signature scheme
+	used by peers during IKEv2.
 
 charon.start-scripts {}
 	Section containing a list of scripts (name = path) that are executed when

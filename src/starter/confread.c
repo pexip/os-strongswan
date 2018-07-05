@@ -40,8 +40,8 @@
 #define SA_REPLACEMENT_RETRIES_DEFAULT   3
 #define SA_REPLAY_WINDOW_DEFAULT        -1 /* use charon.replay_window */
 
-static const char ike_defaults[] = "aes128-sha1-modp2048,3des-sha1-modp1536";
-static const char esp_defaults[] = "aes128-sha1,3des-sha1";
+static const char ike_defaults[] = "aes128-sha256-modp3072";
+static const char esp_defaults[] = "aes128-sha256";
 
 static const char firewall_defaults[] = IPSEC_SCRIPT " _updown iptables";
 
@@ -49,17 +49,6 @@ static const char firewall_defaults[] = IPSEC_SCRIPT " _updown iptables";
  * Provided by GPERF
  */
 extern kw_entry_t *in_word_set (char *str, unsigned int len);
-
-static bool daemon_exists(char *daemon, char *path)
-{
-	struct stat st;
-	if (stat(path, &st) != 0)
-	{
-		DBG1(DBG_APP, "Disabling %sstart option, '%s' not found", daemon, path);
-		return FALSE;
-	}
-	return TRUE;
-}
 
 /**
  * Process deprecated keywords
@@ -147,14 +136,6 @@ static void load_setup(starter_config_t *cfg, conf_parser_t *parser)
 	}
 	enumerator->destroy(enumerator);
 	dict->destroy(dict);
-
-	/* verify the executables are actually available */
-#ifdef START_CHARON
-	cfg->setup.charonstart = cfg->setup.charonstart &&
-							 daemon_exists(daemon_name, cmd);
-#else
-	cfg->setup.charonstart = FALSE;
-#endif
 }
 
 /*
@@ -241,6 +222,7 @@ static void conn_defaults(starter_conn_t *conn)
 	conn->dpd_delay             =  30; /* seconds */
 	conn->dpd_timeout           = 150; /* seconds */
 	conn->replay_window         = SA_REPLAY_WINDOW_DEFAULT;
+	conn->fragmentation         = FRAGMENTATION_YES;
 
 	conn->left.sendcert = CERT_SEND_IF_ASKED;
 	conn->right.sendcert = CERT_SEND_IF_ASKED;
@@ -350,7 +332,7 @@ static void kw_end(starter_conn_t *conn, starter_end_t *end, kw_token_t token,
 						DBG1(DBG_APP, "# bad protocol: %s=%s", key, value);
 						goto err;
 					}
-					end->protocol = (u_int8_t)p;
+					end->protocol = (uint8_t)p;
 				}
 			}
 			if (streq(port, "%any"))
@@ -722,12 +704,8 @@ starter_config_t* confread_load(const char *file)
 	INIT(cfg,
 		.setup = {
 			.uniqueids = TRUE,
-
 		}
 	);
-#ifdef START_CHARON
-	cfg->setup.charonstart = TRUE;
-#endif
 
 	/* load config setup section */
 	load_setup(cfg, parser);

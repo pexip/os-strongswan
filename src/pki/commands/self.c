@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2009 Martin Willi
- * Hochschule fuer Technik Rapperswil
+ * Copyright (C) 2015 Andreas Steffen
+ * HSR Hochschule fuer Technik Rapperswil
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -49,7 +50,7 @@ static int self()
 {
 	cred_encoding_type_t form = CERT_ASN1_DER;
 	key_type_t type = KEY_RSA;
-	hash_algorithm_t digest = HASH_SHA1;
+	hash_algorithm_t digest = HASH_UNKNOWN;
 	certificate_t *cert = NULL;
 	private_key_t *private = NULL;
 	public_key_t *public = NULL;
@@ -57,7 +58,8 @@ static int self()
 	identification_t *id = NULL;
 	linked_list_t *san, *ocsp, *permitted, *excluded, *policies, *mappings;
 	int pathlen = X509_NO_CONSTRAINT, inhibit_any = X509_NO_CONSTRAINT;
-	int inhibit_mapping = X509_NO_CONSTRAINT, require_explicit = X509_NO_CONSTRAINT;
+	int inhibit_mapping = X509_NO_CONSTRAINT;
+	int require_explicit = X509_NO_CONSTRAINT;
 	chunk_t serial = chunk_empty;
 	chunk_t encoding = chunk_empty;
 	time_t not_before, not_after, lifetime = 1095 * 24 * 60 * 60;
@@ -87,6 +89,14 @@ static int self()
 				else if (streq(arg, "ecdsa"))
 				{
 					type = KEY_ECDSA;
+				}
+				else if (streq(arg, "bliss"))
+				{
+					type = KEY_BLISS;
+				}
+				else if (streq(arg, "priv"))
+				{
+					type = KEY_ANY;
 				}
 				else
 				{
@@ -308,6 +318,10 @@ static int self()
 		error = "loading private key failed";
 		goto end;
 	}
+	if (digest == HASH_UNKNOWN)
+	{
+		digest = get_default_digest(private);
+	}
 	public = private->get_public_key(private);
 	if (!public)
 	{
@@ -407,7 +421,7 @@ static void __attribute__ ((constructor))reg()
 	command_register((command_t) {
 		self, 's', "self",
 		"create a self signed certificate",
-		{" [--in file|--keyid hex] [--type rsa|ecdsa]",
+		{" [--in file|--keyid hex] [--type rsa|ecdsa|bliss|priv]",
 		 " --dn distinguished-name [--san subjectAltName]+",
 		 "[--lifetime days] [--serial hex] [--ca] [--ocsp uri]+",
 		 "[--flag serverAuth|clientAuth|crlSign|ocspSigning|msSmartcardLogon]+",
@@ -415,12 +429,13 @@ static void __attribute__ ((constructor))reg()
 		 "[--policy-map issuer-oid:subject-oid]",
 		 "[--policy-explicit len] [--policy-inhibit len] [--policy-any len]",
 		 "[--cert-policy oid [--cps-uri uri] [--user-notice text]]+",
-		 "[--digest md5|sha1|sha224|sha256|sha384|sha512] [--outform der|pem]"},
+		 "[--digest md5|sha1|sha224|sha256|sha384|sha512|sha3_224|sha3_256|sha3_384|sha3_512]",
+		 "[--outform der|pem]"},
 		{
 			{"help",			'h', 0, "show usage information"},
 			{"in",				'i', 1, "private key input file, default: stdin"},
 			{"keyid",			'x', 1, "keyid on smartcard of private key"},
-			{"type",			't', 1, "type of input key, default: rsa"},
+			{"type",			't', 1, "type of input key, default: priv"},
 			{"dn",				'd', 1, "subject and issuer distinguished name"},
 			{"san",				'a', 1, "subjectAltName to include in certificate"},
 			{"lifetime",		'l', 1, "days the certificate is valid, default: 1095"},
@@ -441,7 +456,7 @@ static void __attribute__ ((constructor))reg()
 			{"policy-any",		'A', 1, "inhibitAnyPolicy constraint"},
 			{"flag",			'e', 1, "include extendedKeyUsage flag"},
 			{"ocsp",			'o', 1, "OCSP AuthorityInfoAccess URI to include"},
-			{"digest",			'g', 1, "digest for signature creation, default: sha1"},
+			{"digest",			'g', 1, "digest for signature creation, default: key-specific"},
 			{"outform",			'f', 1, "encoding of generated cert, default: der"},
 		}
 	});

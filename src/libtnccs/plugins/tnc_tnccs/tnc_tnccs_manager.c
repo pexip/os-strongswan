@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2013 Andreas Steffen
+ * Copyright (C) 2010-2015 Andreas Steffen
  * HSR Hochschule fuer Technik Rapperswil
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -87,7 +87,7 @@ struct tnccs_connection_entry_t {
 	/**
 	 * Maximum size of a PA-TNC message
 	 */
-	u_int32_t max_msg_len;
+	uint32_t max_msg_len;
 
 	/**
 	 * collection of IMV recommendations
@@ -169,8 +169,8 @@ METHOD(tnccs_manager_t, remove_method, void,
 
 METHOD(tnccs_manager_t, create_instance, tnccs_t*,
 	private_tnc_tnccs_manager_t *this, tnccs_type_t type, bool is_server,
-	identification_t *server, identification_t *peer, tnc_ift_type_t transport,
-	tnccs_cb_t cb)
+	identification_t *server_id, identification_t *peer_id, host_t *server_ip,
+	host_t *peer_ip, tnc_ift_type_t transport, tnccs_cb_t cb)
 {
 	enumerator_t *enumerator;
 	tnccs_entry_t *entry;
@@ -182,7 +182,8 @@ METHOD(tnccs_manager_t, create_instance, tnccs_t*,
 	{
 		if (type == entry->type)
 		{
-			protocol = entry->constructor(is_server, server, peer, transport, cb);
+			protocol = entry->constructor(is_server, server_id, peer_id,
+										  server_ip, peer_ip, transport, cb);
 			if (protocol)
 			{
 				break;
@@ -198,7 +199,7 @@ METHOD(tnccs_manager_t, create_instance, tnccs_t*,
 METHOD(tnccs_manager_t, create_connection, TNC_ConnectionID,
 	private_tnc_tnccs_manager_t *this, tnccs_type_t type, tnccs_t *tnccs,
 	tnccs_send_message_t send_message, bool* request_handshake_retry,
-	u_int32_t max_msg_len, recommendations_t **recs)
+	uint32_t max_msg_len, recommendations_t **recs)
 {
 	tnccs_connection_entry_t *entry;
 
@@ -413,14 +414,14 @@ static TNC_Result bool_attribute(TNC_UInt32 buffer_len,
 }
 
 /**
- * Write the value of an u_int32_t attribute into the buffer
+ * Write the value of an uint32_t attribute into the buffer
  */
 static TNC_Result uint_attribute(TNC_UInt32 buffer_len,
 								 TNC_BufferReference buffer,
 								 TNC_UInt32 *value_len,
-								 u_int32_t value)
+								 uint32_t value)
 {
-	*value_len = sizeof(u_int32_t);
+	*value_len = sizeof(uint32_t);
 
 	if (buffer && buffer_len >= *value_len)
 	{
@@ -464,7 +465,7 @@ static TNC_Result identity_attribute(TNC_UInt32 buffer_len,
 {
 	bio_writer_t *writer;
 	enumerator_t *enumerator;
-	u_int32_t count;
+	uint32_t count;
 	chunk_t value;
 	tncif_identity_t *tnc_id;
 	TNC_Result result = TNC_RESULT_INVALID_PARAMETER;
@@ -716,20 +717,24 @@ METHOD(tnccs_manager_t, get_attribute, TNC_Result,
 		case TNC_ATTRIBUTEID_AR_IDENTITIES:
 		{
 			linked_list_t *list;
-			identification_t *peer;
+			identification_t *peer_id;
+			host_t *peer_ip;
 			tnccs_t *tnccs;
 			tncif_identity_t *tnc_id;
-			u_int32_t id_type, subject_type;
+			uint32_t id_type, subject_type;
 			chunk_t id_value;
 			char *id_str;
 			TNC_Result result;
 
 			list = linked_list_create();
 			tnccs = entry->tnccs;
-			peer = tnccs->tls.get_peer_id(&tnccs->tls);
-			if (peer)
+
+			peer_id = tnccs->tls.is_server(&tnccs->tls) ?
+					tnccs->tls.get_peer_id(&tnccs->tls) :
+					tnccs->tls.get_server_id(&tnccs->tls);
+			if (peer_id)
 			{
-				switch (peer->get_type(peer))
+				switch (peer_id->get_type(peer_id))
 				{
 					case ID_IPV4_ADDR:
 						id_type = TNC_ID_IPV4_ADDR;
@@ -756,7 +761,7 @@ METHOD(tnccs_manager_t, get_attribute, TNC_Result,
 						subject_type = TNC_SUBJECT_UNKNOWN;
 				}
 				if (id_type != TNC_ID_UNKNOWN &&
-					asprintf(&id_str, "%Y", peer) >= 0)
+					asprintf(&id_str, "%Y", peer_id) >= 0)
 				{
 					id_value = chunk_from_str(id_str);
 					tnc_id = tncif_identity_create(
@@ -764,6 +769,35 @@ METHOD(tnccs_manager_t, get_attribute, TNC_Result,
 								pen_type_create(PEN_TCG, subject_type),
 								pen_type_create(PEN_TCG,
 												tnccs->get_auth_type(tnccs)));
+					list->insert_last(list, tnc_id);
+				}
+			}
+
+			peer_ip = tnccs->tls.is_server(&tnccs->tls) ?
+					tnccs->get_peer_ip(tnccs) :
+					tnccs->get_server_ip(tnccs);
+			if (peer_ip)
+			{
+				switch (peer_ip->get_family(peer_ip))
+				{
+					case AF_INET:
+						id_type = TNC_ID_IPV4_ADDR;
+						break;
+					case AF_INET6:
+						id_type = TNC_ID_IPV6_ADDR;
+						break;
+					default:
+						id_type = TNC_ID_UNKNOWN;
+				}
+
+				if (id_type != TNC_ID_UNKNOWN &&
+					asprintf(&id_str, "%H", peer_ip) >= 0)
+				{
+					id_value = chunk_from_str(id_str);
+					tnc_id = tncif_identity_create(
+								pen_type_create(PEN_TCG, id_type), id_value,
+								pen_type_create(PEN_TCG, TNC_SUBJECT_MACHINE),
+								pen_type_create(PEN_TCG, TNC_AUTH_UNKNOWN));
 					list->insert_last(list, tnc_id);
 				}
 			}

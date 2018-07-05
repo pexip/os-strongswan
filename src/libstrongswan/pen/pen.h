@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2012 Andreas Steffen
+ * Copyright (C) 2011-2015 Andreas Steffen
  * HSR Hochschule fuer Technik Rapperswil
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -39,6 +39,7 @@ enum pen_t {
 	PEN_IBM =			0x000002,	/*        2 */
 	PEN_MICROSOFT =		0x000137,	/*      311 */
 	PEN_REDHAT =		0x000908,	/*     2312 */
+	PEN_PWG =			0x000A8B,	/*     2699 */
 	PEN_ALTIGA =		0x000c04,	/*     3076 */
 	PEN_OSC =			0x002358,	/*     9048 */
 	PEN_DEBIAN =		0x002572,	/*     9586 */
@@ -58,7 +59,7 @@ enum pen_t {
  */
 struct pen_type_t {
 	pen_t vendor_id;
-	u_int32_t type;
+	uint32_t type;
 };
 
 /**
@@ -68,7 +69,7 @@ struct pen_type_t {
  * @param type			type to create a pen_type_t
  * @return				created pen_type_t
  */
-static inline pen_type_t pen_type_create(pen_t vendor_id, u_int32_t type)
+static inline pen_type_t pen_type_create(pen_t vendor_id, uint32_t type)
 {
 	pen_type_t pen_type = { vendor_id, type };
 	return pen_type;
@@ -95,7 +96,7 @@ static inline bool pen_type_equals(pen_type_t a, pen_type_t b)
  * @return				TRUE if vendor_id and type matches pen_type
  */
 static inline bool pen_type_is(pen_type_t pen_type,
-							   pen_t vendor_id, u_int32_t type)
+							   pen_t vendor_id, uint32_t type)
 {
 	return pen_type.vendor_id == vendor_id && pen_type.type == type;
 }

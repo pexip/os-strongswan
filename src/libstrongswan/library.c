@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Tobias Brunner
+ * Copyright (C) 2009-2016 Tobias Brunner
  * Copyright (C) 2008 Martin Willi
  * Hochschule fuer Technik Rapperswil
  *
@@ -55,11 +55,43 @@ struct private_library_t {
 	 */
 	bool integrity_failed;
 
+#ifdef LEAK_DETECTIVE
+	/**
+	 * Where to write leak detective output to
+	 */
+	FILE *ld_out;
+#endif
+
 	/**
 	 * Number of times we have been initialized
 	 */
 	refcount_t ref;
 };
+
+#define MAX_NAMESPACES 5
+
+/**
+ * Additional namespaces registered using __atrribute__((constructor))
+ */
+static char *namespaces[MAX_NAMESPACES];
+static int ns_count;
+
+/**
+ * Described in header
+ */
+void library_add_namespace(char *ns)
+{
+	if (ns_count < MAX_NAMESPACES - 1)
+	{
+		namespaces[ns_count] = ns;
+		ns_count++;
+	}
+	else
+	{
+		fprintf(stderr, "failed to register additional namespace alias, please "
+				"increase MAX_NAMESPACES");
+	}
+}
 
 /**
  * library instance
@@ -70,32 +102,34 @@ library_t *lib = NULL;
 /**
  * Default leak report callback
  */
-static void report_leaks(void *user, int count, size_t bytes,
-						 backtrace_t *bt, bool detailed)
+CALLBACK(report_leaks, void,
+	private_library_t *this, int count, size_t bytes, backtrace_t *bt,
+	bool detailed)
 {
-	fprintf(stderr, "%zu bytes total, %d allocations, %zu bytes average:\n",
+	fprintf(this->ld_out, "%zu bytes total, %d allocations, %zu bytes average:\n",
 			bytes, count, bytes / count);
-	bt->log(bt, stderr, detailed);
+	bt->log(bt, this->ld_out, detailed);
 }
 
 /**
  * Default leak report summary callback
  */
-static void sum_leaks(void* user, int count, size_t bytes, int whitelisted)
+CALLBACK(sum_leaks, void,
+	private_library_t *this, int count, size_t bytes, int whitelisted)
 {
 	switch (count)
 	{
 		case 0:
-			fprintf(stderr, "No leaks detected");
+			fprintf(this->ld_out, "No leaks detected");
 			break;
 		case 1:
-			fprintf(stderr, "One leak detected");
+			fprintf(this->ld_out, "One leak detected");
 			break;
 		default:
-			fprintf(stderr, "%d leaks detected, %zu bytes", count, bytes);
+			fprintf(this->ld_out, "%d leaks detected, %zu bytes", count, bytes);
 			break;
 	}
-	fprintf(stderr, ", %d suppressed by whitelist\n", whitelisted);
+	fprintf(this->ld_out, ", %d suppressed by whitelist\n", whitelisted);
 }
 #endif /* LEAK_DETECTIVE */
 
@@ -147,6 +181,12 @@ void library_deinit()
 		lib->leak_detective->destroy(lib->leak_detective);
 		lib->leak_detective = NULL;
 	}
+#ifdef LEAK_DETECTIVE
+	if (this->ld_out && this->ld_out != stderr)
+	{
+		fclose(this->ld_out);
+	}
+#endif /* LEAK_DETECTIVE */
 
 	backtrace_deinit();
 	arrays_deinit();
@@ -248,6 +288,7 @@ bool library_init(char *settings, const char *namespace)
 {
 	private_library_t *this;
 	printf_hook_t *pfh;
+	int i;
 
 	if (lib)
 	{	/* already initialized, increase refcount */
@@ -275,11 +316,22 @@ bool library_init(char *settings, const char *namespace)
 	backtrace_init();
 
 #ifdef LEAK_DETECTIVE
+	{
+		FILE *out = NULL;
+		char *log;
+
+		log = getenv("LEAK_DETECTIVE_LOG");
+		if (log)
+		{
+			out = fopen(log, "a");
+		}
+		this->ld_out = out ?: stderr;
+	}
 	lib->leak_detective = leak_detective_create();
 	if (lib->leak_detective)
 	{
 		lib->leak_detective->set_report_cb(lib->leak_detective,
-										   report_leaks, sum_leaks, NULL);
+										   report_leaks, sum_leaks, this);
 	}
 #endif /* LEAK_DETECTIVE */
 
@@ -311,6 +363,11 @@ bool library_init(char *settings, const char *namespace)
 									 (hashtable_equals_t)equals, 4);
 
 	this->public.settings = settings_create(this->public.conf);
+	/* add registered aliases */
+	for (i = 0; i < ns_count; ++i)
+	{
+		lib->settings->add_fallback(lib->settings, lib->ns, namespaces[i]);
+	}
 	/* all namespace settings may fall back to libstrongswan */
 	lib->settings->add_fallback(lib->settings, lib->ns, "libstrongswan");
 

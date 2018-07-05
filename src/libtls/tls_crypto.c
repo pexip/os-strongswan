@@ -1215,16 +1215,16 @@ static struct {
 	tls_hash_algorithm_t hash;
 	signature_scheme_t scheme;
 } schemes[] = {
-	{ TLS_SIG_ECDSA,	TLS_HASH_SHA256,	SIGN_ECDSA_WITH_SHA256_DER	},
-	{ TLS_SIG_ECDSA,	TLS_HASH_SHA384,	SIGN_ECDSA_WITH_SHA384_DER	},
-	{ TLS_SIG_ECDSA,	TLS_HASH_SHA512,	SIGN_ECDSA_WITH_SHA512_DER	},
-	{ TLS_SIG_ECDSA,	TLS_HASH_SHA1,		SIGN_ECDSA_WITH_SHA1_DER	},
-	{ TLS_SIG_RSA,		TLS_HASH_SHA256,	SIGN_RSA_EMSA_PKCS1_SHA256	},
-	{ TLS_SIG_RSA,		TLS_HASH_SHA384,	SIGN_RSA_EMSA_PKCS1_SHA384	},
-	{ TLS_SIG_RSA,		TLS_HASH_SHA512,	SIGN_RSA_EMSA_PKCS1_SHA512	},
-	{ TLS_SIG_RSA,		TLS_HASH_SHA224,	SIGN_RSA_EMSA_PKCS1_SHA224	},
-	{ TLS_SIG_RSA,		TLS_HASH_SHA1,		SIGN_RSA_EMSA_PKCS1_SHA1	},
-	{ TLS_SIG_RSA,		TLS_HASH_MD5,		SIGN_RSA_EMSA_PKCS1_MD5		},
+	{ TLS_SIG_ECDSA,	TLS_HASH_SHA256,	SIGN_ECDSA_WITH_SHA256_DER   },
+	{ TLS_SIG_ECDSA,	TLS_HASH_SHA384,	SIGN_ECDSA_WITH_SHA384_DER   },
+	{ TLS_SIG_ECDSA,	TLS_HASH_SHA512,	SIGN_ECDSA_WITH_SHA512_DER   },
+	{ TLS_SIG_ECDSA,	TLS_HASH_SHA1,		SIGN_ECDSA_WITH_SHA1_DER     },
+	{ TLS_SIG_RSA,		TLS_HASH_SHA256,	SIGN_RSA_EMSA_PKCS1_SHA2_256 },
+	{ TLS_SIG_RSA,		TLS_HASH_SHA384,	SIGN_RSA_EMSA_PKCS1_SHA2_384 },
+	{ TLS_SIG_RSA,		TLS_HASH_SHA512,	SIGN_RSA_EMSA_PKCS1_SHA2_512 },
+	{ TLS_SIG_RSA,		TLS_HASH_SHA224,	SIGN_RSA_EMSA_PKCS1_SHA2_224 },
+	{ TLS_SIG_RSA,		TLS_HASH_SHA1,		SIGN_RSA_EMSA_PKCS1_SHA1     },
+	{ TLS_SIG_RSA,		TLS_HASH_MD5,		SIGN_RSA_EMSA_PKCS1_MD5      },
 };
 
 METHOD(tls_crypto_t, get_signature_algorithms, void,
@@ -1340,7 +1340,7 @@ METHOD(tls_crypto_t, set_protection, void,
 METHOD(tls_crypto_t, append_handshake, void,
 	private_tls_crypto_t *this, tls_handshake_type_t type, chunk_t data)
 {
-	u_int32_t header;
+	uint32_t header;
 
 	/* reconstruct handshake header */
 	header = htonl(data.len | (type << 24));
@@ -1407,7 +1407,7 @@ METHOD(tls_crypto_t, sign, bool,
 	{
 		signature_scheme_t scheme;
 		bio_reader_t *reader;
-		u_int8_t hash, alg;
+		uint8_t hash, alg;
 		chunk_t sig;
 		bool done = FALSE;
 
@@ -1487,7 +1487,7 @@ METHOD(tls_crypto_t, verify, bool,
 	if (this->tls->get_version(this->tls) >= TLS_1_2)
 	{
 		signature_scheme_t scheme = SIGN_UNKNOWN;
-		u_int8_t hash, alg;
+		uint8_t hash, alg;
 		chunk_t sig;
 
 		if (!reader->read_uint8(reader, &hash) ||

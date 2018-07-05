@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2014 Andreas Steffen
+ * Copyright (C) 2011-2015 Andreas Steffen
  * HSR Hochschule fuer Technik Rapperswil
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -30,8 +30,8 @@ typedef struct port_entry_t port_entry_t;
  */
 struct port_entry_t {
 	bool      blocked;
-	u_int8_t  protocol;
-	u_int16_t port;
+	uint8_t  protocol;
+	uint16_t port;
 };
 
 /**
@@ -142,11 +142,11 @@ METHOD(pa_tnc_attr_t, build, void,
 }
 
 METHOD(pa_tnc_attr_t, process, status_t,
-	private_ietf_attr_port_filter_t *this, u_int32_t *offset)
+	private_ietf_attr_port_filter_t *this, uint32_t *offset)
 {
 	bio_reader_t *reader;
 	port_entry_t *entry;
-	u_int8_t blocked;
+	uint8_t blocked;
 
 	*offset = 0;
 
@@ -201,8 +201,8 @@ METHOD(pa_tnc_attr_t, destroy, void,
 }
 
 METHOD(ietf_attr_port_filter_t, add_port, void,
-	private_ietf_attr_port_filter_t *this, bool blocked, u_int8_t protocol,
-	u_int16_t port)
+	private_ietf_attr_port_filter_t *this, bool blocked, uint8_t protocol,
+	uint16_t port)
 {
 	port_entry_t *entry;
 
@@ -217,8 +217,8 @@ METHOD(ietf_attr_port_filter_t, add_port, void,
  * Enumerate port filter entries
  */
 static bool port_filter(void *null, port_entry_t **entry,
-						bool *blocked, void *i2, u_int8_t *protocol, void *i3,
-						u_int16_t *port)
+						bool *blocked, void *i2, uint8_t *protocol, void *i3,
+						uint16_t *port)
 {
 	*blocked = (*entry)->blocked;
 	*protocol = (*entry)->protocol;
@@ -236,7 +236,7 @@ METHOD(ietf_attr_port_filter_t, create_port_enumerator, enumerator_t*,
 /**
  * Described in header.
  */
-pa_tnc_attr_t *ietf_attr_port_filter_create(void)
+pa_tnc_attr_t *ietf_attr_port_filter_create(pen_type_t type)
 {
 	private_ietf_attr_port_filter_t *this;
 
@@ -256,7 +256,7 @@ pa_tnc_attr_t *ietf_attr_port_filter_create(void)
 			.add_port = _add_port,
 			.create_port_enumerator = _create_port_enumerator,
 		},
-		.type = { PEN_IETF, IETF_ATTR_PORT_FILTER },
+		.type = type,
 		.ports = linked_list_create(),
 		.ref = 1,
 	);
@@ -268,7 +268,7 @@ pa_tnc_attr_t *ietf_attr_port_filter_create(void)
  * Described in header.
  */
 pa_tnc_attr_t *ietf_attr_port_filter_create_from_data(size_t length,
-													  chunk_t data)
+										chunk_t data, pen_type_t type)
 {
 	private_ietf_attr_port_filter_t *this;
 
@@ -288,7 +288,7 @@ pa_tnc_attr_t *ietf_attr_port_filter_create_from_data(size_t length,
 			.add_port = _add_port,
 			.create_port_enumerator = _create_port_enumerator,
 		},
-		.type = {PEN_IETF, IETF_ATTR_PORT_FILTER },
+		.type = type,
 		.length = length,
 		.value = chunk_clone(data),
 		.ports = linked_list_create(),

@@ -18,7 +18,6 @@
 
 #include <string.h>
 
-#include <hydra.h>
 #include <daemon.h>
 #include <sa/ikev2/tasks/ike_natd.h>
 #include <encoding/payloads/notify_payload.h>
@@ -196,8 +195,8 @@ static void build_address_list(private_ike_mobike_t *this, message_t *message)
 	int added = 0;
 
 	me = this->ike_sa->get_my_host(this->ike_sa);
-	enumerator = hydra->kernel_interface->create_address_enumerator(
-									hydra->kernel_interface, ADDR_TYPE_REGULAR);
+	enumerator = charon->kernel->create_address_enumerator(charon->kernel,
+														   ADDR_TYPE_REGULAR);
 	while (enumerator->enumerate(enumerator, (void**)&host))
 	{
 		if (me->ip_equals(me, host))
@@ -256,6 +255,7 @@ static void update_children(private_ike_mobike_t *this)
 	enumerator_t *enumerator;
 	child_sa_t *child_sa;
 	linked_list_t *vips;
+	status_t status;
 	host_t *host;
 
 	vips = linked_list_create();
@@ -270,15 +270,25 @@ static void update_children(private_ike_mobike_t *this)
 	enumerator = this->ike_sa->create_child_sa_enumerator(this->ike_sa);
 	while (enumerator->enumerate(enumerator, (void**)&child_sa))
 	{
-		if (child_sa->update(child_sa,
-				this->ike_sa->get_my_host(this->ike_sa),
-				this->ike_sa->get_other_host(this->ike_sa), vips,
-				this->ike_sa->has_condition(this->ike_sa,
-											COND_NAT_ANY)) == NOT_SUPPORTED)
+		status = child_sa->update(child_sa,
+					this->ike_sa->get_my_host(this->ike_sa),
+					this->ike_sa->get_other_host(this->ike_sa), vips,
+					this->ike_sa->has_condition(this->ike_sa, COND_NAT_ANY));
+		switch (status)
 		{
-			this->ike_sa->rekey_child_sa(this->ike_sa,
-					child_sa->get_protocol(child_sa),
-					child_sa->get_spi(child_sa, TRUE));
+			case NOT_SUPPORTED:
+				this->ike_sa->rekey_child_sa(this->ike_sa,
+											 child_sa->get_protocol(child_sa),
+											 child_sa->get_spi(child_sa, TRUE));
+				break;
+			case SUCCESS:
+				charon->child_sa_manager->remove(charon->child_sa_manager,
+												 child_sa);
+				charon->child_sa_manager->add(charon->child_sa_manager,
+											  child_sa, this->ike_sa);
+				break;
+			default:
+				break;
 		}
 	}
 	enumerator->destroy(enumerator);
@@ -289,7 +299,7 @@ static void update_children(private_ike_mobike_t *this)
 /**
  * Apply the port of the old host, if its ip equals the new, use port otherwise.
  */
-static void apply_port(host_t *host, host_t *old, u_int16_t port, bool local)
+static void apply_port(host_t *host, host_t *old, uint16_t port, bool local)
 {
 	if (host->ip_equals(host, old))
 	{
@@ -322,13 +332,16 @@ METHOD(ike_mobike_t, transmit, bool,
 
 	if (!this->check)
 	{
-		me = hydra->kernel_interface->get_source_addr(hydra->kernel_interface,
-													  other_old, me_old);
+		me = charon->kernel->get_source_addr(charon->kernel, other_old, me_old);
 		if (me)
 		{
 			if (me->ip_equals(me, me_old))
 			{
-				charon->sender->send(charon->sender, packet->clone(packet));
+				copy = packet->clone(packet);
+				/* hosts might have been updated by a peer's MOBIKE exchange */
+				copy->set_source(copy, me_old->clone(me_old));
+				copy->set_destination(copy, other_old->clone(other_old));
+				charon->sender->send(charon->sender, copy);
 				me->destroy(me);
 				return TRUE;
 			}
@@ -357,8 +370,7 @@ METHOD(ike_mobike_t, transmit, bool,
 		{
 			continue;
 		}
-		me = hydra->kernel_interface->get_source_addr(
-										hydra->kernel_interface, other, NULL);
+		me = charon->kernel->get_source_addr(charon->kernel, other, NULL);
 		if (me)
 		{
 			/* reuse port for an active address, 4500 otherwise */
@@ -392,7 +404,7 @@ METHOD(task_t, build_i, status_t,
 
 		/* we check if the existing address is still valid */
 		old = message->get_source(message);
-		new = hydra->kernel_interface->get_source_addr(hydra->kernel_interface,
+		new = charon->kernel->get_source_addr(charon->kernel,
 										message->get_destination(message), old);
 		if (new)
 		{
@@ -526,7 +538,7 @@ METHOD(task_t, process_i, status_t,
 			cookie2 = this->cookie2;
 			this->cookie2 = chunk_empty;
 			process_payloads(this, message);
-			if (!chunk_equals(cookie2, this->cookie2))
+			if (!chunk_equals_const(cookie2, this->cookie2))
 			{
 				chunk_free(&cookie2);
 				DBG1(DBG_IKE, "COOKIE2 mismatch, closing IKE_SA");

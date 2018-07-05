@@ -45,6 +45,8 @@ enum tcg_attr_t {
 	TCG_SWID_TAG_ID_EVENTS =              0x00000013,
 	TCG_SWID_TAG_INVENTORY =              0x00000014,
 	TCG_SWID_TAG_EVENTS =                 0x00000015,
+	TCG_SWID_SUBSCRIPTION_STATUS_REQ =    0x00000016,
+	TCG_SWID_SUBSCRIPTION_STATUS_RESP =   0x00000017,
 
 	/* IF-M Attribute Segmentation */
 	TCG_SEG_MAX_ATTR_SIZE_REQ =           0x00000021,
@@ -99,7 +101,7 @@ extern enum_name_t *tcg_attr_names;
  * @param length			attribute length
  * @param value				attribute value or segment
  */
-pa_tnc_attr_t* tcg_attr_create_from_data(u_int32_t type, size_t length,
+pa_tnc_attr_t* tcg_attr_create_from_data(uint32_t type, size_t length,
 										 chunk_t value);
 
 #endif /** TCG_ATTR_H_ @}*/

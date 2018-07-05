@@ -30,7 +30,7 @@ typedef struct pts_component_manager_t pts_component_manager_t;
 #include <library.h>
 #include <pen/pen.h>
 
-typedef pts_component_t* (*pts_component_create_t)(u_int32_t depth,
+typedef pts_component_t* (*pts_component_create_t)(uint32_t depth,
 												   pts_database_t *pts_db);
 
 /**
@@ -45,7 +45,7 @@ struct pts_component_manager_t {
 	 * @param comp_func_names		Vendor-specific Component Functional names
 	 * @param qualifier_type_size	Vendor-specific Qualifier Type size
 	 * @param qualifier_flag_names	Vendor-specific Qualifier Flag names
-	 * @param qualifier_type_names	Vendor-specific Qualifier Type names 
+	 * @param qualifier_type_names	Vendor-specific Qualifier Type names
 	 */
 	void (*add_vendor)(pts_component_manager_t *this, pen_t vendor_id,
 					   enum_name_t *comp_func_names,
@@ -61,7 +61,7 @@ struct pts_component_manager_t {
 	 * @param create				Functional Component creation method
 	 */
 	void (*add_component)(pts_component_manager_t *this, pen_t vendor_id,
-						  u_int32_t name, pts_component_create_t create);
+						  uint32_t name, pts_component_create_t create);
 
 	/**
 	 * Remove vendor-specific components and associated namespace
@@ -95,7 +95,7 @@ struct pts_component_manager_t {
 	 * @param flags					Qualifier Flags as a string in a char buffer
 	 * @return						Qualifier Type
 	 */
-	u_int8_t (*get_qualifier)(pts_component_manager_t *this,
+	uint8_t (*get_qualifier)(pts_component_manager_t *this,
 							  pts_comp_func_name_t *name, char *flags);
 
 	/**
@@ -106,8 +106,8 @@ struct pts_component_manager_t {
 	 * @param pts_db				PTS measurement database
 	 * @return						Component object if supported, NULL else
 	 */
-	pts_component_t* (*create)(pts_component_manager_t *this, 
-							   pts_comp_func_name_t *name, u_int32_t depth,
+	pts_component_t* (*create)(pts_component_manager_t *this,
+							   pts_comp_func_name_t *name, uint32_t depth,
 							   pts_database_t *pts_db);
 
 	/**

@@ -19,12 +19,14 @@
 #include <crypto/crypto_tester.h>
 
 /* define symbols of all test vectors */
-#define TEST_VECTOR_CRYPTER(x) crypter_test_vector_t x;
-#define TEST_VECTOR_AEAD(x) aead_test_vector_t x;
-#define TEST_VECTOR_SIGNER(x) signer_test_vector_t x;
-#define TEST_VECTOR_HASHER(x) hasher_test_vector_t x;
-#define TEST_VECTOR_PRF(x) prf_test_vector_t x;
-#define TEST_VECTOR_RNG(x) rng_test_vector_t x;
+#define TEST_VECTOR_CRYPTER(x) extern crypter_test_vector_t x;
+#define TEST_VECTOR_AEAD(x) extern aead_test_vector_t x;
+#define TEST_VECTOR_SIGNER(x) extern signer_test_vector_t x;
+#define TEST_VECTOR_HASHER(x) extern hasher_test_vector_t x;
+#define TEST_VECTOR_PRF(x) extern prf_test_vector_t x;
+#define TEST_VECTOR_XOF(x) extern xof_test_vector_t x;
+#define TEST_VECTOR_RNG(x) extern rng_test_vector_t x;
+#define TEST_VECTOR_DH(x) extern dh_test_vector_t x;
 
 #include "test_vectors.h"
 
@@ -33,14 +35,18 @@
 #undef TEST_VECTOR_SIGNER
 #undef TEST_VECTOR_HASHER
 #undef TEST_VECTOR_PRF
+#undef TEST_VECTOR_XOF
 #undef TEST_VECTOR_RNG
+#undef TEST_VECTOR_DH
 
 #define TEST_VECTOR_CRYPTER(x)
 #define TEST_VECTOR_AEAD(x)
 #define TEST_VECTOR_SIGNER(x)
 #define TEST_VECTOR_HASHER(x)
 #define TEST_VECTOR_PRF(x)
+#define TEST_VECTOR_XOF(x)
 #define TEST_VECTOR_RNG(x)
+#define TEST_VECTOR_DH(x)
 
 /* create test vector arrays */
 #undef TEST_VECTOR_CRYPTER
@@ -83,6 +89,14 @@ static prf_test_vector_t *prf[] = {
 #undef TEST_VECTOR_PRF
 #define TEST_VECTOR_PRF(x)
 
+#undef TEST_VECTOR_XOF
+#define TEST_VECTOR_XOF(x) &x,
+static xof_test_vector_t *xof[] = {
+#include "test_vectors.h"
+};
+#undef TEST_VECTOR_XOF
+#define TEST_VECTOR_XOF(x)
+
 #undef TEST_VECTOR_RNG
 #define TEST_VECTOR_RNG(x) &x,
 static rng_test_vector_t *rng[] = {
@@ -90,6 +104,14 @@ static rng_test_vector_t *rng[] = {
 };
 #undef TEST_VECTOR_RNG
 #define TEST_VECTOR_RNG(x)
+
+#undef TEST_VECTOR_DH
+#define TEST_VECTOR_DH(x) &x,
+static dh_test_vector_t *dh[] = {
+#include "test_vectors.h"
+};
+#undef TEST_VECTOR_DH
+#define TEST_VECTOR_DH(x)
 
 typedef struct private_test_vectors_plugin_t private_test_vectors_plugin_t;
 
@@ -170,12 +192,21 @@ plugin_t *test_vectors_plugin_create()
 		lib->crypto->add_test_vector(lib->crypto,
 									 PSEUDO_RANDOM_FUNCTION, prf[i]);
 	}
+	for (i = 0; i < countof(xof); i++)
+	{
+		lib->crypto->add_test_vector(lib->crypto,
+									 EXTENDED_OUTPUT_FUNCTION, xof[i]);
+	}
 	for (i = 0; i < countof(rng); i++)
 	{
 		lib->crypto->add_test_vector(lib->crypto,
 									 RANDOM_NUMBER_GENERATOR, rng[i]);
 	}
+	for (i = 0; i < countof(dh); i++)
+	{
+		lib->crypto->add_test_vector(lib->crypto,
+									 DIFFIE_HELLMAN_GROUP, dh[i]);
+	}
 
 	return &this->public.plugin;
 }
-

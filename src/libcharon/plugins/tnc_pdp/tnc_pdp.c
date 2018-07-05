@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2013 Andreas Steffen
+ * Copyright (C) 2012-2015 Andreas Steffen
  * HSR Hochschule fuer Technik Rapperswil
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -74,7 +74,7 @@ struct private_tnc_pdp_t {
 	/**
 	 * PT-TLS port of the server
 	 */
-	u_int16_t pt_tls_port;
+	uint16_t pt_tls_port;
 
 	/**
 	 * PT-TLS IPv4 socket
@@ -158,7 +158,7 @@ static void free_client_entry(client_entry_t *this)
 /**
  * Open IPv4 or IPv6 UDP socket
  */
-static int open_udp_socket(int family, u_int16_t port)
+static int open_udp_socket(int family, uint16_t port)
 {
 	int on = TRUE;
 	struct sockaddr_storage addr;
@@ -233,7 +233,7 @@ static int open_udp_socket(int family, u_int16_t port)
 /**
  * Open IPv4 or IPv6 TCP socket
  */
-static int open_tcp_socket(int family, u_int16_t port)
+static int open_tcp_socket(int family, uint16_t port)
 {
 	int on = TRUE;
 	struct sockaddr_storage addr;
@@ -339,8 +339,8 @@ static void send_message(private_tnc_pdp_t *this, radius_message_t *message,
 /**
  * Encrypt a MS-MPPE-Send/Recv-Key
  */
-static chunk_t encrypt_mppe_key(private_tnc_pdp_t *this, u_int8_t type,
-								chunk_t key, u_int16_t *salt,
+static chunk_t encrypt_mppe_key(private_tnc_pdp_t *this, uint8_t type,
+								chunk_t key, uint16_t *salt,
 								radius_message_t *request)
 {
 	chunk_t a, r, seed, data;
@@ -420,8 +420,8 @@ static void send_response(private_tnc_pdp_t *this, radius_message_t *request,
 {
 	radius_message_t *response;
 	chunk_t data, recv, send;
-	u_int32_t tunnel_type;
-	u_int16_t salt = 0;
+	uint32_t tunnel_type;
+	uint16_t salt = 0;
 
 	response = radius_message_create(code);
 	data = eap->get_data(eap);
@@ -477,7 +477,7 @@ static void process_eap(private_tnc_pdp_t *this, radius_message_t *request,
 	eap_payload_t *in, *out = NULL;
 	eap_method_t *method;
 	eap_type_t eap_type;
-	u_int32_t eap_vendor;
+	uint32_t eap_vendor;
 	chunk_t data, message = chunk_empty, msk = chunk_empty;
 	chunk_t user_name = chunk_empty, nas_id = chunk_empty;
 	identification_t *group = NULL;
@@ -646,8 +646,8 @@ static bool pt_tls_receive(private_tnc_pdp_t *this, int fd, watcher_event_t even
 	int pt_tls_fd;
 	struct sockaddr_storage addr;
 	socklen_t addrlen = sizeof(addr);
-	identification_t *peer;
-	host_t *host;
+	identification_t *client_id;
+	host_t *server_ip, *client_ip;
 	pt_tls_server_t *pt_tls;
 	tnccs_t *tnccs;
 	pt_tls_auth_t auth = PT_TLS_AUTH_TLS_OR_SASL;
@@ -658,17 +658,22 @@ static bool pt_tls_receive(private_tnc_pdp_t *this, int fd, watcher_event_t even
 		DBG1(DBG_TNC, "accepting PT-TLS stream failed: %s", strerror(errno));
 		return FALSE;
 	}
-	host = host_create_from_sockaddr((sockaddr_t*)&addr);
-	DBG1(DBG_TNC, "accepting PT-TLS stream from %H", host);
-	host->destroy(host);
+	client_ip = host_create_from_sockaddr((sockaddr_t*)&addr);
+	DBG1(DBG_TNC, "accepting PT-TLS stream from %H", client_ip);
 
-	/* At this moment the peer identity is not known yet */
-	peer = identification_create_from_encoding(ID_ANY, chunk_empty),
+	/* Currently we do not determine the IP address of the server interface */
+	server_ip = host_create_any(client_ip->get_family(client_ip));
+
+	/* At this moment the client identity is not known yet */
+	client_id = identification_create_from_encoding(ID_ANY, chunk_empty),
 
 	tnccs = tnc->tnccs->create_instance(tnc->tnccs, TNCCS_2_0, TRUE,
-										this->server, peer, TNC_IFT_TLS_2_0,
+										this->server, client_id, server_ip,
+										client_ip, TNC_IFT_TLS_2_0,
 										(tnccs_cb_t)get_recommendation);
-	peer->destroy(peer);
+	client_id->destroy(client_id);
+	server_ip->destroy(server_ip);
+	client_ip->destroy(client_ip);
 
 	if (!tnccs)
 	{

@@ -63,7 +63,7 @@ METHOD(logger_t, log_, void,
 		chunk_t local_spi, remote_spi;
 		host_t *local_host, *remote_host;
 		identification_t *local_id, *remote_id;
-		u_int64_t ispi, rspi;
+		uint64_t ispi, rspi;
 		ike_sa_id_t *id;
 
 		id = ike_sa->get_id(ike_sa);
@@ -120,6 +120,7 @@ METHOD(logger_t, get_level, level_t,
 METHOD(sql_logger_t, destroy, void,
 	private_sql_logger_t *this)
 {
+	this->recursive->destroy(this->recursive);
 	free(this);
 }
 

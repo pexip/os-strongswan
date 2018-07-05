@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2008-2014 Tobias Brunner
+ * Copyright (C) 2008-2016 Tobias Brunner
  * Copyright (C) 2006-2010 Martin Willi
+ * Copyright (C) 2013-2015 Andreas Steffen
  * Hochschule fuer Technik Rapperswil
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -60,7 +61,7 @@ struct private_proposal_t {
 	/**
 	 * senders SPI
 	 */
-	u_int64_t spi;
+	uint64_t spi;
 
 	/**
 	 * Proposal number
@@ -75,14 +76,14 @@ typedef struct {
 	/** Type of the transform */
 	transform_type_t type;
 	/** algorithm identifier */
-	u_int16_t alg;
+	uint16_t alg;
 	/** key size in bits, or zero if not needed */
-	u_int16_t key_size;
+	uint16_t key_size;
 } entry_t;
 
 METHOD(proposal_t, add_algorithm, void,
 	private_proposal_t *this, transform_type_t type,
-	u_int16_t alg, u_int16_t key_size)
+	uint16_t alg, uint16_t key_size)
 {
 	entry_t entry = {
 		.type = type,
@@ -96,8 +97,8 @@ METHOD(proposal_t, add_algorithm, void,
 /**
  * filter function for peer configs
  */
-static bool alg_filter(uintptr_t type, entry_t **in, u_int16_t *alg,
-					   void **unused, u_int16_t *key_size)
+static bool alg_filter(uintptr_t type, entry_t **in, uint16_t *alg,
+					   void **unused, uint16_t *key_size)
 {
 	entry_t *entry = *in;
 
@@ -126,7 +127,7 @@ METHOD(proposal_t, create_enumerator, enumerator_t*,
 
 METHOD(proposal_t, get_algorithm, bool,
 	private_proposal_t *this, transform_type_t type,
-	u_int16_t *alg, u_int16_t *key_size)
+	uint16_t *alg, uint16_t *key_size)
 {
 	enumerator_t *enumerator;
 	bool found = FALSE;
@@ -146,7 +147,7 @@ METHOD(proposal_t, has_dh_group, bool,
 {
 	bool found = FALSE, any = FALSE;
 	enumerator_t *enumerator;
-	u_int16_t current;
+	uint16_t current;
 
 	enumerator = create_enumerator(this, DIFFIE_HELLMAN_GROUP);
 	while (enumerator->enumerate(enumerator, &current, NULL))
@@ -192,7 +193,7 @@ static bool select_algo(private_proposal_t *this, proposal_t *other,
 						proposal_t *selected, transform_type_t type, bool priv)
 {
 	enumerator_t *e1, *e2;
-	u_int16_t alg1, alg2, ks1, ks2;
+	uint16_t alg1, alg2, ks1, ks2;
 	bool found = FALSE, optional = FALSE;
 
 	if (type == INTEGRITY_ALGORITHM &&
@@ -209,7 +210,7 @@ static bool select_algo(private_proposal_t *this, proposal_t *other,
 
 	e1 = create_enumerator(this, type);
 	e2 = other->create_enumerator(other, type);
-	if (!e1->enumerate(e1, NULL, NULL))
+	if (!e1->enumerate(e1, &alg1, NULL))
 	{
 		if (!e2->enumerate(e2, &alg2, NULL))
 		{
@@ -218,10 +219,21 @@ static bool select_algo(private_proposal_t *this, proposal_t *other,
 		else if (optional)
 		{
 			do
-			{	/* if the other peer proposes NONE, we accept the proposal */
+			{	/* if NONE is proposed, we accept the proposal */
 				found = !alg2;
 			}
 			while (!found && e2->enumerate(e2, &alg2, NULL));
+		}
+	}
+	else if (!e2->enumerate(e2, NULL, NULL))
+	{
+		if (optional)
+		{
+			do
+			{	/* if NONE is proposed, we accept the proposal */
+				found = !alg1;
+			}
+			while (!found && e1->enumerate(e1, &alg1, NULL));
 		}
 	}
 
@@ -243,7 +255,6 @@ static bool select_algo(private_proposal_t *this, proposal_t *other,
 						 "but peer implementation is unknown, skipped");
 					continue;
 				}
-				/* ok, we have an algorithm */
 				selected->add_algorithm(selected, type, alg1, ks1);
 				found = TRUE;
 				break;
@@ -287,9 +298,7 @@ METHOD(proposal_t, select_proposal, proposal_t*,
 	}
 
 	DBG2(DBG_CFG, "  proposal matches");
-
 	selected->set_spi(selected, other->get_spi(other));
-
 	return selected;
 }
 
@@ -300,12 +309,12 @@ METHOD(proposal_t, get_protocol, protocol_id_t,
 }
 
 METHOD(proposal_t, set_spi, void,
-	private_proposal_t *this, u_int64_t spi)
+	private_proposal_t *this, uint64_t spi)
 {
 	this->spi = spi;
 }
 
-METHOD(proposal_t, get_spi, u_int64_t,
+METHOD(proposal_t, get_spi, uint64_t,
 	private_proposal_t *this)
 {
 	return this->spi;
@@ -318,7 +327,7 @@ static bool algo_list_equals(private_proposal_t *this, proposal_t *other,
 							 transform_type_t type)
 {
 	enumerator_t *e1, *e2;
-	u_int16_t alg1, alg2, ks1, ks2;
+	uint16_t alg1, alg2, ks1, ks2;
 	bool equals = TRUE;
 
 	e1 = create_enumerator(this, type);
@@ -399,34 +408,52 @@ static const struct {
 	pseudo_random_function_t prf;
 } integ_prf_map[] = {
 	{AUTH_HMAC_SHA1_96,					PRF_HMAC_SHA1					},
+	{AUTH_HMAC_SHA1_160,				PRF_HMAC_SHA1					},
 	{AUTH_HMAC_SHA2_256_128,			PRF_HMAC_SHA2_256				},
 	{AUTH_HMAC_SHA2_384_192,			PRF_HMAC_SHA2_384				},
 	{AUTH_HMAC_SHA2_512_256,			PRF_HMAC_SHA2_512				},
 	{AUTH_HMAC_MD5_96,					PRF_HMAC_MD5					},
+	{AUTH_HMAC_MD5_128,					PRF_HMAC_MD5					},
 	{AUTH_AES_XCBC_96,					PRF_AES128_XCBC					},
 	{AUTH_CAMELLIA_XCBC_96,				PRF_CAMELLIA128_XCBC			},
 	{AUTH_AES_CMAC_96,					PRF_AES128_CMAC					},
 };
 
 /**
- * Checks the proposal read from a string.
+ * Remove all entries of the given transform type
  */
-static void check_proposal(private_proposal_t *this)
+static void remove_transform(private_proposal_t *this, transform_type_t type)
 {
 	enumerator_t *e;
 	entry_t *entry;
-	u_int16_t alg, ks;
-	bool all_aead = TRUE;
+
+	e = array_create_enumerator(this->transforms);
+	while (e->enumerate(e, &entry))
+	{
+		if (entry->type == type)
+		{
+			array_remove_at(this->transforms, e);
+		}
+	}
+	e->destroy(e);
+}
+
+/**
+ * Checks the proposal read from a string.
+ */
+static bool check_proposal(private_proposal_t *this)
+{
+	enumerator_t *e;
+	entry_t *entry;
+	uint16_t alg, ks;
+	bool all_aead = TRUE, any_aead = FALSE, any_enc = FALSE;
 	int i;
 
 	if (this->protocol == PROTO_IKE)
 	{
-		e = create_enumerator(this, PSEUDO_RANDOM_FUNCTION);
-		if (!e->enumerate(e, &alg, &ks))
-		{
-			/* No explicit PRF found. We assume the same algorithm as used
-			 * for integrity checking */
-			e->destroy(e);
+		if (!get_algorithm(this, PSEUDO_RANDOM_FUNCTION, NULL, NULL))
+		{	/* No explicit PRF found. We assume the same algorithm as used
+			 * for integrity checking. */
 			e = create_enumerator(this, INTEGRITY_ALGORITHM);
 			while (e->enumerate(e, &alg, &ks))
 			{
@@ -440,50 +467,120 @@ static void check_proposal(private_proposal_t *this)
 					}
 				}
 			}
+			e->destroy(e);
+		}
+		if (!get_algorithm(this, PSEUDO_RANDOM_FUNCTION, NULL, NULL))
+		{
+			DBG1(DBG_CFG, "a PRF algorithm is mandatory in IKE proposals");
+			return FALSE;
+		}
+		/* remove MODP_NONE from IKE proposal */
+		e = array_create_enumerator(this->transforms);
+		while (e->enumerate(e, &entry))
+		{
+			if (entry->type == DIFFIE_HELLMAN_GROUP && !entry->alg)
+			{
+				array_remove_at(this->transforms, e);
+			}
 		}
 		e->destroy(e);
+		if (!get_algorithm(this, DIFFIE_HELLMAN_GROUP, NULL, NULL))
+		{
+			DBG1(DBG_CFG, "a DH group is mandatory in IKE proposals");
+			return FALSE;
+		}
+	}
+	else
+	{	/* remove PRFs from ESP/AH proposals */
+		remove_transform(this, PSEUDO_RANDOM_FUNCTION);
 	}
 
-	if (this->protocol == PROTO_ESP)
+	if (this->protocol == PROTO_IKE || this->protocol == PROTO_ESP)
 	{
 		e = create_enumerator(this, ENCRYPTION_ALGORITHM);
 		while (e->enumerate(e, &alg, &ks))
 		{
-			if (!encryption_algorithm_is_aead(alg))
+			any_enc = TRUE;
+			if (encryption_algorithm_is_aead(alg))
 			{
-				all_aead = FALSE;
-				break;
+				any_aead = TRUE;
+				continue;
+			}
+			all_aead = FALSE;
+		}
+		e->destroy(e);
+
+		if (!any_enc)
+		{
+			DBG1(DBG_CFG, "an encryption algorithm is mandatory in %N proposals",
+				 protocol_id_names, this->protocol);
+			return FALSE;
+		}
+		else if (any_aead && !all_aead)
+		{
+			DBG1(DBG_CFG, "classic and combined-mode (AEAD) encryption "
+				 "algorithms can't be contained in the same %N proposal",
+				 protocol_id_names, this->protocol);
+			return FALSE;
+		}
+		else if (all_aead)
+		{	/* if all encryption algorithms in the proposal are AEADs,
+			 * we MUST NOT propose any integrity algorithms */
+			remove_transform(this, INTEGRITY_ALGORITHM);
+		}
+	}
+	else
+	{	/* AES-GMAC is parsed as encryption algorithm, so we map that to the
+		 * proper integrity algorithm */
+		e = array_create_enumerator(this->transforms);
+		while (e->enumerate(e, &entry))
+		{
+			if (entry->type == ENCRYPTION_ALGORITHM)
+			{
+				if (entry->alg == ENCR_NULL_AUTH_AES_GMAC)
+				{
+					entry->type = INTEGRITY_ALGORITHM;
+					ks = entry->key_size;
+					entry->key_size = 0;
+					switch (ks)
+					{
+						case 128:
+							entry->alg = AUTH_AES_128_GMAC;
+							continue;
+						case 192:
+							entry->alg = AUTH_AES_192_GMAC;
+							continue;
+						case 256:
+							entry->alg = AUTH_AES_256_GMAC;
+							continue;
+						default:
+							break;
+					}
+				}
+				/* remove all other encryption algorithms */
+				array_remove_at(this->transforms, e);
 			}
 		}
 		e->destroy(e);
 
-		if (all_aead)
+		if (!get_algorithm(this, INTEGRITY_ALGORITHM, NULL, NULL))
 		{
-			/* if all encryption algorithms in the proposal are AEADs,
-			 * we MUST NOT propose any integrity algorithms */
-			e = array_create_enumerator(this->transforms);
-			while (e->enumerate(e, &entry))
-			{
-				if (entry->type == INTEGRITY_ALGORITHM)
-				{
-					array_remove_at(this->transforms, e);
-				}
-			}
-			e->destroy(e);
+			DBG1(DBG_CFG, "an integrity algorithm is mandatory in AH "
+				 "proposals");
+			return FALSE;
 		}
 	}
 
 	if (this->protocol == PROTO_AH || this->protocol == PROTO_ESP)
 	{
-		e = create_enumerator(this, EXTENDED_SEQUENCE_NUMBERS);
-		if (!e->enumerate(e, NULL, NULL))
+		if (!get_algorithm(this, EXTENDED_SEQUENCE_NUMBERS, NULL, NULL))
 		{	/* ESN not specified, assume not supported */
 			add_algorithm(this, EXTENDED_SEQUENCE_NUMBERS, NO_EXT_SEQ_NUMBERS, 0);
 		}
-		e->destroy(e);
 	}
 
 	array_compress(this->transforms);
+	return TRUE;
 }
 
 /**
@@ -513,7 +610,7 @@ static int print_alg(private_proposal_t *this, printf_hook_data_t *data,
 {
 	enumerator_t *enumerator;
 	size_t written = 0;
-	u_int16_t alg, size;
+	uint16_t alg, size;
 
 	enumerator = create_enumerator(this, kind);
 	while (enumerator->enumerate(enumerator, &alg, &size))
@@ -638,20 +735,41 @@ static bool proposal_add_supported_ike(private_proposal_t *this, bool aead)
 
 	if (aead)
 	{
+		/* Round 1 adds algorithms with at least 128 bit security strength */
 		enumerator = lib->crypto->create_aead_enumerator(lib->crypto);
 		while (enumerator->enumerate(enumerator, &encryption, &plugin_name))
 		{
 			switch (encryption)
 			{
-				case ENCR_AES_CCM_ICV8:
-				case ENCR_AES_CCM_ICV12:
-				case ENCR_AES_CCM_ICV16:
-				case ENCR_AES_GCM_ICV8:
-				case ENCR_AES_GCM_ICV12:
 				case ENCR_AES_GCM_ICV16:
-				case ENCR_CAMELLIA_CCM_ICV8:
-				case ENCR_CAMELLIA_CCM_ICV12:
+				case ENCR_AES_CCM_ICV16:
 				case ENCR_CAMELLIA_CCM_ICV16:
+					/* we assume that we support all AES/Camellia sizes */
+					add_algorithm(this, ENCRYPTION_ALGORITHM, encryption, 128);
+					add_algorithm(this, ENCRYPTION_ALGORITHM, encryption, 192);
+					add_algorithm(this, ENCRYPTION_ALGORITHM, encryption, 256);
+					break;
+				case ENCR_CHACHA20_POLY1305:
+					add_algorithm(this, ENCRYPTION_ALGORITHM, encryption, 256);
+					break;
+				default:
+					break;
+			}
+		}
+		enumerator->destroy(enumerator);
+
+		/* Round 2 adds algorithms with less than 128 bit security strength */
+		enumerator = lib->crypto->create_aead_enumerator(lib->crypto);
+		while (enumerator->enumerate(enumerator, &encryption, &plugin_name))
+		{
+			switch (encryption)
+			{
+				case ENCR_AES_GCM_ICV12:
+				case ENCR_AES_GCM_ICV8:
+				case ENCR_AES_CCM_ICV12:
+				case ENCR_AES_CCM_ICV8:
+				case ENCR_CAMELLIA_CCM_ICV12:
+				case ENCR_CAMELLIA_CCM_ICV8:
 					/* we assume that we support all AES/Camellia sizes */
 					add_algorithm(this, ENCRYPTION_ALGORITHM, encryption, 128);
 					add_algorithm(this, ENCRYPTION_ALGORITHM, encryption, 192);
@@ -670,6 +788,7 @@ static bool proposal_add_supported_ike(private_proposal_t *this, bool aead)
 	}
 	else
 	{
+		/* Round 1 adds algorithms with at least 128 bit security strength */
 		enumerator = lib->crypto->create_crypter_enumerator(lib->crypto);
 		while (enumerator->enumerate(enumerator, &encryption, &plugin_name))
 		{
@@ -684,6 +803,18 @@ static bool proposal_add_supported_ike(private_proposal_t *this, bool aead)
 					add_algorithm(this, ENCRYPTION_ALGORITHM, encryption, 192);
 					add_algorithm(this, ENCRYPTION_ALGORITHM, encryption, 256);
 					break;
+				default:
+					break;
+			}
+		}
+		enumerator->destroy(enumerator);
+
+		/* Round 2 adds algorithms with less than 128 bit security strength */
+		enumerator = lib->crypto->create_crypter_enumerator(lib->crypto);
+		while (enumerator->enumerate(enumerator, &encryption, &plugin_name))
+		{
+			switch (encryption)
+			{
 				case ENCR_3DES:
 					add_algorithm(this, ENCRYPTION_ALGORITHM, encryption, 0);
 					break;
@@ -701,18 +832,33 @@ static bool proposal_add_supported_ike(private_proposal_t *this, bool aead)
 			return FALSE;
 		}
 
+		/* Round 1 adds algorithms with at least 128 bit security strength */
 		enumerator = lib->crypto->create_signer_enumerator(lib->crypto);
 		while (enumerator->enumerate(enumerator, &integrity, &plugin_name))
 		{
 			switch (integrity)
 			{
-				case AUTH_HMAC_SHA1_96:
 				case AUTH_HMAC_SHA2_256_128:
 				case AUTH_HMAC_SHA2_384_192:
 				case AUTH_HMAC_SHA2_512_256:
-				case AUTH_HMAC_MD5_96:
+					add_algorithm(this, INTEGRITY_ALGORITHM, integrity, 0);
+					break;
+				default:
+					break;
+			}
+		}
+		enumerator->destroy(enumerator);
+
+		/* Round 2 adds algorithms with less than 128 bit security strength */
+		enumerator = lib->crypto->create_signer_enumerator(lib->crypto);
+		while (enumerator->enumerate(enumerator, &integrity, &plugin_name))
+		{
+			switch (integrity)
+			{
 				case AUTH_AES_XCBC_96:
 				case AUTH_AES_CMAC_96:
+				case AUTH_HMAC_SHA1_96:
+				case AUTH_HMAC_MD5_96:
 					add_algorithm(this, INTEGRITY_ALGORITHM, integrity, 0);
 					break;
 				default:
@@ -722,16 +868,15 @@ static bool proposal_add_supported_ike(private_proposal_t *this, bool aead)
 		enumerator->destroy(enumerator);
 	}
 
+	/* Round 1 adds algorithms with at least 128 bit security strength */
 	enumerator = lib->crypto->create_prf_enumerator(lib->crypto);
 	while (enumerator->enumerate(enumerator, &prf, &plugin_name))
 	{
 		switch (prf)
 		{
-			case PRF_HMAC_SHA1:
 			case PRF_HMAC_SHA2_256:
 			case PRF_HMAC_SHA2_384:
 			case PRF_HMAC_SHA2_512:
-			case PRF_HMAC_MD5:
 			case PRF_AES128_XCBC:
 			case PRF_AES128_CMAC:
 				add_algorithm(this, PSEUDO_RANDOM_FUNCTION, prf, 0);
@@ -742,6 +887,64 @@ static bool proposal_add_supported_ike(private_proposal_t *this, bool aead)
 	}
 	enumerator->destroy(enumerator);
 
+	/* Round 2 adds algorithms with less than 128 bit security strength */
+	enumerator = lib->crypto->create_prf_enumerator(lib->crypto);
+	while (enumerator->enumerate(enumerator, &prf, &plugin_name))
+	{
+		switch (prf)
+		{
+			case PRF_HMAC_SHA1:
+			case PRF_HMAC_MD5:
+				add_algorithm(this, PSEUDO_RANDOM_FUNCTION, prf, 0);
+				break;
+			default:
+				break;
+		}
+	}
+	enumerator->destroy(enumerator);
+
+	/* Round 1 adds ECC and NTRU algorithms with at least 128 bit security strength */
+	enumerator = lib->crypto->create_dh_enumerator(lib->crypto);
+	while (enumerator->enumerate(enumerator, &group, &plugin_name))
+	{
+		switch (group)
+		{
+			case ECP_256_BIT:
+			case ECP_384_BIT:
+			case ECP_521_BIT:
+			case ECP_256_BP:
+			case ECP_384_BP:
+			case ECP_512_BP:
+			case NTRU_128_BIT:
+			case NTRU_192_BIT:
+			case NTRU_256_BIT:
+			case NH_128_BIT:
+				add_algorithm(this, DIFFIE_HELLMAN_GROUP, group, 0);
+				break;
+			default:
+				break;
+		}
+	}
+	enumerator->destroy(enumerator);
+
+	/* Round 2 adds other algorithms with at least 128 bit security strength */
+	enumerator = lib->crypto->create_dh_enumerator(lib->crypto);
+	while (enumerator->enumerate(enumerator, &group, &plugin_name))
+	{
+		switch (group)
+		{
+			case MODP_3072_BIT:
+			case MODP_4096_BIT:
+			case MODP_8192_BIT:
+				add_algorithm(this, DIFFIE_HELLMAN_GROUP, group, 0);
+				break;
+			default:
+				break;
+		}
+	}
+	enumerator->destroy(enumerator);
+
+	/* Round 3 adds algorithms with less than 128 bit security strength */
 	enumerator = lib->crypto->create_dh_enumerator(lib->crypto);
 	while (enumerator->enumerate(enumerator, &group, &plugin_name))
 	{
@@ -753,28 +956,18 @@ static bool proposal_add_supported_ike(private_proposal_t *this, bool aead)
 			case MODP_768_BIT:
 				/* weak */
 				break;
-			case MODP_1024_BIT:
-			case MODP_1536_BIT:
-			case MODP_2048_BIT:
-			case MODP_3072_BIT:
-			case MODP_4096_BIT:
-			case MODP_8192_BIT:
-			case ECP_256_BIT:
-			case ECP_384_BIT:
-			case ECP_521_BIT:
-			case MODP_1024_160:
 			case MODP_2048_224:
-			case MODP_2048_256:
-			case ECP_192_BIT:
+			case MODP_1536_BIT:
+			case MODP_1024_160:
 			case ECP_224_BIT:
 			case ECP_224_BP:
-			case ECP_256_BP:
-			case ECP_384_BP:
-			case ECP_512_BP:
+			case ECP_192_BIT:
 			case NTRU_112_BIT:
-			case NTRU_128_BIT:
-			case NTRU_192_BIT:
-			case NTRU_256_BIT:
+				/* rarely used */
+				break;
+			case MODP_2048_BIT:
+			case MODP_2048_256:
+			case MODP_1024_BIT:
 				add_algorithm(this, DIFFIE_HELLMAN_GROUP, group, 0);
 				break;
 			default:
@@ -803,21 +996,27 @@ proposal_t *proposal_create_default(protocol_id_t protocol)
 			}
 			break;
 		case PROTO_ESP:
-			add_algorithm(this, ENCRYPTION_ALGORITHM,   ENCR_AES_CBC,         128);
-			add_algorithm(this, ENCRYPTION_ALGORITHM,   ENCR_AES_CBC,         192);
-			add_algorithm(this, ENCRYPTION_ALGORITHM,   ENCR_AES_CBC,         256);
-			add_algorithm(this, ENCRYPTION_ALGORITHM,   ENCR_3DES,              0);
-			add_algorithm(this, ENCRYPTION_ALGORITHM,   ENCR_BLOWFISH,        256);
-			add_algorithm(this, INTEGRITY_ALGORITHM,    AUTH_HMAC_SHA1_96,      0);
-			add_algorithm(this, INTEGRITY_ALGORITHM,    AUTH_AES_XCBC_96,       0);
-			add_algorithm(this, INTEGRITY_ALGORITHM,    AUTH_HMAC_MD5_96,       0);
-			add_algorithm(this, EXTENDED_SEQUENCE_NUMBERS, NO_EXT_SEQ_NUMBERS,  0);
+			add_algorithm(this, ENCRYPTION_ALGORITHM, ENCR_AES_CBC,          128);
+			add_algorithm(this, ENCRYPTION_ALGORITHM, ENCR_AES_CBC,          192);
+			add_algorithm(this, ENCRYPTION_ALGORITHM, ENCR_AES_CBC,          256);
+			add_algorithm(this, ENCRYPTION_ALGORITHM, ENCR_3DES,               0);
+			add_algorithm(this, ENCRYPTION_ALGORITHM, ENCR_BLOWFISH,         256);
+			add_algorithm(this, INTEGRITY_ALGORITHM,  AUTH_HMAC_SHA2_256_128,  0);
+			add_algorithm(this, INTEGRITY_ALGORITHM,  AUTH_HMAC_SHA2_384_192,  0);
+			add_algorithm(this, INTEGRITY_ALGORITHM,  AUTH_HMAC_SHA2_512_256,  0);
+			add_algorithm(this, INTEGRITY_ALGORITHM,  AUTH_HMAC_SHA1_96,       0);
+			add_algorithm(this, INTEGRITY_ALGORITHM,  AUTH_AES_XCBC_96,        0);
+			add_algorithm(this, INTEGRITY_ALGORITHM,  AUTH_HMAC_MD5_96,        0);
+			add_algorithm(this, EXTENDED_SEQUENCE_NUMBERS, NO_EXT_SEQ_NUMBERS, 0);
 			break;
 		case PROTO_AH:
-			add_algorithm(this, INTEGRITY_ALGORITHM,    AUTH_HMAC_SHA1_96,      0);
-			add_algorithm(this, INTEGRITY_ALGORITHM,    AUTH_AES_XCBC_96,       0);
-			add_algorithm(this, INTEGRITY_ALGORITHM,    AUTH_HMAC_MD5_96,       0);
-			add_algorithm(this, EXTENDED_SEQUENCE_NUMBERS, NO_EXT_SEQ_NUMBERS,  0);
+			add_algorithm(this, INTEGRITY_ALGORITHM,  AUTH_HMAC_SHA2_256_128,  0);
+			add_algorithm(this, INTEGRITY_ALGORITHM,  AUTH_HMAC_SHA2_384_192,  0);
+			add_algorithm(this, INTEGRITY_ALGORITHM,  AUTH_HMAC_SHA2_512_256,  0);
+			add_algorithm(this, INTEGRITY_ALGORITHM,  AUTH_HMAC_SHA1_96,       0);
+			add_algorithm(this, INTEGRITY_ALGORITHM,  AUTH_AES_XCBC_96,        0);
+			add_algorithm(this, INTEGRITY_ALGORITHM,  AUTH_HMAC_MD5_96,        0);
+			add_algorithm(this, EXTENDED_SEQUENCE_NUMBERS, NO_EXT_SEQ_NUMBERS, 0);
 			break;
 		default:
 			break;
@@ -877,13 +1076,11 @@ proposal_t *proposal_create_from_string(protocol_id_t protocol, const char *algs
 	}
 	enumerator->destroy(enumerator);
 
-	if (failed)
+	if (failed || !check_proposal(this))
 	{
 		destroy(this);
 		return NULL;
 	}
-
-	check_proposal(this);
 
 	return &this->public;
 }

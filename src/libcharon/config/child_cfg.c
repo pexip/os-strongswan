@@ -1,8 +1,9 @@
 /*
- * Copyright (C) 2008-2009 Tobias Brunner
+ * Copyright (C) 2016 Andreas Steffen
+ * Copyright (C) 2008-2016 Tobias Brunner
  * Copyright (C) 2005-2007 Martin Willi
  * Copyright (C) 2005 Jan Hutter
- * Hochschule fuer Technik Rapperswil
+ * HSR Hochschule fuer Technik Rapperswil
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -110,12 +111,12 @@ struct private_child_cfg_t {
 	/**
 	 * Inactivity timeout
 	 */
-	u_int32_t inactivity;
+	uint32_t inactivity;
 
 	/**
 	 * Reqid to install CHILD_SA with
 	 */
-	u_int32_t reqid;
+	uint32_t reqid;
 
 	/**
 	 * Optional mark to install inbound CHILD_SA with
@@ -130,7 +131,17 @@ struct private_child_cfg_t {
 	/**
 	 * Traffic Flow Confidentiality padding, if enabled
 	 */
-	u_int32_t tfc;
+	uint32_t tfc;
+
+	/**
+	 * Optional manually-set IPsec policy priorities
+	 */
+	uint32_t manual_prio;
+
+	/**
+	 * Optional restriction of IPsec policy to a given network interface
+	 */
+	char *interface;
 
 	/**
 	 * set up IPsec transport SA in MIPv6 proxy mode
@@ -143,9 +154,14 @@ struct private_child_cfg_t {
 	bool install_policy;
 
 	/**
+	 * Install outbound FWD policies
+	 */
+	bool fwd_out_policy;
+
+	/**
 	 * anti-replay window size
 	 */
-	u_int32_t replay_window;
+	uint32_t replay_window;
 };
 
 METHOD(child_cfg_t, get_name, char*,
@@ -200,25 +216,40 @@ METHOD(child_cfg_t, get_proposals, linked_list_t*,
 
 METHOD(child_cfg_t, select_proposal, proposal_t*,
 	private_child_cfg_t*this, linked_list_t *proposals, bool strip_dh,
-	bool private)
+	bool private, bool prefer_self)
 {
-	enumerator_t *stored_enum, *supplied_enum;
-	proposal_t *stored, *supplied, *selected = NULL;
+	enumerator_t *prefer_enum, *match_enum;
+	proposal_t *proposal, *match, *selected = NULL;
 
-	stored_enum = this->proposals->create_enumerator(this->proposals);
-	supplied_enum = proposals->create_enumerator(proposals);
-
-	/* compare all stored proposals with all supplied. Stored ones are preferred. */
-	while (stored_enum->enumerate(stored_enum, &stored))
+	if (prefer_self)
 	{
-		stored = stored->clone(stored);
-		while (supplied_enum->enumerate(supplied_enum, &supplied))
+		prefer_enum = this->proposals->create_enumerator(this->proposals);
+		match_enum = proposals->create_enumerator(proposals);
+	}
+	else
+	{
+		prefer_enum = proposals->create_enumerator(proposals);
+		match_enum = this->proposals->create_enumerator(this->proposals);
+	}
+
+	while (prefer_enum->enumerate(prefer_enum, &proposal))
+	{
+		proposal = proposal->clone(proposal);
+		if (prefer_self)
+		{
+			proposals->reset_enumerator(proposals, match_enum);
+		}
+		else
+		{
+			this->proposals->reset_enumerator(this->proposals, match_enum);
+		}
+		while (match_enum->enumerate(match_enum, &match))
 		{
 			if (strip_dh)
 			{
-				stored->strip_dh(stored, MODP_NONE);
+				proposal->strip_dh(proposal, MODP_NONE);
 			}
-			selected = stored->select(stored, supplied, private);
+			selected = proposal->select(proposal, match, private);
 			if (selected)
 			{
 				DBG2(DBG_CFG, "received proposals: %#P", proposals);
@@ -227,17 +258,15 @@ METHOD(child_cfg_t, select_proposal, proposal_t*,
 				break;
 			}
 		}
-		stored->destroy(stored);
+		proposal->destroy(proposal);
 		if (selected)
 		{
 			break;
 		}
-		supplied_enum->destroy(supplied_enum);
-		supplied_enum = proposals->create_enumerator(proposals);
 	}
-	stored_enum->destroy(stored_enum);
-	supplied_enum->destroy(supplied_enum);
-	if (selected == NULL)
+	prefer_enum->destroy(prefer_enum);
+	match_enum->destroy(match_enum);
+	if (!selected)
 	{
 		DBG1(DBG_CFG, "received proposals: %#P", proposals);
 		DBG1(DBG_CFG, "configured proposals: %#P", this->proposals);
@@ -405,7 +434,7 @@ METHOD(child_cfg_t, get_hostaccess, bool,
  * Note: The distribution of random values is not perfect, but it
  * should get the job done.
  */
-static u_int64_t apply_jitter(u_int64_t rekey, u_int64_t jitter)
+static uint64_t apply_jitter(uint64_t rekey, uint64_t jitter)
 {
 	if (jitter == 0)
 	{
@@ -417,10 +446,14 @@ static u_int64_t apply_jitter(u_int64_t rekey, u_int64_t jitter)
 #define APPLY_JITTER(l) l.rekey = apply_jitter(l.rekey, l.jitter)
 
 METHOD(child_cfg_t, get_lifetime, lifetime_cfg_t*,
-	private_child_cfg_t *this)
+	private_child_cfg_t *this, bool jitter)
 {
 	lifetime_cfg_t *lft = malloc_thing(lifetime_cfg_t);
 	memcpy(lft, &this->lifetime, sizeof(lifetime_cfg_t));
+	if (!jitter)
+	{
+		lft->time.jitter = lft->bytes.jitter = lft->packets.jitter = 0;
+	}
 	APPLY_JITTER(lft->time);
 	APPLY_JITTER(lft->bytes);
 	APPLY_JITTER(lft->packets);
@@ -456,7 +489,7 @@ METHOD(child_cfg_t, get_dh_group, diffie_hellman_group_t,
 {
 	enumerator_t *enumerator;
 	proposal_t *proposal;
-	u_int16_t dh_group = MODP_NONE;
+	uint16_t dh_group = MODP_NONE;
 
 	enumerator = this->proposals->create_enumerator(this->proposals);
 	while (enumerator->enumerate(enumerator, &proposal))
@@ -476,13 +509,13 @@ METHOD(child_cfg_t, use_ipcomp, bool,
 	return this->use_ipcomp;
 }
 
-METHOD(child_cfg_t, get_inactivity, u_int32_t,
+METHOD(child_cfg_t, get_inactivity, uint32_t,
 	private_child_cfg_t *this)
 {
 	return this->inactivity;
 }
 
-METHOD(child_cfg_t, get_reqid, u_int32_t,
+METHOD(child_cfg_t, get_reqid, uint32_t,
 	private_child_cfg_t *this)
 {
 	return this->reqid;
@@ -494,29 +527,34 @@ METHOD(child_cfg_t, get_mark, mark_t,
 	return inbound ? this->mark_in : this->mark_out;
 }
 
-METHOD(child_cfg_t, get_tfc, u_int32_t,
+METHOD(child_cfg_t, get_tfc, uint32_t,
 	private_child_cfg_t *this)
 {
 	return this->tfc;
 }
 
-METHOD(child_cfg_t, get_replay_window, u_int32_t,
+METHOD(child_cfg_t, get_manual_prio, uint32_t,
+	private_child_cfg_t *this)
+{
+	return this->manual_prio;
+}
+
+METHOD(child_cfg_t, get_interface, char*,
+	private_child_cfg_t *this)
+{
+	return this->interface;
+}
+
+METHOD(child_cfg_t, get_replay_window, uint32_t,
 	private_child_cfg_t *this)
 {
 	return this->replay_window;
 }
 
 METHOD(child_cfg_t, set_replay_window, void,
-	private_child_cfg_t *this, u_int32_t replay_window)
+	private_child_cfg_t *this, uint32_t replay_window)
 {
 	this->replay_window = replay_window;
-}
-
-METHOD(child_cfg_t, set_mipv6_options, void,
-	private_child_cfg_t *this, bool proxy_mode, bool install_policy)
-{
-	this->proxy_mode = proxy_mode;
-	this->install_policy = install_policy;
 }
 
 METHOD(child_cfg_t, use_proxy_mode, bool,
@@ -529,6 +567,66 @@ METHOD(child_cfg_t, install_policy, bool,
 	private_child_cfg_t *this)
 {
 	return this->install_policy;
+}
+
+METHOD(child_cfg_t, install_fwd_out_policy, bool,
+	private_child_cfg_t *this)
+{
+	return this->fwd_out_policy;
+}
+
+#define LT_PART_EQUALS(a, b) ({ a.life == b.life && a.rekey == b.rekey && a.jitter == b.jitter; })
+#define LIFETIME_EQUALS(a, b) ({ LT_PART_EQUALS(a.time, b.time) && LT_PART_EQUALS(a.bytes, b.bytes) && LT_PART_EQUALS(a.packets, b.packets); })
+
+METHOD(child_cfg_t, equals, bool,
+	private_child_cfg_t *this, child_cfg_t *other_pub)
+{
+	private_child_cfg_t *other = (private_child_cfg_t*)other_pub;
+
+	if (this == other)
+	{
+		return TRUE;
+	}
+	if (this->public.equals != other->public.equals)
+	{
+		return FALSE;
+	}
+	if (!this->proposals->equals_offset(this->proposals, other->proposals,
+										offsetof(proposal_t, equals)))
+	{
+		return FALSE;
+	}
+	if (!this->my_ts->equals_offset(this->my_ts, other->my_ts,
+									offsetof(traffic_selector_t, equals)))
+	{
+		return FALSE;
+	}
+	if (!this->other_ts->equals_offset(this->other_ts, other->other_ts,
+									   offsetof(traffic_selector_t, equals)))
+	{
+		return FALSE;
+	}
+	return this->hostaccess == other->hostaccess &&
+		this->mode == other->mode &&
+		this->start_action == other->start_action &&
+		this->dpd_action == other->dpd_action &&
+		this->close_action == other->close_action &&
+		LIFETIME_EQUALS(this->lifetime, other->lifetime) &&
+		this->use_ipcomp == other->use_ipcomp &&
+		this->inactivity == other->inactivity &&
+		this->reqid == other->reqid &&
+		this->mark_in.value == other->mark_in.value &&
+		this->mark_in.mask == other->mark_in.mask &&
+		this->mark_out.value == other->mark_out.value &&
+		this->mark_out.mask == other->mark_out.mask &&
+		this->tfc == other->tfc &&
+		this->manual_prio == other->manual_prio &&
+		this->replay_window == other->replay_window &&
+		this->proxy_mode == other->proxy_mode &&
+		this->install_policy == other->install_policy &&
+		this->fwd_out_policy == other->fwd_out_policy &&
+		streq(this->updown, other->updown) &&
+		streq(this->interface, other->interface);
 }
 
 METHOD(child_cfg_t, get_ref, child_cfg_t*,
@@ -546,10 +644,8 @@ METHOD(child_cfg_t, destroy, void,
 		this->proposals->destroy_offset(this->proposals, offsetof(proposal_t, destroy));
 		this->my_ts->destroy_offset(this->my_ts, offsetof(traffic_selector_t, destroy));
 		this->other_ts->destroy_offset(this->other_ts, offsetof(traffic_selector_t, destroy));
-		if (this->updown)
-		{
-			free(this->updown);
-		}
+		free(this->updown);
+		free(this->interface);
 		free(this->name);
 		free(this);
 	}
@@ -558,12 +654,7 @@ METHOD(child_cfg_t, destroy, void,
 /*
  * Described in header-file
  */
-child_cfg_t *child_cfg_create(char *name, lifetime_cfg_t *lifetime,
-							  char *updown, bool hostaccess,
-							  ipsec_mode_t mode, action_t start_action,
-							  action_t dpd_action, action_t close_action,
-							  bool ipcomp, u_int32_t inactivity, u_int32_t reqid,
-							  mark_t *mark_in, mark_t *mark_out, u_int32_t tfc)
+child_cfg_t *child_cfg_create(char *name, child_cfg_create_t *data)
 {
 	private_child_cfg_t *this;
 
@@ -583,49 +674,48 @@ child_cfg_t *child_cfg_create(char *name, lifetime_cfg_t *lifetime,
 			.get_close_action = _get_close_action,
 			.get_lifetime = _get_lifetime,
 			.get_dh_group = _get_dh_group,
-			.set_mipv6_options = _set_mipv6_options,
 			.use_ipcomp = _use_ipcomp,
 			.get_inactivity = _get_inactivity,
 			.get_reqid = _get_reqid,
 			.get_mark = _get_mark,
 			.get_tfc = _get_tfc,
+			.get_manual_prio = _get_manual_prio,
+			.get_interface = _get_interface,
 			.get_replay_window = _get_replay_window,
 			.set_replay_window = _set_replay_window,
 			.use_proxy_mode = _use_proxy_mode,
 			.install_policy = _install_policy,
+			.install_fwd_out_policy = _install_fwd_out_policy,
+			.equals = _equals,
 			.get_ref = _get_ref,
 			.destroy = _destroy,
 		},
 		.name = strdup(name),
-		.updown = strdupnull(updown),
-		.hostaccess = hostaccess,
-		.mode = mode,
-		.start_action = start_action,
-		.dpd_action = dpd_action,
-		.close_action = close_action,
-		.use_ipcomp = ipcomp,
-		.inactivity = inactivity,
-		.reqid = reqid,
-		.proxy_mode = FALSE,
-		.install_policy = TRUE,
+		.updown = strdupnull(data->updown),
+		.hostaccess = data->hostaccess,
+		.reqid = data->reqid,
+		.mode = data->mode,
+		.proxy_mode = data->proxy_mode,
+		.start_action = data->start_action,
+		.dpd_action = data->dpd_action,
+		.close_action = data->close_action,
+		.mark_in = data->mark_in,
+		.mark_out = data->mark_out,
+		.lifetime = data->lifetime,
+		.inactivity = data->inactivity,
+		.use_ipcomp = data->ipcomp,
+		.tfc = data->tfc,
+		.manual_prio = data->priority,
+		.interface = strdupnull(data->interface),
+		.install_policy = !data->suppress_policies,
+		.fwd_out_policy = data->fwd_out_policies,
 		.refcount = 1,
 		.proposals = linked_list_create(),
 		.my_ts = linked_list_create(),
 		.other_ts = linked_list_create(),
-		.tfc = tfc,
 		.replay_window = lib->settings->get_int(lib->settings,
-				"%s.replay_window", DEFAULT_REPLAY_WINDOW, lib->ns),
+							"%s.replay_window", DEFAULT_REPLAY_WINDOW, lib->ns),
 	);
-
-	if (mark_in)
-	{
-		this->mark_in = *mark_in;
-	}
-	if (mark_out)
-	{
-		this->mark_out = *mark_out;
-	}
-	memcpy(&this->lifetime, lifetime, sizeof(lifetime_cfg_t));
 
 	return &this->public;
 }

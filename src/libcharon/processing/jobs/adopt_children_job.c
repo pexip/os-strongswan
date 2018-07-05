@@ -1,4 +1,7 @@
 /*
+ * Copyright (C) 2015 Tobias Brunner
+ * Hochschule fuer Technik Rapperswil
+ *
  * Copyright (C) 2012 Martin Willi
  * Copyright (C) 2012 revosec AG
  *
@@ -16,8 +19,8 @@
 #include "adopt_children_job.h"
 
 #include <daemon.h>
-#include <hydra.h>
 #include <collections/array.h>
+#include <processing/jobs/delete_ike_sa_job.h>
 
 typedef struct private_adopt_children_job_t private_adopt_children_job_t;
 
@@ -54,18 +57,20 @@ METHOD(job_t, execute, job_requeue_t,
 	private_adopt_children_job_t *this)
 {
 	identification_t *my_id, *other_id, *xauth;
-	host_t *me, *other;
+	host_t *me, *other, *vip;
 	peer_cfg_t *cfg;
-	linked_list_t *children;
-	enumerator_t *enumerator, *childenum;
+	linked_list_t *children, *vips;
+	enumerator_t *enumerator, *subenum;
 	ike_sa_id_t *id;
 	ike_sa_t *ike_sa;
 	child_sa_t *child_sa;
+	uint32_t unique;
 
 	ike_sa = charon->ike_sa_manager->checkout(charon->ike_sa_manager, this->id);
 	if (ike_sa)
 	{
 		/* get what we need from new SA */
+		unique = ike_sa->get_unique_id(ike_sa);
 		me = ike_sa->get_my_host(ike_sa);
 		me = me->clone(me);
 		other = ike_sa->get_other_host(ike_sa);
@@ -81,7 +86,8 @@ METHOD(job_t, execute, job_requeue_t,
 
 		charon->ike_sa_manager->checkin(charon->ike_sa_manager, ike_sa);
 
-		/* find old SA to adopt children from */
+		/* find old SA to adopt children and virtual IPs from */
+		vips = linked_list_create();
 		children = linked_list_create();
 		enumerator = charon->ike_sa_manager->create_id_enumerator(
 									charon->ike_sa_manager, my_id, xauth,
@@ -102,30 +108,51 @@ METHOD(job_t, execute, job_requeue_t,
 					other_id->equals(other_id, ike_sa->get_other_id(ike_sa)) &&
 					cfg->equals(cfg, ike_sa->get_peer_cfg(ike_sa)))
 				{
-					childenum = ike_sa->create_child_sa_enumerator(ike_sa);
-					while (childenum->enumerate(childenum, &child_sa))
+					charon->bus->children_migrate(charon->bus, this->id, unique);
+					subenum = ike_sa->create_child_sa_enumerator(ike_sa);
+					while (subenum->enumerate(subenum, &child_sa))
 					{
-						ike_sa->remove_child_sa(ike_sa, childenum);
+						ike_sa->remove_child_sa(ike_sa, subenum);
 						children->insert_last(children, child_sa);
 					}
-					childenum->destroy(childenum);
-					if (children->get_count(children))
+					subenum->destroy(subenum);
+
+					subenum = ike_sa->create_virtual_ip_enumerator(ike_sa, FALSE);
+					while (subenum->enumerate(subenum, &vip))
+					{
+						vips->insert_last(vips, vip->clone(vip));
+					}
+					subenum->destroy(subenum);
+					/* this does not release the addresses, which is good, but
+					 * it does trigger an assign_vips(FALSE) event, so we also
+					 * trigger one below */
+					ike_sa->clear_virtual_ips(ike_sa, FALSE);
+					if (children->get_count(children) || vips->get_count(vips))
 					{
 						DBG1(DBG_IKE, "detected reauth of existing IKE_SA, "
-							 "adopting %d children",
-							 children->get_count(children));
+							 "adopting %d children and %d virtual IPs",
+							 children->get_count(children), vips->get_count(vips));
 					}
-					ike_sa->set_state(ike_sa, IKE_DELETING);
-					charon->bus->ike_updown(charon->bus, ike_sa, FALSE);
-					charon->ike_sa_manager->checkin_and_destroy(
+					if (ike_sa->get_state(ike_sa) == IKE_PASSIVE)
+					{
+						charon->ike_sa_manager->checkin_and_destroy(
 											charon->ike_sa_manager, ike_sa);
+					}
+					else
+					{
+						lib->scheduler->schedule_job(lib->scheduler, (job_t*)
+								delete_ike_sa_job_create(ike_sa->get_id(ike_sa),
+														 TRUE), 10);
+						charon->ike_sa_manager->checkin(
+											charon->ike_sa_manager, ike_sa);
+					}
 				}
 				else
 				{
 					charon->ike_sa_manager->checkin(
 											charon->ike_sa_manager, ike_sa);
 				}
-				if (children->get_count(children))
+				if (children->get_count(children) || vips->get_count(vips))
 				{
 					break;
 				}
@@ -140,7 +167,7 @@ METHOD(job_t, execute, job_requeue_t,
 		xauth->destroy(xauth);
 		cfg->destroy(cfg);
 
-		if (children->get_count(children))
+		if (children->get_count(children) || vips->get_count(vips))
 		{
 			/* adopt children by new SA */
 			ike_sa = charon->ike_sa_manager->checkout(charon->ike_sa_manager,
@@ -152,10 +179,28 @@ METHOD(job_t, execute, job_requeue_t,
 				{
 					ike_sa->add_child_sa(ike_sa, child_sa);
 				}
+				if (vips->get_count(vips))
+				{
+					while (vips->remove_first(vips, (void**)&vip) == SUCCESS)
+					{
+						ike_sa->add_virtual_ip(ike_sa, FALSE, vip);
+						vip->destroy(vip);
+					}
+					charon->bus->assign_vips(charon->bus, ike_sa, TRUE);
+				}
+				charon->bus->children_migrate(charon->bus, NULL, 0);
 				charon->ike_sa_manager->checkin(charon->ike_sa_manager, ike_sa);
 			}
 		}
 		children->destroy_offset(children, offsetof(child_sa_t, destroy));
+		/* FIXME: If we still have addresses here it means we weren't able to
+		 * find the new SA anymore (while not very likely during a proper
+		 * reauthentication, this theoretically could happen because the SA is
+		 * not locked while we search for the old one).  So the addresses here
+		 * should be released properly to avoid leaking these leases.  This is
+		 * currently not possible, though, due to the changed interface of
+		 * release_address(), which now takes a complete IKE_SA object. */
+		vips->destroy_offset(vips, offsetof(host_t, destroy));
 
 		if (array_count(this->tasks))
 		{

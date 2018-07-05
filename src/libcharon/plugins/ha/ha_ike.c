@@ -78,13 +78,13 @@ METHOD(listener_t, ike_keys, bool,
 	ha_message_t *m;
 	chunk_t secret;
 	proposal_t *proposal;
-	u_int16_t alg, len;
+	uint16_t alg, len;
 
 	if (this->tunnel && this->tunnel->is_sa(this->tunnel, ike_sa))
 	{	/* do not sync SA between nodes */
 		return TRUE;
 	}
-	if (dh->get_shared_secret(dh, &secret) != SUCCESS)
+	if (!dh->get_shared_secret(dh, &secret))
 	{
 		return TRUE;
 	}
@@ -121,21 +121,28 @@ METHOD(listener_t, ike_keys, bool,
 	{
 		m->add_attribute(m, HA_ALG_PRF, alg);
 	}
+	if (proposal->get_algorithm(proposal, DIFFIE_HELLMAN_GROUP, &alg, NULL))
+	{
+		m->add_attribute(m, HA_ALG_DH, alg);
+	}
 	m->add_attribute(m, HA_NONCE_I, nonce_i);
 	m->add_attribute(m, HA_NONCE_R, nonce_r);
 	m->add_attribute(m, HA_SECRET, secret);
 	chunk_clear(&secret);
 	if (ike_sa->get_version(ike_sa) == IKEV1)
 	{
-		dh->get_my_public_value(dh, &secret);
-		m->add_attribute(m, HA_LOCAL_DH, secret);
-		chunk_free(&secret);
+		if (dh->get_my_public_value(dh, &secret))
+		{
+			m->add_attribute(m, HA_LOCAL_DH, secret);
+			chunk_free(&secret);
+		}
 		m->add_attribute(m, HA_REMOTE_DH, dh_other);
 		if (shared)
 		{
 			m->add_attribute(m, HA_PSK, shared->get_key(shared));
 		}
 	}
+	m->add_attribute(m, HA_REMOTE_ADDR, ike_sa->get_other_host(ike_sa));
 
 	this->socket->push(this->socket, m);
 	this->cache->cache(this->cache, ike_sa, m);
@@ -161,7 +168,7 @@ METHOD(listener_t, ike_updown, bool,
 	{
 		enumerator_t *enumerator;
 		peer_cfg_t *peer_cfg;
-		u_int32_t extension, condition;
+		uint32_t extension, condition;
 		host_t *addr;
 		ike_sa_id_t *id;
 		identification_t *eap_id;
@@ -307,27 +314,31 @@ METHOD(listener_t, message_hook, bool,
 			sync_vips(this, ike_sa);
 		}
 	}
-	if (!plain && ike_sa->get_version(ike_sa) == IKEV1)
+	if (ike_sa->get_version(ike_sa) == IKEV1)
 	{
 		ha_message_t *m;
 		keymat_v1_t *keymat;
-		u_int32_t mid;
 		chunk_t iv;
 
-		mid = message->get_message_id(message);
-		if (mid == 0)
+		/* we need the last block (or expected next IV) of Phase 1, which gets
+		 * upated after successful en-/decryption depending on direction */
+		if (incoming == plain)
 		{
-			keymat = (keymat_v1_t*)ike_sa->get_keymat(ike_sa);
-			if (keymat->get_iv(keymat, mid, &iv))
+			if (message->get_message_id(message) == 0)
 			{
-				m = ha_message_create(HA_IKE_IV);
-				m->add_attribute(m, HA_IKE_ID, ike_sa->get_id(ike_sa));
-				m->add_attribute(m, HA_IV, iv);
-				this->socket->push(this->socket, m);
-				this->cache->cache(this->cache, ike_sa, m);
+				keymat = (keymat_v1_t*)ike_sa->get_keymat(ike_sa);
+				if (keymat->get_iv(keymat, 0, &iv))
+				{
+					m = ha_message_create(HA_IKE_IV);
+					m->add_attribute(m, HA_IKE_ID, ike_sa->get_id(ike_sa));
+					m->add_attribute(m, HA_IV, iv);
+					this->socket->push(this->socket, m);
+					this->cache->cache(this->cache, ike_sa, m);
+				}
 			}
 		}
-		if (!incoming && message->get_exchange_type(message) == TRANSACTION)
+		if (!plain && !incoming &&
+			message->get_exchange_type(message) == TRANSACTION)
 		{
 			sync_vips(this, ike_sa);
 		}
@@ -338,7 +349,7 @@ METHOD(listener_t, message_hook, bool,
 		ha_message_t *m;
 		notify_payload_t *notify;
 		chunk_t data;
-		u_int32_t seq;
+		uint32_t seq;
 
 		notify = message->get_notify(message, DPD_R_U_THERE);
 		if (notify)

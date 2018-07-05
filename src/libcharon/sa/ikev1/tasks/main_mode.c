@@ -77,7 +77,7 @@ struct private_main_mode_t {
 	/**
 	 * Negotiated SA lifetime
 	 */
-	u_int32_t lifetime;
+	uint32_t lifetime;
 
 	/**
 	 * Negotiated authentication method
@@ -173,7 +173,7 @@ static status_t send_notify(private_main_mode_t *this, notify_type_t type)
 {
 	notify_payload_t *notify;
 	ike_sa_id_t *ike_sa_id;
-	u_int64_t spi_i, spi_r;
+	uint64_t spi_i, spi_r;
 	chunk_t spi;
 
 	notify = notify_payload_create_from_protocol_and_type(PLV1_NOTIFY,
@@ -203,6 +203,43 @@ static status_t send_delete(private_main_mode_t *this)
 	this->ike_sa->flush_queue(this->ike_sa,
 					this->initiator ? TASK_QUEUE_ACTIVE : TASK_QUEUE_PASSIVE);
 	return ALREADY_DONE;
+}
+
+/**
+ * Add an INITIAL_CONTACT notify if first contact with peer
+ */
+static void add_initial_contact(private_main_mode_t *this, message_t *message,
+								identification_t *idi)
+{
+	identification_t *idr;
+	host_t *host;
+	notify_payload_t *notify;
+	ike_sa_id_t *ike_sa_id;
+	uint64_t spi_i, spi_r;
+	chunk_t spi;
+
+	idr = this->ph1->get_id(this->ph1, this->peer_cfg, FALSE);
+	if (idr && !idr->contains_wildcards(idr))
+	{
+		if (this->peer_cfg->get_unique_policy(this->peer_cfg) != UNIQUE_NO &&
+			this->peer_cfg->get_unique_policy(this->peer_cfg) != UNIQUE_NEVER)
+		{
+			host = this->ike_sa->get_other_host(this->ike_sa);
+			if (!charon->ike_sa_manager->has_contact(charon->ike_sa_manager,
+										idi, idr, host->get_family(host)))
+			{
+				notify = notify_payload_create_from_protocol_and_type(
+								PLV1_NOTIFY, PROTO_IKE, INITIAL_CONTACT_IKEV1);
+				ike_sa_id = this->ike_sa->get_id(this->ike_sa);
+				spi_i = ike_sa_id->get_initiator_spi(ike_sa_id);
+				spi_r = ike_sa_id->get_responder_spi(ike_sa_id);
+				spi = chunk_cata("cc", chunk_from_thing(spi_i),
+								 chunk_from_thing(spi_r));
+				notify->set_spi_data(notify, spi);
+				message->add_payload(message, (payload_t*)notify);
+			}
+		}
+	}
 }
 
 METHOD(task_t, build_i, status_t,
@@ -266,7 +303,7 @@ METHOD(task_t, build_i, status_t,
 		}
 		case MM_SA:
 		{
-			u_int16_t group;
+			uint16_t group;
 
 			if (!this->ph1->create_hasher(this->ph1))
 			{
@@ -311,6 +348,8 @@ METHOD(task_t, build_i, status_t,
 				return send_notify(this, AUTHENTICATION_FAILED);
 			}
 
+			add_initial_contact(this, message, id);
+
 			this->state = MM_AUTH;
 			return NEED_MORE;
 		}
@@ -328,7 +367,7 @@ METHOD(task_t, process_r, status_t,
 		{
 			linked_list_t *list;
 			sa_payload_t *sa_payload;
-			bool private;
+			bool private, prefer_configured;
 
 			this->ike_cfg = this->ike_sa->get_ike_cfg(this->ike_sa);
 			DBG0(DBG_IKE, "%H is initiating a Main Mode IKE_SA",
@@ -353,9 +392,11 @@ METHOD(task_t, process_r, status_t,
 
 			list = sa_payload->get_proposals(sa_payload);
 			private = this->ike_sa->supports_extension(this->ike_sa,
-														   EXT_STRONGSWAN);
+													   EXT_STRONGSWAN);
+			prefer_configured = lib->settings->get_bool(lib->settings,
+							"%s.prefer_configured_proposals", TRUE, lib->ns);
 			this->proposal = this->ike_cfg->select_proposal(this->ike_cfg,
-															list, private);
+											list, private, prefer_configured);
 			list->destroy_offset(list, offsetof(proposal_t, destroy));
 			if (!this->proposal)
 			{
@@ -372,7 +413,7 @@ METHOD(task_t, process_r, status_t,
 		}
 		case MM_SA:
 		{
-			u_int16_t group;
+			uint16_t group;
 
 			if (!this->ph1->create_hasher(this->ph1))
 			{
@@ -588,7 +629,7 @@ METHOD(task_t, process_i, status_t,
 			linked_list_t *list;
 			sa_payload_t *sa_payload;
 			auth_method_t method;
-			u_int32_t lifetime;
+			uint32_t lifetime;
 			bool private;
 
 			sa_payload = (sa_payload_t*)message->get_payload(message,
@@ -602,7 +643,7 @@ METHOD(task_t, process_i, status_t,
 			private = this->ike_sa->supports_extension(this->ike_sa,
 														   EXT_STRONGSWAN);
 			this->proposal = this->ike_cfg->select_proposal(this->ike_cfg,
-															list, private);
+															list, private, TRUE);
 			list->destroy_offset(list, offsetof(proposal_t, destroy));
 			if (!this->proposal)
 			{

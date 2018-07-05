@@ -67,11 +67,11 @@ struct private_gcm_aead_t {
 #if ULONG_MAX == 18446744073709551615UL && defined(htobe64)
 #	define htobeword htobe64
 #	define bewordtoh be64toh
-#	define SHIFT_WORD_TYPE u_int64_t
+#	define SHIFT_WORD_TYPE uint64_t
 #else
 #	define htobeword htonl
 #	define bewordtoh ntohl
-#	define SHIFT_WORD_TYPE u_int32_t
+#	define SHIFT_WORD_TYPE uint32_t
 #endif
 
 /**
@@ -276,7 +276,7 @@ static bool verify_icv(private_gcm_aead_t *this, chunk_t assoc, chunk_t crypt,
 	char tmp[this->icv_size];
 
 	return create_icv(this, assoc, crypt, j, tmp) &&
-		   memeq(tmp, icv, this->icv_size);
+		   memeq_const(tmp, icv, this->icv_size);
 }
 
 METHOD(aead_t, encrypt, bool,

@@ -76,7 +76,7 @@ METHOD(eap_method_t, process, status_t,
 }
 
 METHOD(eap_method_t, get_type, eap_type_t,
-	private_eap_ttls_t *this, u_int32_t *vendor)
+	private_eap_ttls_t *this, uint32_t *vendor)
 {
 	*vendor = 0;
 	return EAP_TTLS;
@@ -93,14 +93,14 @@ METHOD(eap_method_t, get_msk, status_t,
 	return FAILED;
 }
 
-METHOD(eap_method_t, get_identifier, u_int8_t,
+METHOD(eap_method_t, get_identifier, uint8_t,
 	private_eap_ttls_t *this)
 {
 	return this->tls_eap->get_identifier(this->tls_eap);
 }
 
 METHOD(eap_method_t, set_identifier, void,
-	private_eap_ttls_t *this, u_int8_t identifier)
+	private_eap_ttls_t *this, uint8_t identifier)
 {
 	this->tls_eap->set_identifier(this->tls_eap, identifier);
 }
@@ -109,6 +109,12 @@ METHOD(eap_method_t, is_mutual, bool,
 	private_eap_ttls_t *this)
 {
 	return TRUE;
+}
+
+METHOD(eap_method_t, get_auth, auth_cfg_t*,
+	private_eap_ttls_t *this)
+{
+	return this->tls_eap->get_auth(this->tls_eap);
 }
 
 METHOD(eap_method_t, destroy, void,
@@ -141,6 +147,7 @@ static eap_ttls_t *eap_ttls_create(identification_t *server,
 				.get_identifier = _get_identifier,
 				.set_identifier = _set_identifier,
 				.get_msk = _get_msk,
+				.get_auth = _get_auth,
 				.destroy = _destroy,
 			},
 		},

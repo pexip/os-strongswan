@@ -41,7 +41,7 @@ struct private_tkm_diffie_hellman_t {
 	/**
 	 * Diffie Hellman group number.
 	 */
-	u_int16_t group;
+	diffie_hellman_group_t group;
 
 	/**
 	 * Diffie Hellman public value.
@@ -55,30 +55,29 @@ struct private_tkm_diffie_hellman_t {
 
 };
 
-METHOD(diffie_hellman_t, get_my_public_value, void,
+METHOD(diffie_hellman_t, get_my_public_value, bool,
 	private_tkm_diffie_hellman_t *this, chunk_t *value)
 {
 	sequence_to_chunk(this->pubvalue.data, this->pubvalue.size, value);
+	return TRUE;
 }
 
-METHOD(diffie_hellman_t, get_shared_secret, status_t,
+METHOD(diffie_hellman_t, get_shared_secret, bool,
 	private_tkm_diffie_hellman_t *this, chunk_t *secret)
 {
 	*secret = chunk_empty;
-	return SUCCESS;
+	return TRUE;
 }
 
 
-METHOD(diffie_hellman_t, set_other_public_value, void,
+METHOD(diffie_hellman_t, set_other_public_value, bool,
 	private_tkm_diffie_hellman_t *this, chunk_t value)
 {
-	// TODO: unvoid this function
-
 	dh_pubvalue_type othervalue;
 	othervalue.size = value.len;
 	memcpy(&othervalue.data, value.ptr, value.len);
 
-	ike_dh_generate_key(this->context_id, othervalue);
+	return ike_dh_generate_key(this->context_id, othervalue) == TKM_OK;
 }
 
 METHOD(diffie_hellman_t, get_dh_group, diffie_hellman_group_t,
@@ -124,7 +123,7 @@ int register_dh_mapping()
 	int count, i;
 	char *iana_id_str, *tkm_id_str;
 	diffie_hellman_group_t *iana_id;
-	u_int64_t *tkm_id;
+	uint64_t *tkm_id;
 	hashtable_t *map;
 	enumerator_t *enumerator;
 
@@ -139,7 +138,7 @@ int register_dh_mapping()
 	{
 		iana_id = malloc_thing(diffie_hellman_group_t);
 		*iana_id = settings_value_as_int(iana_id_str, 0);
-		tkm_id = malloc_thing(u_int64_t);
+		tkm_id = malloc_thing(uint64_t);
 		*tkm_id = settings_value_as_int(tkm_id_str, 0);
 
 		map->put(map, iana_id, tkm_id);
@@ -228,7 +227,7 @@ tkm_diffie_hellman_t *tkm_diffie_hellman_create(diffie_hellman_group_t group)
 		return NULL;
 	}
 
-	u_int64_t *dha_id = group_map->get(group_map, &group);
+	uint64_t *dha_id = group_map->get(group_map, &group);
 	if (!dha_id)
 	{
 		free(this);

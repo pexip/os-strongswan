@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007 Tobias Brunner
+ * Copyright (C) 2007-2015 Tobias Brunner
  * Copyright (C) 2005-2006 Martin Willi
  * Copyright (C) 2005 Jan Hutter
  * Hochschule fuer Technik Rapperswil
@@ -264,6 +264,11 @@ enum payload_type_t {
 	PL_HEADER = 256,
 
 	/**
+	 * Used to handle unknown or invalid payload types.
+	 */
+	PL_UNKNOWN,
+
+	/**
 	 * PLV2_PROPOSAL_SUBSTRUCTURE, IKEv2 proposals in a SA payload.
 	 */
 	PLV2_PROPOSAL_SUBSTRUCTURE,
@@ -405,9 +410,10 @@ payload_t *payload_create(payload_type_t type);
  * Check if a specific payload is implemented, or handled as unknown payload.
  *
  * @param type		type of the payload to check
+ * @param maj_ver	major IKE version (use 0 to skip version check)
  * @return			FALSE if payload type handled as unknown payload
  */
-bool payload_is_known(payload_type_t type);
+bool payload_is_known(payload_type_t type, uint8_t maj_ver);
 
 /**
  * Get the value field in a payload using encoding rules.

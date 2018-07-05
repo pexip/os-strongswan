@@ -340,7 +340,7 @@ static const int days[] = { 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 33
 static const int tm_leap_1970 = 477;
 
 /**
- * Converts ASN.1 UTCTIME or GENERALIZEDTIME into calender time
+ * Converts ASN.1 UTCTIME or GENERALIZEDTIME into calendar time
  */
 time_t asn1_to_time(const chunk_t *utctime, asn1_t type)
 {
@@ -592,15 +592,15 @@ bool asn1_parse_simple_object(chunk_t *object, asn1_t type, u_int level, const c
 /*
  * Described in header
  */
-u_int64_t asn1_parse_integer_uint64(chunk_t blob)
+uint64_t asn1_parse_integer_uint64(chunk_t blob)
 {
-	u_int64_t val = 0;
+	uint64_t val = 0;
 	int i;
 
 	for (i = 0; i < blob.len; i++)
 	{	/* if it is longer than 8 bytes, we just use the 8 LSBs */
 		val <<= 8;
-		val |= (u_int64_t)blob.ptr[i];
+		val |= (uint64_t)blob.ptr[i];
 	}
 	return val;
 }
@@ -913,6 +913,10 @@ static const asn1Object_t timeObjects[] = {
 	{ 0, "end opt",			ASN1_EOC,				ASN1_END			}, /* 3 */
 	{ 0, "exit",			ASN1_EOC,				ASN1_EXIT			}
 };
+#ifdef TIME_UTC
+/* used by C11 timespec_get(), <time.h> */
+# undef TIME_UTC
+#endif
 #define TIME_UTC			0
 #define TIME_GENERALIZED	2
 

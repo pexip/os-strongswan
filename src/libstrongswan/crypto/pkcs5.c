@@ -41,7 +41,7 @@ struct private_pkcs5_t {
 	/**
 	 * Iterations for key derivation
 	 */
-	u_int64_t iterations;
+	uint64_t iterations;
 
 	/**
 	 * Encryption algorithm
@@ -108,13 +108,13 @@ struct private_pkcs5_t {
  * Verify padding of decrypted blob.
  * Length of blob is adjusted accordingly.
  */
-static bool verify_padding(chunk_t *blob)
+static bool verify_padding(crypter_t *crypter, chunk_t *blob)
 {
-	u_int8_t padding, count;
+	uint8_t padding, count;
 
 	padding = count = blob->ptr[blob->len - 1];
 
-	if (padding > 8)
+	if (padding > crypter->get_block_size(crypter))
 	{
 		return FALSE;
 	}
@@ -153,7 +153,7 @@ static bool decrypt_generic(private_pkcs5_t *this, chunk_t password,
 		return FALSE;
 	}
 	memwipe(keymat.ptr, keymat.len);
-	if (verify_padding(decrypted))
+	if (verify_padding(this->crypter, decrypted))
 	{
 		return TRUE;
 	}
@@ -181,10 +181,10 @@ static bool pkcs12_kdf(private_pkcs5_t *this, chunk_t password, chunk_t keymat)
  * Function F of PBKDF2
  */
 static bool pbkdf2_f(chunk_t block, prf_t *prf, chunk_t seed,
-					 u_int64_t iterations)
+					 uint64_t iterations)
 {
 	chunk_t u;
-	u_int64_t i;
+	uint64_t i;
 
 	u = chunk_alloca(prf->get_block_size(prf));
 	if (!prf->get_bytes(prf, seed, u.ptr))
@@ -212,7 +212,7 @@ static bool pbkdf2(private_pkcs5_t *this, chunk_t password, chunk_t key)
 	prf_t *prf;
 	chunk_t keymat, block, seed;
 	size_t blocks;
-	u_int32_t i = 0;
+	uint32_t i = 0;
 
 	prf = this->data.pbes2.prf;
 
@@ -247,7 +247,7 @@ static bool pbkdf1(private_pkcs5_t *this, chunk_t password, chunk_t key)
 {
 	hasher_t *hasher;
 	chunk_t hash;
-	u_int64_t i;
+	uint64_t i;
 
 	hasher = this->data.pbes1.hasher;
 
@@ -504,6 +504,7 @@ static bool parse_pbes2_params(private_pkcs5_t *this, chunk_t blob, int level0)
 {
 	asn1_parser_t *parser;
 	chunk_t object, params;
+	size_t keylen;
 	int objectID;
 	bool success = FALSE;
 
@@ -533,20 +534,35 @@ static bool parse_pbes2_params(private_pkcs5_t *this, chunk_t blob, int level0)
 			{
 				int oid = asn1_parse_algorithmIdentifier(object,
 									parser->get_level(parser) + 1, &params);
-				if (oid != OID_3DES_EDE_CBC)
+				this->encr = encryption_algorithm_from_oid(oid, &keylen);
+				if (this->encr == ENCR_UNDEFINED)
 				{	/* unsupported encryption scheme */
 					goto end;
 				}
-				if (this->keylen <= 0)
-				{	/* default key length for DES-EDE3-CBC-Pad */
-					this->keylen = 24;
+				/* prefer encoded key length */
+				this->keylen = this->keylen ?: keylen / 8;
+				if (!this->keylen)
+				{	/* set default key length for known algorithms */
+					switch (this->encr)
+					{
+						case ENCR_DES:
+							this->keylen = 8;
+							break;
+						case ENCR_3DES:
+							this->keylen = 24;
+							break;
+						case ENCR_BLOWFISH:
+							this->keylen = 16;
+							break;
+						default:
+							goto end;
+					}
 				}
 				if (!asn1_parse_simple_object(&params, ASN1_OCTET_STRING,
 									parser->get_level(parser) + 1, "IV"))
 				{
 					goto end;
 				}
-				this->encr = ENCR_3DES;
 				this->data.pbes2.iv = chunk_clone(params);
 				break;
 			}

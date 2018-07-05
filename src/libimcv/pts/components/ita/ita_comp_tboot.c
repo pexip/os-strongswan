@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2014 Andreas Steffen
+ * Copyright (C) 2011-2015 Andreas Steffen
  * HSR Hochschule fuer Technik Rapperswil
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -43,7 +43,7 @@ struct pts_ita_comp_tboot_t {
 	/**
 	 * Sub-component depth
 	 */
-	u_int32_t depth;
+	uint32_t depth;
 
 	/**
 	 * PTS measurement database
@@ -59,11 +59,6 @@ struct pts_ita_comp_tboot_t {
 	 * Primary key for Component Functional Name database entry
 	 */
 	int cid;
-
-	/**
-	 * Primary key for AIK database entry
-	 */
-	int kid;
 
 	/**
 	 * Component is registering measurements
@@ -98,20 +93,20 @@ METHOD(pts_component_t, get_comp_func_name, pts_comp_func_name_t*,
 	return this->name;
 }
 
-METHOD(pts_component_t, get_evidence_flags, u_int8_t,
+METHOD(pts_component_t, get_evidence_flags, uint8_t,
 	pts_ita_comp_tboot_t *this)
 {
 	return PTS_REQ_FUNC_COMP_EVID_PCR;
 }
 
-METHOD(pts_component_t, get_depth, u_int32_t,
+METHOD(pts_component_t, get_depth, uint32_t,
 	pts_ita_comp_tboot_t *this)
 {
 	return this->depth;
 }
 
 METHOD(pts_component_t, measure, status_t,
-	pts_ita_comp_tboot_t *this, u_int8_t qualifier, pts_t *pts,
+	pts_ita_comp_tboot_t *this, uint8_t qualifier, pts_t *pts,
 	pts_comp_evidence_t **evidence)
 
 {
@@ -122,7 +117,7 @@ METHOD(pts_component_t, measure, status_t,
 	pts_comp_evidence_t *evid;
 	char *meas_hex, *pcr_before_hex, *pcr_after_hex;
 	chunk_t measurement, pcr_before, pcr_after;
-	u_int32_t extended_pcr;
+	uint32_t extended_pcr;
 
 	switch (this->seq_no++)
 	{
@@ -188,11 +183,11 @@ METHOD(pts_component_t, measure, status_t,
 }
 
 METHOD(pts_component_t, verify, status_t,
-	pts_ita_comp_tboot_t *this, u_int8_t qualifier,pts_t *pts,
+	pts_ita_comp_tboot_t *this, uint8_t qualifier,pts_t *pts,
 	pts_comp_evidence_t *evidence)
 {
 	bool has_pcr_info;
-	u_int32_t extended_pcr, vid, name;
+	uint32_t extended_pcr, vid, name;
 	enum_name_t *names;
 	pts_meas_algorithms_t algo;
 	pts_pcr_transform_t transform;
@@ -243,7 +238,7 @@ METHOD(pts_component_t, verify, status_t,
 	else
 	{
 		status = this->pts_db->check_comp_measurement(this->pts_db,
-								measurement, this->cid, this->kid,
+								measurement, this->cid, this->aik_id,
 								++this->seq_no, extended_pcr, algo);
 		if (status != SUCCESS)
 		{
@@ -254,7 +249,7 @@ METHOD(pts_component_t, verify, status_t,
 	has_pcr_info = evidence->get_pcr_info(evidence, &pcr_before, &pcr_after);
 	if (has_pcr_info)
 	{
-		if (!chunk_equals(pcr_before, pcrs->get(pcrs, extended_pcr)))
+		if (!chunk_equals_const(pcr_before, pcrs->get(pcrs, extended_pcr)))
 		{
 			DBG1(DBG_PTS, "PCR %2u: pcr_before is not equal to register value",
 						   extended_pcr);
@@ -269,7 +264,7 @@ METHOD(pts_component_t, verify, status_t,
 }
 
 METHOD(pts_component_t, finalize, bool,
-	pts_ita_comp_tboot_t *this, u_int8_t qualifier, bio_writer_t *result)
+	pts_ita_comp_tboot_t *this, uint8_t qualifier, bio_writer_t *result)
 {
 	char result_buf[BUF_LEN];
 
@@ -309,7 +304,7 @@ METHOD(pts_component_t, destroy, void,
 	   pts_ita_comp_tboot_t *this)
 {
 	int count;
-	u_int32_t vid, name;
+	uint32_t vid, name;
 	enum_name_t *names;
 
 	if (ref_put(&this->ref))
@@ -333,7 +328,7 @@ METHOD(pts_component_t, destroy, void,
 /**
  * See header
  */
-pts_component_t *pts_ita_comp_tboot_create(u_int32_t depth,
+pts_component_t *pts_ita_comp_tboot_create(uint32_t depth,
 										   pts_database_t *pts_db)
 {
 	pts_ita_comp_tboot_t *this;
@@ -359,4 +354,3 @@ pts_component_t *pts_ita_comp_tboot_create(u_int32_t depth,
 
 	return &this->public;
 }
-

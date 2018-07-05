@@ -75,8 +75,8 @@ METHOD(tls_application_t, process, status_t,
 	eap_packet_t *pkt;
 	eap_code_t code;
 	eap_type_t type, received_type;
-	u_int32_t vendor, received_vendor;
-	u_int16_t eap_len;
+	uint32_t vendor, received_vendor;
+	uint16_t eap_len;
 	size_t eap_pos = 0;
 	bool concatenated = FALSE;
 
@@ -112,6 +112,13 @@ METHOD(tls_application_t, process, status_t,
 				eap_data = avp_data;
 				break;
 			}
+			else if (eap_len > reader->remaining(reader) + avp_data.len)
+			{
+				/* rough size check, ignoring AVP headers in remaining data */
+				DBG1(DBG_IKE, "EAP packet too large for EAP-TTLS AVP(s)");
+				chunk_free(&avp_data);
+				return FAILED;
+			}
 			else if (avp_data.len == MAX_RADIUS_ATTRIBUTE_SIZE)
 			{
 				/* non-standard: EAP packet segmented into multiple AVPs */
@@ -128,7 +135,7 @@ METHOD(tls_application_t, process, status_t,
 
 		if (avp_data.len > eap_data.len - eap_pos)
 		{
-			DBG1(DBG_IKE, "AVP size to large to fit into EAP packet");
+			DBG1(DBG_IKE, "AVP size too large to fit into EAP packet");
 			chunk_free(&avp_data);
 			chunk_free(&eap_data);
 			return FAILED;
@@ -233,7 +240,7 @@ METHOD(tls_application_t, build, status_t,
 	chunk_t data;
 	eap_code_t code;
 	eap_type_t type;
-	u_int32_t vendor;
+	uint32_t vendor;
 
 	if (this->method == NULL && this->start_phase2)
 	{

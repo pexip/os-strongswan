@@ -356,6 +356,7 @@ static plugin_entry_t *load_plugin(private_plugin_loader_t *this, char *name,
 {
 	plugin_entry_t *entry;
 	void *handle;
+	int flag = RTLD_LAZY;
 
 	switch (create_plugin(this, RTLD_DEFAULT, name, FALSE, critical, &entry))
 	{
@@ -380,7 +381,19 @@ static plugin_entry_t *load_plugin(private_plugin_loader_t *this, char *name,
 			return NULL;
 		}
 	}
-	handle = dlopen(file, RTLD_LAZY);
+	if (lib->settings->get_bool(lib->settings, "%s.dlopen_use_rtld_now",
+								lib->ns, FALSE))
+	{
+		flag = RTLD_NOW;
+	}
+#ifdef RTLD_NODELETE
+	/* If supported, do not unload the library when unloading a plugin. It
+	 * really doesn't matter in productive systems, but causes many (dependency)
+	 * library reloads during unit tests. Some libraries can't handle that, e.g.
+	 * GnuTLS leaks file descriptors in its library load/unload functions. */
+	flag |= RTLD_NODELETE;
+#endif
+	handle = dlopen(file, flag);
 	if (handle == NULL)
 	{
 		DBG1(DBG_LIB, "plugin '%s' failed to load: %s", name, dlerror());
@@ -1011,6 +1024,15 @@ static int plugin_priority_cmp(const plugin_priority_t *a,
 	return diff;
 }
 
+/**
+ * Convert enumerated plugin_priority_t to a plugin name
+ */
+static bool plugin_priority_filter(void *null, plugin_priority_t **prio,
+						   char **name)
+{
+	*name = (*prio)->name;
+	return TRUE;
+}
 
 /**
  * Determine the list of plugins to load via load option in each plugin's
@@ -1023,12 +1045,7 @@ static char *modular_pluginlist(char *list)
 	plugin_priority_t item, *current, found;
 	char *plugin, *plugins = NULL;
 	int i = 0, max_prio;
-
-	if (!lib->settings->get_bool(lib->settings, "%s.load_modular", FALSE,
-								 lib->ns))
-	{
-		return list;
-	}
+	bool load_def = FALSE;
 
 	given = array_create(sizeof(plugin_priority_t), 0);
 	final = array_create(sizeof(plugin_priority_t), 0);
@@ -1045,16 +1062,26 @@ static char *modular_pluginlist(char *list)
 	/* the maximum priority used for plugins not found in this list */
 	max_prio = i + 1;
 
-	enumerator = lib->settings->create_section_enumerator(lib->settings,
+	if (lib->settings->get_bool(lib->settings, "%s.load_modular", FALSE,
+								lib->ns))
+	{
+		enumerator = lib->settings->create_section_enumerator(lib->settings,
 														"%s.plugins", lib->ns);
+	}
+	else
+	{
+		enumerator = enumerator_create_filter(array_create_enumerator(given),
+									(void*)plugin_priority_filter, NULL, NULL);
+		load_def = TRUE;
+	}
 	while (enumerator->enumerate(enumerator, &plugin))
 	{
 		item.prio = lib->settings->get_int(lib->settings,
-								"%s.plugins.%s.load", 0, lib->ns, plugin);
+							"%s.plugins.%s.load", 0, lib->ns, plugin);
 		if (!item.prio)
 		{
 			if (!lib->settings->get_bool(lib->settings,
-								"%s.plugins.%s.load", FALSE, lib->ns, plugin))
+							"%s.plugins.%s.load", load_def, lib->ns, plugin))
 			{
 				continue;
 			}
@@ -1070,7 +1097,6 @@ static char *modular_pluginlist(char *list)
 		array_insert(final, ARRAY_TAIL, &item);
 	}
 	enumerator->destroy(enumerator);
-	array_destroy_function(given, (void*)plugin_priority_free, NULL);
 
 	array_sort(final, (void*)plugin_priority_cmp, NULL);
 
@@ -1087,6 +1113,7 @@ static char *modular_pluginlist(char *list)
 		free(prev);
 	}
 	enumerator->destroy(enumerator);
+	array_destroy_function(given, (void*)plugin_priority_free, NULL);
 	array_destroy(final);
 	return plugins;
 }
@@ -1283,9 +1310,9 @@ METHOD(plugin_loader_t, status, void,
 
 		if (this->stats.failed)
 		{
-			dbg(DBG_LIB, level, "unable to load %d plugin feature%s (%d due to "
-				"unmet dependencies)", this->stats.failed,
-				this->stats.failed == 1 ? "" : "s", this->stats.depends);
+			DBG2(DBG_LIB, "unable to load %d plugin feature%s (%d due to unmet "
+				 "dependencies)", this->stats.failed,
+				 this->stats.failed == 1 ? "" : "s", this->stats.depends);
 		}
 	}
 }

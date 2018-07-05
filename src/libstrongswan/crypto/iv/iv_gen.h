@@ -38,8 +38,8 @@ struct iv_gen_t {
 	 * @param buffer	pointer where the generated IV will be written
 	 * @return			TRUE if IV allocation was successful, FALSE otherwise
 	 */
-	bool (*get_iv)(iv_gen_t *this, u_int64_t seq, size_t size,
-				   u_int8_t *buffer) __attribute__((warn_unused_result));
+	bool (*get_iv)(iv_gen_t *this, uint64_t seq, size_t size,
+				   uint8_t *buffer) __attribute__((warn_unused_result));
 
 	/**
 	 * Generates an IV and allocates space for it.
@@ -49,7 +49,7 @@ struct iv_gen_t {
 	 * @param chunk		chunk which will hold the generated IV
 	 * @return			TRUE if IV allocation was successful, FALSE otherwise
 	 */
-	bool (*allocate_iv)(iv_gen_t *this, u_int64_t seq, size_t size,
+	bool (*allocate_iv)(iv_gen_t *this, uint64_t seq, size_t size,
 						chunk_t *chunk) __attribute__((warn_unused_result));
 
 	/**
@@ -57,5 +57,13 @@ struct iv_gen_t {
 	 */
 	void (*destroy)(iv_gen_t *this);
 };
+
+/**
+ * Select an IV generator for a given encryption algorithm.
+ *
+ * @param alg			encryption algorithm
+ * @return				IV generator
+ */
+iv_gen_t* iv_gen_create_for_alg(encryption_algorithm_t alg);
 
 #endif /** IV_GEN_H_ @}*/

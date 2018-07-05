@@ -30,14 +30,14 @@ struct private_inactivity_job_t {
 	inactivity_job_t public;
 
 	/**
-	 * Reqid of CHILD_SA to check
+	 * Unique CHILD_SA identifier to check
 	 */
-	u_int32_t reqid;
+	uint32_t id;
 
 	/**
 	 * Inactivity timeout
 	 */
-	u_int32_t timeout;
+	uint32_t timeout;
 
 	/**
 	 * Close IKE_SA if last remaining CHILD inactive?
@@ -55,23 +55,23 @@ METHOD(job_t, execute, job_requeue_t,
 	private_inactivity_job_t *this)
 {
 	ike_sa_t *ike_sa;
-	u_int32_t reschedule = 0;
+	uint32_t reschedule = 0;
 
-	ike_sa = charon->ike_sa_manager->checkout_by_id(charon->ike_sa_manager,
-													this->reqid, TRUE);
+	ike_sa = charon->child_sa_manager->checkout_by_id(charon->child_sa_manager,
+													  this->id, NULL);
 	if (ike_sa)
 	{
 		enumerator_t *enumerator;
 		child_sa_t *child_sa;
-		u_int32_t delete = 0;
+		uint32_t delete = 0;
 		protocol_id_t proto = 0;
 		int children = 0;
 		status_t status = SUCCESS;
 
 		enumerator = ike_sa->create_child_sa_enumerator(ike_sa);
-		while (enumerator->enumerate(enumerator, (void**)&child_sa))
+		while (enumerator->enumerate(enumerator, &child_sa))
 		{
-			if (child_sa->get_reqid(child_sa) == this->reqid)
+			if (child_sa->get_unique_id(child_sa) == this->id)
 			{
 				time_t in, out, install, diff;
 
@@ -136,7 +136,7 @@ METHOD(job_t, get_priority, job_priority_t,
 /**
  * See header
  */
-inactivity_job_t *inactivity_job_create(u_int32_t reqid, u_int32_t timeout,
+inactivity_job_t *inactivity_job_create(uint32_t unique_id, uint32_t timeout,
 										bool close_ike)
 {
 	private_inactivity_job_t *this;
@@ -149,7 +149,7 @@ inactivity_job_t *inactivity_job_create(u_int32_t reqid, u_int32_t timeout,
 				.destroy = _destroy,
 			},
 		},
-		.reqid = reqid,
+		.id = unique_id,
 		.timeout = timeout,
 		.close_ike = close_ike,
 	);

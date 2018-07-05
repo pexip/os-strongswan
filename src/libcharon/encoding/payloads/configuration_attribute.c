@@ -48,12 +48,12 @@ struct private_configuration_attribute_t {
 	/**
 	 * Type of the attribute.
 	 */
-	u_int16_t attr_type;
+	uint16_t attr_type;
 
 	/**
 	 * Length of the attribute, value if af_flag set.
 	 */
-	u_int16_t length_or_value;
+	uint16_t length_or_value;
 
 	/**
 	 * Attribute value as chunk.
@@ -132,6 +132,7 @@ METHOD(payload_t, verify, status_t,
 		case INTERNAL_IP4_NBNS:
 		case INTERNAL_ADDRESS_EXPIRY:
 		case INTERNAL_IP4_DHCP:
+		case P_CSCF_IP4_ADDRESS:
 			if (this->length_or_value != 0 && this->length_or_value != 4)
 			{
 				failed = TRUE;
@@ -144,6 +145,13 @@ METHOD(payload_t, verify, status_t,
 			}
 			break;
 		case INTERNAL_IP6_ADDRESS:
+			if (this->type == PLV1_CONFIGURATION_ATTRIBUTE &&
+				this->length_or_value == 16)
+			{	/* 16 bytes are correct for IKEv1, but older releases sent a
+				 * prefix byte so we still accept 0 or 17 as in IKEv2 */
+				break;
+			}
+			/* fall-through */
 		case INTERNAL_IP6_SUBNET:
 			if (this->length_or_value != 0 && this->length_or_value != 17)
 			{
@@ -153,6 +161,7 @@ METHOD(payload_t, verify, status_t,
 		case INTERNAL_IP6_DNS:
 		case INTERNAL_IP6_NBNS:
 		case INTERNAL_IP6_DHCP:
+		case P_CSCF_IP6_ADDRESS:
 			if (this->length_or_value != 0 && this->length_or_value != 16)
 			{
 				failed = TRUE;
@@ -263,7 +272,7 @@ METHOD(configuration_attribute_t, get_chunk, chunk_t,
 	return this->value;
 }
 
-METHOD(configuration_attribute_t, get_value, u_int16_t,
+METHOD(configuration_attribute_t, get_value, uint16_t,
 	private_configuration_attribute_t *this)
 {
 	if (this->af_flag)
@@ -319,7 +328,7 @@ configuration_attribute_t *configuration_attribute_create_chunk(
 
 	this = (private_configuration_attribute_t*)
 							configuration_attribute_create(type);
-	this->attr_type = ((u_int16_t)attr_type) & 0x7FFF;
+	this->attr_type = ((uint16_t)attr_type) & 0x7FFF;
 	this->value = chunk_clone(chunk);
 	this->length_or_value = chunk.len;
 
@@ -330,13 +339,13 @@ configuration_attribute_t *configuration_attribute_create_chunk(
  * Described in header.
  */
 configuration_attribute_t *configuration_attribute_create_value(
-					configuration_attribute_type_t attr_type, u_int16_t value)
+					configuration_attribute_type_t attr_type, uint16_t value)
 {
 	private_configuration_attribute_t *this;
 
 	this = (private_configuration_attribute_t*)
 					configuration_attribute_create(PLV1_CONFIGURATION_ATTRIBUTE);
-	this->attr_type = ((u_int16_t)attr_type) & 0x7FFF;
+	this->attr_type = ((uint16_t)attr_type) & 0x7FFF;
 	this->length_or_value = value;
 	this->af_flag = TRUE;
 

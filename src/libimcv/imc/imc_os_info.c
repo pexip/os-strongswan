@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2014 Andreas Steffen
+ * Copyright (C) 2012-2015 Andreas Steffen
  * HSR Hochschule fuer Technik Rapperswil
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -69,7 +69,7 @@ METHOD(imc_os_info_t, get_name, chunk_t,
 }
 
 METHOD(imc_os_info_t, get_numeric_version, void,
-	private_imc_os_info_t *this, u_int32_t *major, u_int32_t *minor)
+	private_imc_os_info_t *this, uint32_t *major, uint32_t *minor)
 {
 	u_char *pos;
 
@@ -88,6 +88,14 @@ METHOD(imc_os_info_t, get_version, chunk_t,
 	private_imc_os_info_t *this)
 {
 	return this->version;
+}
+
+METHOD(imc_os_info_t, get_default_pwd_status, bool,
+	private_imc_os_info_t *this)
+{
+	/* As an option the default password status can be configured manually */
+	return lib->settings->get_bool(lib->settings,
+					"%s.imcv.os_info.default_password_enabled", FALSE, lib->ns);
 }
 
 #ifdef WIN32
@@ -375,6 +383,7 @@ static bool extract_platform_info(os_type_t *type, chunk_t *name,
 	FILE *file;
 	u_char buf[BUF_LEN], *pos = buf;
 	int len = BUF_LEN - 1;
+	long file_len;
 	os_type_t os_type = OS_TYPE_UNKNOWN;
 	chunk_t os_name = chunk_empty;
 	chunk_t os_version = chunk_empty;
@@ -417,15 +426,22 @@ static bool extract_platform_info(os_type_t *type, chunk_t *name,
 
 		/* read release file into buffer */
 		fseek(file, 0, SEEK_END);
-		len = min(ftell(file), len);
+		file_len = ftell(file);
+		if (file_len < 0)
+		{
+			DBG1(DBG_IMC, "failed to determine size of \"%s\"", releases[i]);
+			fclose(file);
+			return FALSE;
+		}
+		len = min(file_len, len);
 		rewind(file);
-		buf[len] = '\0';
 		if (fread(buf, 1, len, file) != len)
 		{
 			DBG1(DBG_IMC, "failed to read file \"%s\"", releases[i]);
 			fclose(file);
 			return FALSE;
 		}
+		buf[len] = '\0';
 		fclose(file);
 
 		DBG1(DBG_IMC, "processing \"%s\" file", releases[i]);
@@ -586,9 +602,9 @@ imc_os_info_t *imc_os_info_create(void)
 
 	/* As an option OS name and OS version can be configured manually */
 	name.ptr = lib->settings->get_str(lib->settings,
-									  "%s.imcv.imc_os_info.name", NULL, lib->ns);
+									  "%s.imcv.os_info.name", NULL, lib->ns);
 	version.ptr = lib->settings->get_str(lib->settings,
-									  "%s.imcv.imc_os_info.version", NULL, lib->ns);
+									  "%s.imcv.os_info.version", NULL, lib->ns);
 	if (name.ptr && version.ptr)
 	{
 		name.len = strlen(name.ptr);
@@ -618,6 +634,7 @@ imc_os_info_t *imc_os_info_create(void)
 			.get_numeric_version = _get_numeric_version,
 			.get_version = _get_version,
 			.get_fwd_status = _get_fwd_status,
+			.get_default_pwd_status = _get_default_pwd_status,
 			.get_uptime = _get_uptime,
 			.get_setting = _get_setting,
 			.create_package_enumerator = _create_package_enumerator,

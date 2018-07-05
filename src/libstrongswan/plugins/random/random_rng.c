@@ -41,7 +41,7 @@ struct private_random_rng_t {
 };
 
 METHOD(rng_t, get_bytes, bool,
-	private_random_rng_t *this, size_t bytes, u_int8_t *buffer)
+	private_random_rng_t *this, size_t bytes, uint8_t *buffer)
 {
 	size_t done;
 	ssize_t got;
@@ -56,6 +56,7 @@ METHOD(rng_t, get_bytes, bool,
 			DBG1(DBG_LIB, "reading from random FD %d failed: %s, retrying...",
 				 this->fd, strerror(errno));
 			sleep(1);
+			continue;
 		}
 		done += got;
 	}

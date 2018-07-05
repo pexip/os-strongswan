@@ -20,7 +20,6 @@
 
 #include "receiver.h"
 
-#include <hydra.h>
 #include <daemon.h>
 #include <network/socket.h>
 #include <processing/jobs/job.h>
@@ -82,17 +81,17 @@ struct private_receiver_t {
 	/**
 	 * how many times we have used "secret" so far
 	 */
-	u_int32_t secret_used;
+	uint32_t secret_used;
 
 	/**
 	 * time we did the cookie switch
 	 */
-	u_int32_t secret_switch;
+	uint32_t secret_switch;
 
 	/**
 	 * time offset to use, hides our system time
 	 */
-	u_int32_t secret_offset;
+	uint32_t secret_offset;
 
 	/**
 	 * the RNG to use for secret generation
@@ -107,7 +106,7 @@ struct private_receiver_t {
 	/**
 	 * require cookies after this many half open IKE_SAs
 	 */
-	u_int32_t cookie_threshold;
+	uint32_t cookie_threshold;
 
 	/**
 	 * timestamp of last cookie requested
@@ -117,7 +116,7 @@ struct private_receiver_t {
 	/**
 	 * how many half open IKE_SAs per peer before blocking
 	 */
-	u_int32_t block_threshold;
+	uint32_t block_threshold;
 
 	/**
 	 * Drop IKE_SA_INIT requests if processor job load exceeds this limit
@@ -193,9 +192,9 @@ static void send_notify(message_t *request, int major, exchange_type_t exchange,
  * build a cookie
  */
 static bool cookie_build(private_receiver_t *this, message_t *message,
-						 u_int32_t t, chunk_t secret, chunk_t *cookie)
+						 uint32_t t, chunk_t secret, chunk_t *cookie)
 {
-	u_int64_t spi = message->get_initiator_spi(message);
+	uint64_t spi = message->get_initiator_spi(message);
 	host_t *ip = message->get_source(message);
 	chunk_t input, hash;
 
@@ -217,14 +216,14 @@ static bool cookie_build(private_receiver_t *this, message_t *message,
 static bool cookie_verify(private_receiver_t *this, message_t *message,
 						  chunk_t cookie)
 {
-	u_int32_t t, now;
+	uint32_t t, now;
 	chunk_t reference;
 	chunk_t secret;
 
 	now = time_monotonic(NULL);
-	t = *(u_int32_t*)cookie.ptr;
+	t = *(uint32_t*)cookie.ptr;
 
-	if (cookie.len != sizeof(u_int32_t) +
+	if (cookie.len != sizeof(uint32_t) +
 			this->hasher->get_hash_size(this->hasher) ||
 		t < now - this->secret_offset - COOKIE_LIFETIME)
 	{
@@ -247,7 +246,7 @@ static bool cookie_verify(private_receiver_t *this, message_t *message,
 	{
 		return FALSE;
 	}
-	if (chunk_equals(reference, cookie))
+	if (chunk_equals_const(reference, cookie))
 	{
 		chunk_free(&reference);
 		return TRUE;
@@ -270,15 +269,15 @@ static bool check_cookie(private_receiver_t *this, message_t *message)
 	data = message->get_packet_data(message);
 	if (data.len <
 		 IKE_HEADER_LENGTH + NOTIFY_PAYLOAD_HEADER_LENGTH +
-		 sizeof(u_int32_t) + this->hasher->get_hash_size(this->hasher) ||
+		 sizeof(uint32_t) + this->hasher->get_hash_size(this->hasher) ||
 		*(data.ptr + 16) != PLV2_NOTIFY ||
-		*(u_int16_t*)(data.ptr + IKE_HEADER_LENGTH + 6) != htons(COOKIE))
+		*(uint16_t*)(data.ptr + IKE_HEADER_LENGTH + 6) != htons(COOKIE))
 	{
 		/* no cookie found */
 		return FALSE;
 	}
 	data.ptr += IKE_HEADER_LENGTH + NOTIFY_PAYLOAD_HEADER_LENGTH;
-	data.len = sizeof(u_int32_t) + this->hasher->get_hash_size(this->hasher);
+	data.len = sizeof(uint32_t) + this->hasher->get_hash_size(this->hasher);
 	if (!cookie_verify(this, message, data))
 	{
 		DBG2(DBG_NET, "found cookie, but content invalid");
@@ -291,7 +290,7 @@ static bool check_cookie(private_receiver_t *this, message_t *message)
  * Check if we currently require cookies
  */
 static bool cookie_required(private_receiver_t *this,
-							u_int half_open, u_int32_t now)
+							u_int half_open, uint32_t now)
 {
 	if (this->cookie_threshold && half_open >= this->cookie_threshold)
 	{
@@ -322,16 +321,18 @@ static bool cookie_required(private_receiver_t *this,
  */
 static bool drop_ike_sa_init(private_receiver_t *this, message_t *message)
 {
-	u_int half_open;
-	u_int32_t now;
+	u_int half_open, half_open_r;
+	uint32_t now;
 
 	now = time_monotonic(NULL);
 	half_open = charon->ike_sa_manager->get_half_open_count(
-										charon->ike_sa_manager, NULL);
+										charon->ike_sa_manager, NULL, FALSE);
+	half_open_r = charon->ike_sa_manager->get_half_open_count(
+										charon->ike_sa_manager, NULL, TRUE);
 
 	/* check for cookies in IKEv2 */
 	if (message->get_major_version(message) == IKEV2_MAJOR_VERSION &&
-		cookie_required(this, half_open, now) && !check_cookie(this, message))
+		cookie_required(this, half_open_r, now) && !check_cookie(this, message))
 	{
 		chunk_t cookie;
 
@@ -372,7 +373,7 @@ static bool drop_ike_sa_init(private_receiver_t *this, message_t *message)
 	/* check if peer has too many IKE_SAs half open */
 	if (this->block_threshold &&
 		charon->ike_sa_manager->get_half_open_count(charon->ike_sa_manager,
-				message->get_source(message)) >= this->block_threshold)
+				message->get_source(message), TRUE) >= this->block_threshold)
 	{
 		DBG1(DBG_NET, "ignoring IKE_SA setup from %H, "
 			 "peer too aggressive", message->get_source(message));
@@ -381,7 +382,7 @@ static bool drop_ike_sa_init(private_receiver_t *this, message_t *message)
 
 	/* check if global half open IKE_SA limit reached */
 	if (this->init_limit_half_open &&
-		half_open >= this->init_limit_half_open)
+	    half_open >= this->init_limit_half_open)
 	{
 		DBG1(DBG_NET, "ignoring IKE_SA setup from %H, half open IKE_SA "
 			 "count of %d exceeds limit of %d", message->get_source(message),
@@ -449,9 +450,8 @@ static job_requeue_t receive_packets(private_receiver_t *this)
 
 	dst = packet->get_destination(packet);
 	src = packet->get_source(packet);
-	if (!hydra->kernel_interface->all_interfaces_usable(hydra->kernel_interface)
-		&& !hydra->kernel_interface->get_interface(hydra->kernel_interface,
-												   dst, NULL))
+	if (!charon->kernel->all_interfaces_usable(charon->kernel)
+		&& !charon->kernel->get_interface(charon->kernel, dst, NULL))
 	{
 		DBG3(DBG_NET, "received packet from %#H to %#H on ignored interface",
 			 src, dst);
@@ -542,7 +542,9 @@ static job_requeue_t receive_packets(private_receiver_t *this)
 	if (message->get_request(message) &&
 		message->get_exchange_type(message) == IKE_SA_INIT)
 	{
-		if (this->initiator_only || drop_ike_sa_init(this, message))
+		id = message->get_ike_sa_id(message);
+		if (this->initiator_only || !id->is_initiator(id) ||
+			drop_ike_sa_init(this, message))
 		{
 			message->destroy(message);
 			return JOB_REQUEUE_DIRECT;
@@ -618,7 +620,7 @@ METHOD(receiver_t, destroy, void,
 receiver_t *receiver_create()
 {
 	private_receiver_t *this;
-	u_int32_t now = time_monotonic(NULL);
+	uint32_t now = time_monotonic(NULL);
 
 	INIT(this,
 		.public = {

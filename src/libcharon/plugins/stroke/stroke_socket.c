@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2011-2013 Tobias Brunner
  * Copyright (C) 2008 Martin Willi
- * Hochschule fuer Technik Rapperswil
+ * HSR Hochschule fuer Technik Rapperswil
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -24,7 +24,6 @@
 #include <unistd.h>
 #include <errno.h>
 
-#include <hydra.h>
 #include <daemon.h>
 
 #include "stroke_config.h"
@@ -591,17 +590,10 @@ static void stroke_loglevel(private_stroke_socket_t *this,
 		fprintf(out, "command not allowed!\n");
 		return;
 	}
-	if (strcaseeq(msg->loglevel.type, "any"))
+	if (!enum_from_name(debug_names, msg->loglevel.type, &group))
 	{
-		group = DBG_ANY;
-	}
-	else
-	{
-		if (!enum_from_name(debug_names, msg->loglevel.type, &group))
-		{
-			fprintf(out, "unknown type '%s'!\n", msg->loglevel.type);
-			return;
-		}
+		fprintf(out, "unknown type '%s'!\n", msg->loglevel.type);
+		return;
 	}
 	charon->set_level(charon, group, msg->loglevel.level);
 }
@@ -621,7 +613,7 @@ static void stroke_config(private_stroke_socket_t *this,
 static bool on_accept(private_stroke_socket_t *this, stream_t *stream)
 {
 	stroke_msg_t *msg;
-	u_int16_t len;
+	uint16_t len;
 	FILE *out;
 
 	/* read length */
@@ -747,8 +739,10 @@ METHOD(stroke_socket_t, destroy, void,
 	lib->credmgr->remove_set(lib->credmgr, &this->ca->set);
 	lib->credmgr->remove_set(lib->credmgr, &this->cred->set);
 	charon->backends->remove_backend(charon->backends, &this->config->backend);
-	hydra->attributes->remove_provider(hydra->attributes, &this->attribute->provider);
-	hydra->attributes->remove_handler(hydra->attributes, &this->handler->handler);
+	charon->attributes->remove_provider(charon->attributes,
+										&this->attribute->provider);
+	charon->attributes->remove_handler(charon->attributes,
+									   &this->handler->handler);
 	charon->bus->remove_listener(charon->bus, &this->counter->listener);
 	this->cred->destroy(this->cred);
 	this->ca->destroy(this->ca);
@@ -778,10 +772,10 @@ stroke_socket_t *stroke_socket_create()
 				"%s.plugins.stroke.prevent_loglevel_changes", FALSE, lib->ns),
 	);
 
-	this->cred = stroke_cred_create();
+	this->ca = stroke_ca_create();
+	this->cred = stroke_cred_create(this->ca);
 	this->attribute = stroke_attribute_create();
 	this->handler = stroke_handler_create();
-	this->ca = stroke_ca_create(this->cred);
 	this->config = stroke_config_create(this->ca, this->cred, this->attribute);
 	this->control = stroke_control_create();
 	this->list = stroke_list_create(this->attribute);
@@ -790,8 +784,10 @@ stroke_socket_t *stroke_socket_create()
 	lib->credmgr->add_set(lib->credmgr, &this->ca->set);
 	lib->credmgr->add_set(lib->credmgr, &this->cred->set);
 	charon->backends->add_backend(charon->backends, &this->config->backend);
-	hydra->attributes->add_provider(hydra->attributes, &this->attribute->provider);
-	hydra->attributes->add_handler(hydra->attributes, &this->handler->handler);
+	charon->attributes->add_provider(charon->attributes,
+									 &this->attribute->provider);
+	charon->attributes->add_handler(charon->attributes,
+									&this->handler->handler);
 	charon->bus->add_listener(charon->bus, &this->counter->listener);
 
 	max_concurrent = lib->settings->get_int(lib->settings,

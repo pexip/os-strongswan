@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010-2013 Martin Willi, revosec AG
- * Copyright (C) 2013-2014 Andreas Steffen
+ * Copyright (C) 2013-2015 Andreas Steffen
  * HSR Hochschule für Technik Rapperswil
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -42,7 +42,7 @@ static void usage(FILE *out)
 {
 	fprintf(out,
 		"Usage: pt-tls  --connect <hostname|address> [--port <port>]\n"
-		"              [--cert <file>]+ [--key <file>]\n"
+		"              [--cert <file>]+ [--key <file>] [--key-type rsa|ecdsa]\n"
 		"              [--client <client-id>] [--secret <password>]\n"
 		"              [--optionsfrom <filename>] [--quiet] [--debug <level>]\n");
 }
@@ -50,36 +50,48 @@ static void usage(FILE *out)
 /**
  * Client routine
  */
-static int client(char *address, u_int16_t port, char *identity)
+static int client(char *address, uint16_t port, char *identity)
 {
 	pt_tls_client_t *assessment;
 	tls_t *tnccs;
-	identification_t *server, *client;
-	host_t *host;
+	identification_t *server_id, *client_id;
+	host_t *server_ip, *client_ip;
 	status_t status;
 
-	host = host_create_from_dns(address, AF_UNSPEC, port);
-	if (!host)
+	server_ip = host_create_from_dns(address, AF_UNSPEC, port);
+	if (!server_ip)
 	{
 		return 1;
 	}
-	server = identification_create_from_string(address);
-	client = identification_create_from_string(identity);
+
+	client_ip = host_create_any(server_ip->get_family(server_ip));
+	if (!client_ip)
+	{
+		server_ip->destroy(server_ip);
+		return 1;
+	}
+	server_id = identification_create_from_string(address);
+	client_id = identification_create_from_string(identity);
+
 	tnccs = (tls_t*)tnc->tnccs->create_instance(tnc->tnccs, TNCCS_2_0, FALSE,
-								server, client, TNC_IFT_TLS_2_0, NULL);
+								server_id, client_id, server_ip, client_ip,
+								TNC_IFT_TLS_2_0, NULL);
+	client_ip->destroy(client_ip);
+
 	if (!tnccs)
 	{
 		fprintf(stderr, "loading TNCCS failed: %s\n", PLUGINS);
-		host->destroy(host);
-		server->destroy(server);
-		client->destroy(client);
+		server_ip->destroy(server_ip);
+		server_id->destroy(server_id);
+		client_id->destroy(client_id);
 		return 1;
 	}
-	assessment = pt_tls_client_create(host, server, client);
+	assessment = pt_tls_client_create(server_ip, server_id, client_id);
 	status = assessment->run_assessment(assessment, (tnccs_t*)tnccs);
 	assessment->destroy(assessment);
 	tnccs->destroy(tnccs);
-	return status;
+
+	return (status != SUCCESS);
 }
 
 
@@ -109,11 +121,11 @@ static bool load_certificate(char *filename)
 /**
  * Load private key from file
  */
-static bool load_key(char *filename)
+static bool load_key(char *filename, key_type_t type)
 {
 	private_key_t *key;
 
-	key = lib->creds->create(lib->creds, CRED_PRIVATE_KEY, KEY_RSA,
+	key = lib->creds->create(lib->creds, CRED_PRIVATE_KEY, type,
 							 BUILD_FROM_FILE, filename, BUILD_END);
 	if (!key)
 	{
@@ -243,7 +255,8 @@ static void init()
 
 int main(int argc, char *argv[])
 {
-	char *address = NULL, *identity = "%any", *secret = NULL;
+	char *address = NULL, *identity = "%any", *secret = NULL, *key_file = NULL;
+	key_type_t key_type = KEY_RSA;
 	int port = PT_TLS_PORT;
 
 	init();
@@ -258,6 +271,8 @@ int main(int argc, char *argv[])
 			{"port",		required_argument,		NULL,		'p' },
 			{"cert",		required_argument,		NULL,		'x' },
 			{"key",			required_argument,		NULL,		'k' },
+			{"key-type",		required_argument,		NULL,		't' },
+			{"mutual",		no_argument,			NULL,		'm' },
 			{"quiet",		no_argument,			NULL,		'q' },
 			{"debug",		required_argument,		NULL,		'd' },
 			{"optionsfrom",	required_argument,		NULL,		'+' },
@@ -277,9 +292,20 @@ int main(int argc, char *argv[])
 				}
 				continue;
 			case 'k':			/* --key <file> */
-				if (!load_key(optarg))
+				key_file = optarg;
+				continue;
+			case 't':			/* --key-type <type> */
+				if (strcaseeq(optarg, "ecdsa"))
 				{
-					return 1;
+					key_type = KEY_ECDSA;
+				}
+				else if (strcaseeq(optarg, "rsa"))
+				{
+					key_type = KEY_RSA;
+				}
+				else
+				{
+					key_type = KEY_ANY;
 				}
 				continue;
 			case 'c':			/* --connect <hostname|address> */
@@ -298,6 +324,10 @@ int main(int argc, char *argv[])
 				continue;
 			case 'p':			/* --port <port> */
 				port = atoi(optarg);
+				continue;
+			case 'm':			/* --mutual */
+				lib->settings->set_bool(lib->settings,
+								"%s.plugins.tnccs-20.mutual", TRUE, lib->ns);
 				continue;
 			case 'q':       	/* --quiet */
 				log_to_stderr = FALSE;
@@ -322,12 +352,15 @@ int main(int argc, char *argv[])
 		usage(stderr);
 		return 1;
 	}
+	if (key_file && !load_key(key_file, key_type))
+	{
+		return 1;
+	}
 	if (secret)
 	{
 		creds->add_shared(creds, shared_key_create(SHARED_EAP,
 										chunk_clone(chunk_from_str(secret))),
 							identification_create_from_string(identity), NULL);
 	}
-
 	return client(address, port, identity);
 }
