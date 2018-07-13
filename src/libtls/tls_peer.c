@@ -141,8 +141,8 @@ struct private_tls_peer_t {
 static status_t process_server_hello(private_tls_peer_t *this,
 									 bio_reader_t *reader)
 {
-	u_int8_t compression;
-	u_int16_t version, cipher;
+	uint8_t compression;
+	uint16_t version, cipher;
 	chunk_t random, session, ext = chunk_empty;
 	tls_cipher_suite_t suite = 0;
 
@@ -312,7 +312,7 @@ static status_t process_certificate(private_tls_peer_t *this,
 static public_key_t *find_public_key(private_tls_peer_t *this)
 {
 	public_key_t *public = NULL, *current;
-	certificate_t *cert;
+	certificate_t *cert, *found;
 	enumerator_t *enumerator;
 	auth_cfg_t *auth;
 
@@ -320,11 +320,17 @@ static public_key_t *find_public_key(private_tls_peer_t *this)
 	if (cert)
 	{
 		enumerator = lib->credmgr->create_public_enumerator(lib->credmgr,
-						KEY_ANY, cert->get_subject(cert), this->server_auth);
+											KEY_ANY, cert->get_subject(cert),
+											this->server_auth, TRUE);
 		while (enumerator->enumerate(enumerator, &current, &auth))
 		{
-			public = current->get_ref(current);
-			break;
+			found = auth->get(auth, AUTH_RULE_SUBJECT_CERT);
+			if (found && cert->equals(cert, found))
+			{
+				public = current->get_ref(current);
+				this->server_auth->merge(this->server_auth, auth, FALSE);
+				break;
+			}
 		}
 		enumerator->destroy(enumerator);
 	}
@@ -347,6 +353,13 @@ static status_t process_modp_key_exchange(private_tls_peer_t *this,
 	{
 		DBG1(DBG_TLS, "received invalid Server Key Exchange");
 		this->alert->add(this->alert, TLS_FATAL, TLS_DECODE_ERROR);
+		return NEED_MORE;
+	}
+	/* reject (export) DH groups using primes smaller than 1024 bit */
+	if (prime.len < 1024 / 8)
+	{
+		DBG1(DBG_TLS, "short DH prime received (%zu bytes)", prime.len);
+		this->alert->add(this->alert, TLS_FATAL, TLS_INTERNAL_ERROR);
 		return NEED_MORE;
 	}
 	public = find_public_key(this);
@@ -379,7 +392,12 @@ static status_t process_modp_key_exchange(private_tls_peer_t *this,
 		this->alert->add(this->alert, TLS_FATAL, TLS_INTERNAL_ERROR);
 		return NEED_MORE;
 	}
-	this->dh->set_other_public_value(this->dh, pub);
+	if (!this->dh->set_other_public_value(this->dh, pub))
+	{
+		DBG1(DBG_TLS, "applying DH public value failed");
+		this->alert->add(this->alert, TLS_FATAL, TLS_INTERNAL_ERROR);
+		return NEED_MORE;
+	}
 
 	this->state = STATE_KEY_EXCHANGE_RECEIVED;
 	return NEED_MORE;
@@ -416,8 +434,8 @@ static status_t process_ec_key_exchange(private_tls_peer_t *this,
 {
 	diffie_hellman_group_t group;
 	public_key_t *public;
-	u_int8_t type;
-	u_int16_t curve;
+	uint8_t type;
+	uint16_t curve;
 	chunk_t pub, chunk;
 
 	chunk = reader->peek(reader);
@@ -489,7 +507,12 @@ static status_t process_ec_key_exchange(private_tls_peer_t *this,
 		this->alert->add(this->alert, TLS_FATAL, TLS_INTERNAL_ERROR);
 		return NEED_MORE;
 	}
-	this->dh->set_other_public_value(this->dh, chunk_skip(pub, 1));
+	if (!this->dh->set_other_public_value(this->dh, chunk_skip(pub, 1)))
+	{
+		DBG1(DBG_TLS, "applying DH public value failed");
+		this->alert->add(this->alert, TLS_FATAL, TLS_INTERNAL_ERROR);
+		return NEED_MORE;
+	}
 
 	this->state = STATE_KEY_EXCHANGE_RECEIVED;
 	return NEED_MORE;
@@ -626,7 +649,7 @@ static status_t process_finished(private_tls_peer_t *this, bio_reader_t *reader)
 		this->alert->add(this->alert, TLS_FATAL, TLS_INTERNAL_ERROR);
 		return NEED_MORE;
 	}
-	if (!chunk_equals(received, chunk_from_thing(buf)))
+	if (!chunk_equals_const(received, chunk_from_thing(buf)))
 	{
 		DBG1(DBG_TLS, "received server finished invalid");
 		this->alert->add(this->alert, TLS_FATAL, TLS_DECRYPT_ERROR);
@@ -810,7 +833,7 @@ static private_key_t *find_private_key(private_tls_peer_t *this)
 	private_key_t *key = NULL;
 	bio_reader_t *reader;
 	key_type_t type;
-	u_int8_t cert;
+	uint8_t cert;
 
 	if (!this->peer)
 	{
@@ -968,7 +991,7 @@ static status_t send_key_exchange_dhe(private_tls_peer_t *this,
 {
 	chunk_t premaster, pub;
 
-	if (this->dh->get_shared_secret(this->dh, &premaster) != SUCCESS)
+	if (!this->dh->get_shared_secret(this->dh, &premaster))
 	{
 		DBG1(DBG_TLS, "calculating premaster from DH failed");
 		this->alert->add(this->alert, TLS_FATAL, TLS_INTERNAL_ERROR);
@@ -985,7 +1008,11 @@ static status_t send_key_exchange_dhe(private_tls_peer_t *this,
 	}
 	chunk_clear(&premaster);
 
-	this->dh->get_my_public_value(this->dh, &pub);
+	if (!this->dh->get_my_public_value(this->dh, &pub))
+	{
+		this->alert->add(this->alert, TLS_FATAL, TLS_INTERNAL_ERROR);
+		return NEED_MORE;
+	}
 	if (this->dh->get_dh_group(this->dh) == MODP_CUSTOM)
 	{
 		writer->write_data16(writer, pub);
@@ -1153,6 +1180,12 @@ METHOD(tls_handshake_t, get_server_id, identification_t*,
 	return this->server;
 }
 
+METHOD(tls_handshake_t, get_auth, auth_cfg_t*,
+	private_tls_peer_t *this)
+{
+	return this->server_auth;
+}
+
 METHOD(tls_handshake_t, destroy, void,
 	private_tls_peer_t *this)
 {
@@ -1186,6 +1219,7 @@ tls_peer_t *tls_peer_create(tls_t *tls, tls_crypto_t *crypto, tls_alert_t *alert
 				.finished = _finished,
 				.get_peer_id = _get_peer_id,
 				.get_server_id = _get_server_id,
+				.get_auth = _get_auth,
 				.destroy = _destroy,
 			},
 		},

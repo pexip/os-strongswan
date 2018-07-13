@@ -63,9 +63,19 @@ struct private_crypto_tester_t {
 	linked_list_t *prf;
 
 	/**
+	 * List of XOF test vectors
+	 */
+	linked_list_t *xof;
+
+	/**
 	 * List of RNG test vectors
 	 */
 	linked_list_t *rng;
+
+	/**
+	 * List of Diffie-Hellman test vectors
+	 */
+	linked_list_t *dh;
 
 	/**
 	 * Is a test vector required to pass a test?
@@ -138,11 +148,11 @@ static u_int end_timing(struct timespec *start)
  * Benchmark a crypter
  */
 static u_int bench_crypter(private_crypto_tester_t *this,
-	encryption_algorithm_t alg, crypter_constructor_t create)
+	encryption_algorithm_t alg, crypter_constructor_t create, size_t key_size)
 {
 	crypter_t *crypter;
 
-	crypter = create(alg, 0);
+	crypter = create(alg, key_size);
 	if (crypter)
 	{
 		char iv[crypter->get_iv_size(crypter)];
@@ -280,8 +290,8 @@ failure:
 	{
 		if (failed)
 		{
-			DBG1(DBG_LIB,"disable %N[%s]: no key size supported",
-				 encryption_algorithm_names, alg, plugin_name);
+			DBG1(DBG_LIB,"disable %N[%s]: %zd byte key size not supported",
+				 encryption_algorithm_names, alg, plugin_name, key_size);
 			return FALSE;
 		}
 		else
@@ -296,9 +306,10 @@ failure:
 	{
 		if (speed)
 		{
-			*speed = bench_crypter(this, alg, create);
-			DBG1(DBG_LIB, "enabled  %N[%s]: passed %u test vectors, %d points",
-				 encryption_algorithm_names, alg, plugin_name, tested, *speed);
+			*speed = bench_crypter(this, alg, create, key_size);
+			DBG1(DBG_LIB, "enabled  %N[%s]: passed %u test vectors, %d points "
+				 "(%zd bit key)", encryption_algorithm_names, alg,
+				 plugin_name, tested, *speed, key_size * 8);
 		}
 		else
 		{
@@ -313,11 +324,11 @@ failure:
  * Benchmark an aead transform
  */
 static u_int bench_aead(private_crypto_tester_t *this,
-	encryption_algorithm_t alg, aead_constructor_t create)
+	encryption_algorithm_t alg, aead_constructor_t create, size_t key_size)
 {
 	aead_t *aead;
 
-	aead = create(alg, 0, 0);
+	aead = create(alg, key_size, 0);
 	if (aead)
 	{
 		char iv[aead->get_iv_size(aead)];
@@ -474,8 +485,8 @@ failure:
 	{
 		if (failed)
 		{
-			DBG1(DBG_LIB,"disable %N[%s]: no key size supported",
-				 encryption_algorithm_names, alg, plugin_name);
+			DBG1(DBG_LIB,"disable %N[%s]: %zd byte key size not supported",
+				 encryption_algorithm_names, alg, plugin_name, key_size);
 			return FALSE;
 		}
 		else
@@ -490,9 +501,10 @@ failure:
 	{
 		if (speed)
 		{
-			*speed = bench_aead(this, alg, create);
-			DBG1(DBG_LIB, "enabled  %N[%s]: passed %u test vectors, %d points",
-				 encryption_algorithm_names, alg, plugin_name, tested, *speed);
+			*speed = bench_aead(this, alg, create, key_size);
+			DBG1(DBG_LIB, "enabled  %N[%s]: passed %u test vectors, %d points "
+				 "(%zd bit key)", encryption_algorithm_names, alg,
+				 plugin_name, tested, *speed, key_size * 8);
 		}
 		else
 		{
@@ -580,13 +592,22 @@ METHOD(crypto_tester_t, test_signer, bool,
 			break;
 		}
 
+		data = chunk_create(vector->data, vector->len);
 		key = chunk_create(vector->key, signer->get_key_size(signer));
 		if (!signer->set_key(signer, key))
 		{
 			goto failure;
 		}
+		/* do partial append mode and check if key gets set correctly */
+		if (!signer->get_signature(signer, data, NULL))
+		{
+			goto failure;
+		}
+		if (!signer->set_key(signer, key))
+		{
+			goto failure;
+		}
 		/* allocated signature */
-		data = chunk_create(vector->data, vector->len);
 		if (!signer->allocate_signature(signer, data, &mac))
 		{
 			goto failure;
@@ -905,13 +926,25 @@ METHOD(crypto_tester_t, test_prf, bool,
 			break;
 		}
 
+		seed = chunk_create(vector->seed, vector->len);
 		key = chunk_create(vector->key, vector->key_size);
 		if (!prf->set_key(prf, key))
 		{
 			goto failure;
 		}
+		if (alg != PRF_FIPS_SHA1_160)
+		{
+			/* do partial append mode and check if key gets set correctly */
+			if (!prf->get_bytes(prf, seed, NULL))
+			{
+				goto failure;
+			}
+			if (!prf->set_key(prf, key))
+			{
+				goto failure;
+			}
+		}
 		/* allocated bytes */
-		seed = chunk_create(vector->seed, vector->len);
 		if (!prf->allocate_bytes(prf, seed, &out))
 		{
 			goto failure;
@@ -942,7 +975,7 @@ METHOD(crypto_tester_t, test_prf, bool,
 			goto failure;
 		}
 		/* bytes to existing buffer, using append mode */
-		if (seed.len > 2)
+		if (alg != PRF_FIPS_SHA1_160 && seed.len > 2)
 		{
 			memset(out.ptr, 0, out.len);
 			if (vector->stateful)
@@ -1001,6 +1034,146 @@ failure:
 		{
 			DBG1(DBG_LIB, "enabled  %N[%s]: passed %u test vectors",
 				 pseudo_random_function_names, alg, plugin_name, tested);
+		}
+	}
+	return !failed;
+}
+
+/**
+ * Benchmark an XOF
+ */
+static u_int bench_xof(private_crypto_tester_t *this,
+					   ext_out_function_t alg, xof_constructor_t create)
+{
+	xof_t *xof;
+
+	xof = create(alg);
+	if (xof)
+	{
+		char seed[xof->get_seed_size(xof)];
+		char bytes[xof->get_block_size(xof)];
+		struct timespec start;
+		u_int runs;
+
+		memset(seed, 0x56, xof->get_seed_size(xof));
+		if (!xof->set_seed(xof, chunk_create(seed, xof->get_seed_size(xof))))
+		{
+			xof->destroy(xof);
+			return 0;
+		}
+
+		runs = 0;
+		start_timing(&start);
+		while (end_timing(&start) < this->bench_time)
+		{
+			if (xof->get_bytes(xof, xof->get_block_size(xof), bytes))
+			{
+				runs++;
+			}
+		}
+		xof->destroy(xof);
+
+		return runs;
+	}
+	return 0;
+}
+
+METHOD(crypto_tester_t, test_xof, bool,
+	private_crypto_tester_t *this, ext_out_function_t alg,
+	xof_constructor_t create, u_int *speed, const char *plugin_name)
+{
+	enumerator_t *enumerator;
+	xof_test_vector_t *vector;
+	bool failed = FALSE;
+	u_int tested = 0;
+
+	enumerator = this->xof->create_enumerator(this->xof);
+	while (enumerator->enumerate(enumerator, &vector))
+	{
+		xof_t *xof;
+		chunk_t seed, out = chunk_empty;
+
+		if (vector->alg != alg)
+		{
+			continue;
+		}
+
+		tested++;
+		failed = TRUE;
+		xof = create(alg);
+		if (!xof)
+		{
+			DBG1(DBG_LIB, "disabled %N[%s]: creating instance failed",
+				 ext_out_function_names, alg, plugin_name);
+			break;
+		}
+
+		seed = chunk_create(vector->seed, vector->len);
+		if (!xof->set_seed(xof, seed))
+		{
+			goto failure;
+		}
+		/* allocated bytes */
+		if (!xof->allocate_bytes(xof, vector->out_len, &out))
+		{
+			goto failure;
+		}
+		if (out.len != vector->out_len)
+		{
+			goto failure;
+		}
+		if (!memeq(vector->out, out.ptr, out.len))
+		{
+			goto failure;
+		}
+		/* bytes to existing buffer */
+		memset(out.ptr, 0, out.len);
+		if (!xof->set_seed(xof, seed))
+		{
+			goto failure;
+		}
+		if (!xof->get_bytes(xof, vector->out_len, out.ptr))
+		{
+			goto failure;
+		}
+		if (!memeq(vector->out, out.ptr, vector->out_len))
+		{
+			goto failure;
+		}
+		/* bytes to existing buffer, using append mode */
+		/* TODO */
+
+		failed = FALSE;
+failure:
+		xof->destroy(xof);
+		chunk_free(&out);
+		if (failed)
+		{
+			DBG1(DBG_LIB, "disabled %N[%s]: %s test vector failed",
+				 ext_out_function_names, alg, plugin_name, get_name(vector));
+			break;
+		}
+	}
+	enumerator->destroy(enumerator);
+	if (!tested)
+	{
+		DBG1(DBG_LIB, "%s %N[%s]: no test vectors found",
+			 this->required ? "disabled" : "enabled ",
+			 ext_out_function_names, alg, plugin_name);
+		return !this->required;
+	}
+	if (!failed)
+	{
+		if (speed)
+		{
+			*speed = bench_xof(this, alg, create);
+			DBG1(DBG_LIB, "enabled  %N[%s]: passed %u test vectors, %d points",
+				 ext_out_function_names, alg, plugin_name, tested, *speed);
+		}
+		else
+		{
+			DBG1(DBG_LIB, "enabled  %N[%s]: passed %u test vectors",
+				 ext_out_function_names, alg, plugin_name, tested);
 		}
 	}
 	return !failed;
@@ -1132,6 +1305,154 @@ failure:
 	return !failed;
 }
 
+/**
+ * Benchmark a DH backend
+ */
+static u_int bench_dh(private_crypto_tester_t *this,
+					  diffie_hellman_group_t group, dh_constructor_t create)
+{
+	chunk_t pub = chunk_empty, shared = chunk_empty;
+	diffie_hellman_t *dh;
+	struct timespec start;
+	u_int runs;
+
+	runs = 0;
+	start_timing(&start);
+	while (end_timing(&start) < this->bench_time)
+	{
+		dh = create(group);
+		if (!dh)
+		{
+			return 0;
+		}
+		if (dh->get_my_public_value(dh, &pub) &&
+			dh->set_other_public_value(dh, pub) &&
+			dh->get_shared_secret(dh, &shared))
+		{
+			runs++;
+		}
+		chunk_free(&pub);
+		chunk_free(&shared);
+		dh->destroy(dh);
+	}
+	return runs;
+}
+
+METHOD(crypto_tester_t, test_dh, bool,
+	private_crypto_tester_t *this, diffie_hellman_group_t group,
+	dh_constructor_t create, u_int *speed, const char *plugin_name)
+{
+	enumerator_t *enumerator;
+	dh_test_vector_t *v;
+	bool failed = FALSE;
+	u_int tested = 0;
+
+	enumerator = this->dh->create_enumerator(this->dh);
+	while (enumerator->enumerate(enumerator, &v))
+	{
+		diffie_hellman_t *a, *b;
+		chunk_t apub, bpub, asec, bsec;
+
+		if (v->group != group)
+		{
+			continue;
+		}
+
+		a = create(group);
+		b = create(group);
+		if (!a || !b)
+		{
+			DESTROY_IF(a);
+			DESTROY_IF(b);
+			failed = TRUE;
+			tested++;
+			DBG1(DBG_LIB, "disabled %N[%s]: creating instance failed",
+				 diffie_hellman_group_names, group, plugin_name);
+			break;
+		}
+
+		if (!a->set_private_value || !b->set_private_value)
+		{	/* does not support testing */
+			a->destroy(a);
+			b->destroy(b);
+			continue;
+		}
+		failed = TRUE;
+		tested++;
+
+		apub = bpub = asec = bsec = chunk_empty;
+
+		if (!a->set_private_value(a, chunk_create(v->priv_a, v->priv_len)) ||
+			!b->set_private_value(b, chunk_create(v->priv_b, v->priv_len)))
+		{
+			goto failure;
+		}
+		if (!a->get_my_public_value(a, &apub) ||
+			!chunk_equals(apub, chunk_create(v->pub_a, v->pub_len)))
+		{
+			goto failure;
+		}
+		if (!b->get_my_public_value(b, &bpub) ||
+			!chunk_equals(bpub, chunk_create(v->pub_b, v->pub_len)))
+		{
+			goto failure;
+		}
+		if (!a->set_other_public_value(a, bpub) ||
+			!b->set_other_public_value(b, apub))
+		{
+			goto failure;
+		}
+		if (!a->get_shared_secret(a, &asec) ||
+			!chunk_equals(asec, chunk_create(v->shared, v->shared_len)))
+		{
+			goto failure;
+		}
+		if (!b->get_shared_secret(b, &bsec) ||
+			!chunk_equals(bsec, chunk_create(v->shared, v->shared_len)))
+		{
+			goto failure;
+		}
+
+		failed = FALSE;
+failure:
+		a->destroy(a);
+		b->destroy(b);
+		chunk_free(&apub);
+		chunk_free(&bpub);
+		chunk_free(&asec);
+		chunk_free(&bsec);
+		if (failed)
+		{
+			DBG1(DBG_LIB, "disabled %N[%s]: %s test vector failed",
+				 diffie_hellman_group_names, group, plugin_name, get_name(v));
+			break;
+		}
+	}
+	enumerator->destroy(enumerator);
+	if (!tested)
+	{
+		DBG1(DBG_LIB, "%s %N[%s]: no test vectors found / untestable",
+			 this->required ? "disabled" : "enabled ",
+			 diffie_hellman_group_names, group, plugin_name);
+		return !this->required;
+	}
+	if (!failed)
+	{
+		if (speed)
+		{
+			*speed = bench_dh(this, group, create);
+			DBG1(DBG_LIB, "enabled  %N[%s]: passed %u test vectors, %d points",
+				 diffie_hellman_group_names, group, plugin_name, tested, *speed);
+		}
+		else
+		{
+			DBG1(DBG_LIB, "enabled  %N[%s]: passed %u test vectors",
+				 diffie_hellman_group_names, group, plugin_name, tested);
+		}
+	}
+	return !failed;
+}
+
 METHOD(crypto_tester_t, add_crypter_vector, void,
 	private_crypto_tester_t *this, crypter_test_vector_t *vector)
 {
@@ -1162,10 +1483,22 @@ METHOD(crypto_tester_t, add_prf_vector, void,
 	this->prf->insert_last(this->prf, vector);
 }
 
+METHOD(crypto_tester_t, add_xof_vector, void,
+	private_crypto_tester_t *this, xof_test_vector_t *vector)
+{
+	this->xof->insert_last(this->xof, vector);
+}
+
 METHOD(crypto_tester_t, add_rng_vector, void,
 	private_crypto_tester_t *this, rng_test_vector_t *vector)
 {
 	this->rng->insert_last(this->rng, vector);
+}
+
+METHOD(crypto_tester_t, add_dh_vector, void,
+	private_crypto_tester_t *this, dh_test_vector_t *vector)
+{
+	this->dh->insert_last(this->dh, vector);
 }
 
 METHOD(crypto_tester_t, destroy, void,
@@ -1176,7 +1509,9 @@ METHOD(crypto_tester_t, destroy, void,
 	this->signer->destroy(this->signer);
 	this->hasher->destroy(this->hasher);
 	this->prf->destroy(this->prf);
+	this->xof->destroy(this->xof);
 	this->rng->destroy(this->rng);
+	this->dh->destroy(this->dh);
 	free(this);
 }
 
@@ -1194,13 +1529,17 @@ crypto_tester_t *crypto_tester_create()
 			.test_signer = _test_signer,
 			.test_hasher = _test_hasher,
 			.test_prf = _test_prf,
+			.test_xof = _test_xof,
 			.test_rng = _test_rng,
+			.test_dh = _test_dh,
 			.add_crypter_vector = _add_crypter_vector,
 			.add_aead_vector = _add_aead_vector,
 			.add_signer_vector = _add_signer_vector,
 			.add_hasher_vector = _add_hasher_vector,
 			.add_prf_vector = _add_prf_vector,
+			.add_xof_vector = _add_xof_vector,
 			.add_rng_vector = _add_rng_vector,
+			.add_dh_vector = _add_dh_vector,
 			.destroy = _destroy,
 		},
 		.crypter = linked_list_create(),
@@ -1208,7 +1547,9 @@ crypto_tester_t *crypto_tester_create()
 		.signer = linked_list_create(),
 		.hasher = linked_list_create(),
 		.prf = linked_list_create(),
+		.xof = linked_list_create(),
 		.rng = linked_list_create(),
+		.dh = linked_list_create(),
 
 		.required = lib->settings->get_bool(lib->settings,
 								"%s.crypto_test.required", FALSE, lib->ns),

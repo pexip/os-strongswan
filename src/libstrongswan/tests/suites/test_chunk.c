@@ -61,6 +61,32 @@ START_TEST(test_chunk_equals)
 END_TEST
 
 /*******************************************************************************
+ * equals_const
+ */
+
+START_TEST(test_chunk_equals_const)
+{
+	chunk_t chunk = chunk_from_str("chunk");
+	chunk_t chunk_a, chunk_b;
+
+	chunk_a = chunk_empty;
+	chunk_b = chunk_empty;
+	ck_assert(!chunk_equals_const(chunk_a, chunk_b));
+
+	chunk_a = chunk;
+	ck_assert(!chunk_equals_const(chunk_a, chunk_b));
+	chunk_b = chunk;
+	ck_assert(chunk_equals_const(chunk_a, chunk_b));
+
+	chunk_b = chunk_from_str("asdf");
+	ck_assert(!chunk_equals_const(chunk_a, chunk_b));
+
+	chunk_b = chunk_from_str("chunk");
+	ck_assert(chunk_equals_const(chunk_a, chunk_b));
+}
+END_TEST
+
+/*******************************************************************************
  * chunk_compare test
  */
 
@@ -290,11 +316,11 @@ START_TEST(test_chunk_skip)
 	foobar = chunk_from_str("foobar");
 	a = foobar;
 	a = chunk_skip(a, 0);
-	ck_assert(chunk_equals(a, foobar));
+	ck_assert_chunk_eq(a, foobar);
 	a = chunk_skip(a, 1);
-	ck_assert(chunk_equals(a, chunk_from_str("oobar")));
+	ck_assert_chunk_eq(a, chunk_from_str("oobar"));
 	a = chunk_skip(a, 2);
-	ck_assert(chunk_equals(a, chunk_from_str("bar")));
+	ck_assert_chunk_eq(a, chunk_from_str("bar"));
 	a = chunk_skip(a, 3);
 	assert_chunk_empty(a);
 
@@ -312,20 +338,24 @@ START_TEST(test_chunk_skip_zero)
 {
 	chunk_t foobar, a;
 
-	a = chunk_empty;
-	a = chunk_skip_zero(a);
+	a = chunk_skip_zero(chunk_empty);
 	assert_chunk_empty(a);
 
 	foobar = chunk_from_str("foobar");
-	a = foobar;
-	a = chunk_skip_zero(a);
-	ck_assert(chunk_equals(a, foobar));
+	a = chunk_skip_zero(foobar);
+	ck_assert_chunk_eq(a, foobar);
 
-	a = chunk_from_chars(0x00, 0xaa, 0xbb, 0xcc);
+	foobar = chunk_from_chars(0x00);
+	a = chunk_skip_zero(foobar);
+	ck_assert_chunk_eq(a, foobar);
+
+	a = chunk_skip_zero(chunk_from_chars(0x00, 0xaa, 0xbb, 0xcc));
+	ck_assert_chunk_eq(a, chunk_from_chars(0xaa, 0xbb, 0xcc));
 	a = chunk_skip_zero(a);
-	ck_assert(chunk_equals(a, chunk_from_chars(0xaa, 0xbb, 0xcc)));
-	a = chunk_skip_zero(a);
-	ck_assert(chunk_equals(a, chunk_from_chars(0xaa, 0xbb, 0xcc)));
+	ck_assert_chunk_eq(a, chunk_from_chars(0xaa, 0xbb, 0xcc));
+
+	a = chunk_skip_zero(chunk_from_chars(0x00, 0x00, 0xaa, 0xbb, 0xcc));
+	ck_assert_chunk_eq(a, chunk_from_chars(0xaa, 0xbb, 0xcc));
 }
 END_TEST
 
@@ -710,7 +740,7 @@ START_TEST(test_chunk_mac)
 {
 	chunk_t in;
 	u_char key[16];
-	u_int64_t out;
+	uint64_t out;
 	int i, count;
 
 	count = countof(sip_vectors);
@@ -739,7 +769,7 @@ END_TEST
 START_TEST(test_chunk_hash)
 {
 	chunk_t chunk;
-	u_int32_t hash_a, hash_b, hash_c;
+	uint32_t hash_a, hash_b, hash_c;
 
 	chunk = chunk_from_str("asdf");
 
@@ -761,7 +791,7 @@ END_TEST
 START_TEST(test_chunk_hash_static)
 {
 	chunk_t in;
-	u_int32_t out, hash_a, hash_b, hash_inc = 0x7b891a95;
+	uint32_t out, hash_a, hash_b, hash_inc = 0x7b891a95;
 	int i, count;
 
 	count = countof(sip_vectors);
@@ -787,10 +817,15 @@ END_TEST
  * test for chunk_internet_checksum[_inc]()
  */
 
+static inline uint16_t compensate_alignment(uint16_t val)
+{
+	return ((val & 0xff) << 8) | (val >> 8);
+}
+
 START_TEST(test_chunk_internet_checksum)
 {
 	chunk_t chunk;
-	u_int16_t sum;
+	uint16_t sum;
 
 	chunk = chunk_from_chars(0x45,0x00,0x00,0x30,0x44,0x22,0x40,0x00,0x80,0x06,
 							 0x00,0x00,0x8c,0x7c,0x19,0xac,0xae,0x24,0x1e,0x2b);
@@ -804,9 +839,9 @@ START_TEST(test_chunk_internet_checksum)
 
 	/* need to compensate for even/odd alignment */
 	sum = chunk_internet_checksum(chunk_create(chunk.ptr, 9));
-	sum = ntohs(sum);
+	sum = compensate_alignment(sum);
 	sum = chunk_internet_checksum_inc(chunk_create(chunk.ptr+9, 11), sum);
-	sum = ntohs(sum);
+	sum = compensate_alignment(sum);
 	ck_assert_int_eq(0x442e, ntohs(sum));
 
 	chunk = chunk_from_chars(0x45,0x00,0x00,0x30,0x44,0x22,0x40,0x00,0x80,0x06,
@@ -821,9 +856,9 @@ START_TEST(test_chunk_internet_checksum)
 
 	/* need to compensate for even/odd alignment */
 	sum = chunk_internet_checksum(chunk_create(chunk.ptr, 9));
-	sum = ntohs(sum);
+	sum = compensate_alignment(sum);
 	sum = chunk_internet_checksum_inc(chunk_create(chunk.ptr+9, 10), sum);
-	sum = ntohs(sum);
+	sum = compensate_alignment(sum);
 	ck_assert_int_eq(0x4459, ntohs(sum));
 }
 END_TEST
@@ -989,7 +1024,7 @@ START_TEST(test_printf_hook)
 	int len;
 
 	/* %B should be the same as %b, which is what we check, comparing the
-	 * acutal result could be tricky as %b prints the chunk's memory address */
+	 * actual result could be tricky as %b prints the chunk's memory address */
 	len = snprintf(buf, sizeof(buf), "%B", &printf_hook_data[_i].in);
 	ck_assert(len >= 0 && len < sizeof(buf));
 	len = snprintf(mem, sizeof(mem), "%b", printf_hook_data[_i].in.ptr,
@@ -1008,6 +1043,7 @@ Suite *chunk_suite_create()
 
 	tc = tcase_create("equals");
 	tcase_add_test(tc, test_chunk_equals);
+	tcase_add_test(tc, test_chunk_equals_const);
 	suite_add_tcase(s, tc);
 
 	tc = tcase_create("chunk_compare");

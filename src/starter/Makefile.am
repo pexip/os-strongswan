@@ -15,7 +15,7 @@ parser/parser.y parser/lexer.l parser/conf_parser.c parser/conf_parser.h
 AM_CPPFLAGS = \
 	-I${linux_headers} \
 	-I$(top_srcdir)/src/libstrongswan \
-	-I$(top_srcdir)/src/libhydra \
+	-I$(top_srcdir)/src/libcharon \
 	-I$(top_srcdir)/src/starter \
 	-I$(top_srcdir)/src/stroke \
 	-DIPSEC_DIR=\"${ipsecdir}\" \
@@ -28,28 +28,23 @@ AM_CPPFLAGS = \
 	-DPLUGINS=\""${starter_plugins}\"" \
 	-DDEBUG
 
+AM_CFLAGS = \
+	@COVERAGE_CFLAGS@
+
 AM_YFLAGS = -v -d
 
 starter_LDADD = \
 	$(top_builddir)/src/libstrongswan/libstrongswan.la \
-	$(top_builddir)/src/libhydra/libhydra.la \
+	$(top_builddir)/src/libcharon/libcharon.la \
 	libstarter.la \
-	$(SOCKLIB) $(PTHREADLIB)
+	$(SOCKLIB) $(PTHREADLIB) $(ATOMICLIB)
 
-EXTRA_DIST = keywords.txt ipsec.conf Android.mk
+EXTRA_DIST = keywords.txt ipsec.conf ipsec.secrets Android.mk
 MAINTAINERCLEANFILES = keywords.c
 BUILT_SOURCES = keywords.c parser/parser.h
 
-if USE_CHARON
-  AM_CPPFLAGS += -DSTART_CHARON
-endif
-
 if USE_LOAD_WARNING
   AM_CPPFLAGS += -DLOAD_WARNING
-endif
-
-if USE_SCEPCLIENT
-  AM_CPPFLAGS += -DGENERATE_SELFCERT
 endif
 
 keywords.c:	$(srcdir)/keywords.txt $(srcdir)/keywords.h
@@ -67,3 +62,4 @@ install-exec-local :
 		test -e "$(DESTDIR)${sysconfdir}/ipsec.d/reqs" || $(INSTALL) -d "$(DESTDIR)$(sysconfdir)/ipsec.d/reqs" || true
 		test -e "$(DESTDIR)${sysconfdir}/ipsec.d/private" || $(INSTALL) -d -m 750 "$(DESTDIR)$(sysconfdir)/ipsec.d/private" || true
 		test -e "$(DESTDIR)$(sysconfdir)/ipsec.conf" || $(INSTALL) -m 644 $(srcdir)/ipsec.conf $(DESTDIR)$(sysconfdir)/ipsec.conf || true
+		test -e "$(DESTDIR)$(sysconfdir)/ipsec.secrets" || $(INSTALL) -m 600 $(srcdir)/ipsec.secrets $(DESTDIR)$(sysconfdir)/ipsec.secrets || true

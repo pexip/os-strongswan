@@ -1,9 +1,10 @@
 /*
- * Copyright (C) 2006-2011 Tobias Brunner
+ * Coypright (C) 2016 Andreas Steffen
+ * Copyright (C) 2006-2016 Tobias Brunner
  * Copyright (C) 2005-2008 Martin Willi
  * Copyright (C) 2006 Daniel Roethlisberger
  * Copyright (C) 2005 Jan Hutter
- * Hochschule fuer Technik Rapperswil
+ * HSR Hochschule fuer Technik Rapperswil
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -23,7 +24,6 @@
 #include <string.h>
 #include <time.h>
 
-#include <hydra.h>
 #include <daemon.h>
 #include <collections/array.h>
 
@@ -34,6 +34,8 @@ ENUM(child_sa_state_names, CHILD_CREATED, CHILD_DESTROYING,
 	"INSTALLED",
 	"UPDATING",
 	"REKEYING",
+	"REKEYED",
+	"RETRYING",
 	"DELETING",
 	"DESTROYING",
 );
@@ -62,22 +64,22 @@ struct private_child_sa_t {
 	/**
 	 * our actually used SPI, 0 if unused
 	 */
-	u_int32_t my_spi;
+	uint32_t my_spi;
 
 	/**
 	 * others used SPI, 0 if unused
 	 */
-	u_int32_t other_spi;
+	uint32_t other_spi;
 
 	/**
 	 * our Compression Parameter Index (CPI) used, 0 if unused
 	 */
-	u_int16_t my_cpi;
+	uint16_t my_cpi;
 
 	/**
 	 * others Compression Parameter Index (CPI) used, 0 if unused
 	 */
-	u_int16_t other_cpi;
+	uint16_t other_cpi;
 
 	/**
 	 * Array for local traffic selectors
@@ -97,7 +99,27 @@ struct private_child_sa_t {
 	/**
 	 * reqid used for this child_sa
 	 */
-	u_int32_t reqid;
+	uint32_t reqid;
+
+	/**
+	 * Did we allocate/confirm and must release the reqid?
+	 */
+	bool reqid_allocated;
+
+	/**
+	 * Is the reqid statically configured
+	 */
+	bool static_reqid;
+
+	/**
+	 * Unique CHILD_SA identifier
+	 */
+	uint32_t unique_id;
+
+	/**
+	 * Whether FWD policieis in the outbound direction should be installed
+	 */
+	bool policies_fwd_out;
 
 	/**
 	 * inbound mark used for this child_sa
@@ -182,28 +204,28 @@ struct private_child_sa_t {
 	/**
 	 * last number of inbound bytes
 	 */
-	u_int64_t my_usebytes;
+	uint64_t my_usebytes;
 
 	/**
 	 * last number of outbound bytes
 	 */
-	u_int64_t other_usebytes;
+	uint64_t other_usebytes;
 
 	/**
 	 * last number of inbound packets
 	 */
-	u_int64_t my_usepackets;
+	uint64_t my_usepackets;
 
 	/**
 	 * last number of outbound bytes
 	 */
-	u_int64_t other_usepackets;
+	uint64_t other_usepackets;
 };
 
 /**
  * convert an IKEv2 specific protocol identifier to the IP protocol identifier.
  */
-static inline u_int8_t proto_ike2ip(protocol_id_t protocol)
+static inline uint8_t proto_ike2ip(protocol_id_t protocol)
 {
 	switch (protocol)
 	{
@@ -222,10 +244,16 @@ METHOD(child_sa_t, get_name, char*,
 	return this->config->get_name(this->config);
 }
 
-METHOD(child_sa_t, get_reqid, u_int32_t,
+METHOD(child_sa_t, get_reqid, uint32_t,
 	   private_child_sa_t *this)
 {
 	return this->reqid;
+}
+
+METHOD(child_sa_t, get_unique_id, uint32_t,
+	private_child_sa_t *this)
+{
+	return this->unique_id;
 }
 
 METHOD(child_sa_t, get_config, child_cfg_t*,
@@ -247,13 +275,13 @@ METHOD(child_sa_t, get_state, child_sa_state_t,
 	return this->state;
 }
 
-METHOD(child_sa_t, get_spi, u_int32_t,
+METHOD(child_sa_t, get_spi, uint32_t,
 	   private_child_sa_t *this, bool inbound)
 {
 	return inbound ? this->my_spi : this->other_spi;
 }
 
-METHOD(child_sa_t, get_cpi, u_int16_t,
+METHOD(child_sa_t, get_cpi, uint16_t,
 	   private_child_sa_t *this, bool inbound)
 {
 	return inbound ? this->my_cpi : this->other_cpi;
@@ -390,8 +418,14 @@ METHOD(enumerator_t, policy_enumerate, bool,
 		{	/* protocol mismatch */
 			continue;
 		}
-		*my_out = this->ts;
-		*other_out = other_ts;
+		if (my_out)
+		{
+			*my_out = this->ts;
+		}
+		if (other_out)
+		{
+			*other_out = other_ts;
+		}
 		return TRUE;
 	}
 	return FALSE;
@@ -433,17 +467,24 @@ METHOD(child_sa_t, create_policy_enumerator, enumerator_t*,
 static status_t update_usebytes(private_child_sa_t *this, bool inbound)
 {
 	status_t status = FAILED;
-	u_int64_t bytes, packets;
+	uint64_t bytes, packets;
 	time_t time;
 
 	if (inbound)
 	{
 		if (this->my_spi)
 		{
-			status = hydra->kernel_interface->query_sa(hydra->kernel_interface,
-							this->other_addr, this->my_addr, this->my_spi,
-							proto_ike2ip(this->protocol), this->mark_in,
-							&bytes, &packets, &time);
+			kernel_ipsec_sa_id_t id = {
+				.src = this->other_addr,
+				.dst = this->my_addr,
+				.spi = this->my_spi,
+				.proto = proto_ike2ip(this->protocol),
+				.mark = this->mark_in,
+			};
+			kernel_ipsec_query_sa_t query = {};
+
+			status = charon->kernel->query_sa(charon->kernel, &id, &query,
+											  &bytes, &packets, &time);
 			if (status == SUCCESS)
 			{
 				if (bytes > this->my_usebytes)
@@ -464,10 +505,17 @@ static status_t update_usebytes(private_child_sa_t *this, bool inbound)
 	{
 		if (this->other_spi)
 		{
-			status = hydra->kernel_interface->query_sa(hydra->kernel_interface,
-							this->my_addr, this->other_addr, this->other_spi,
-							proto_ike2ip(this->protocol), this->mark_out,
-							&bytes, &packets, &time);
+			kernel_ipsec_sa_id_t id = {
+				.src = this->my_addr,
+				.dst = this->other_addr,
+				.spi = this->other_spi,
+				.proto = proto_ike2ip(this->protocol),
+				.mark = this->mark_out,
+			};
+			kernel_ipsec_query_sa_t query = {};
+
+			status = charon->kernel->query_sa(charon->kernel, &id, &query,
+											  &bytes, &packets, &time);
 			if (status == SUCCESS)
 			{
 				if (bytes > this->other_usebytes)
@@ -503,15 +551,24 @@ static bool update_usetime(private_child_sa_t *this, bool inbound)
 
 		if (inbound)
 		{
-			if (hydra->kernel_interface->query_policy(hydra->kernel_interface,
-						other_ts, my_ts, POLICY_IN, this->mark_in, &in) == SUCCESS)
+			kernel_ipsec_policy_id_t id = {
+				.dir = POLICY_IN,
+				.src_ts = other_ts,
+				.dst_ts = my_ts,
+				.mark = this->mark_in,
+			};
+			kernel_ipsec_query_policy_t query = {};
+
+			if (charon->kernel->query_policy(charon->kernel, &id, &query,
+											 &in) == SUCCESS)
 			{
 				last_use = max(last_use, in);
 			}
 			if (this->mode != MODE_TRANSPORT)
 			{
-				if (hydra->kernel_interface->query_policy(hydra->kernel_interface,
-						other_ts, my_ts, POLICY_FWD, this->mark_in, &fwd) == SUCCESS)
+				id.dir = POLICY_FWD;
+				if (charon->kernel->query_policy(charon->kernel, &id, &query,
+												 &fwd) == SUCCESS)
 				{
 					last_use = max(last_use, fwd);
 				}
@@ -519,8 +576,17 @@ static bool update_usetime(private_child_sa_t *this, bool inbound)
 		}
 		else
 		{
-			if (hydra->kernel_interface->query_policy(hydra->kernel_interface,
-						my_ts, other_ts, POLICY_OUT, this->mark_out, &out) == SUCCESS)
+			kernel_ipsec_policy_id_t id = {
+				.dir = POLICY_OUT,
+				.src_ts = my_ts,
+				.dst_ts = other_ts,
+				.mark = this->mark_out,
+				.interface = this->config->get_interface(this->config),
+			};
+			kernel_ipsec_query_policy_t query = {};
+
+			if (charon->kernel->query_policy(charon->kernel, &id, &query,
+											 &out) == SUCCESS)
 			{
 				last_use = max(last_use, out);
 			}
@@ -545,7 +611,7 @@ static bool update_usetime(private_child_sa_t *this, bool inbound)
 
 METHOD(child_sa_t, get_usestats, void,
 	private_child_sa_t *this, bool inbound,
-	time_t *time, u_int64_t *bytes, u_int64_t *packets)
+	time_t *time, uint64_t *bytes, uint64_t *packets)
 {
 	if ((!bytes && !packets) || update_usebytes(this, inbound) != FAILED)
 	{
@@ -597,13 +663,11 @@ METHOD(child_sa_t, get_installtime, time_t,
 	return this->install_time;
 }
 
-METHOD(child_sa_t, alloc_spi, u_int32_t,
+METHOD(child_sa_t, alloc_spi, uint32_t,
 	   private_child_sa_t *this, protocol_id_t protocol)
 {
-	if (hydra->kernel_interface->get_spi(hydra->kernel_interface,
-										 this->other_addr, this->my_addr,
-										 proto_ike2ip(protocol), this->reqid,
-										 &this->my_spi) == SUCCESS)
+	if (charon->kernel->get_spi(charon->kernel, this->other_addr, this->my_addr,
+							proto_ike2ip(protocol), &this->my_spi) == SUCCESS)
 	{
 		/* if we allocate a SPI, but then are unable to establish the SA, we
 		 * need to know the protocol family to delete the partial SA */
@@ -613,12 +677,11 @@ METHOD(child_sa_t, alloc_spi, u_int32_t,
 	return 0;
 }
 
-METHOD(child_sa_t, alloc_cpi, u_int16_t,
+METHOD(child_sa_t, alloc_cpi, uint16_t,
 	   private_child_sa_t *this)
 {
-	if (hydra->kernel_interface->get_cpi(hydra->kernel_interface,
-										 this->other_addr, this->my_addr,
-										 this->reqid, &this->my_cpi) == SUCCESS)
+	if (charon->kernel->get_cpi(charon->kernel, this->other_addr, this->my_addr,
+								&this->my_cpi) == SUCCESS)
 	{
 		return this->my_cpi;
 	}
@@ -626,16 +689,18 @@ METHOD(child_sa_t, alloc_cpi, u_int16_t,
 }
 
 METHOD(child_sa_t, install, status_t,
-	private_child_sa_t *this, chunk_t encr, chunk_t integ, u_int32_t spi,
-	u_int16_t cpi, bool initiator, bool inbound, bool tfcv3,
+	private_child_sa_t *this, chunk_t encr, chunk_t integ, uint32_t spi,
+	uint16_t cpi, bool initiator, bool inbound, bool tfcv3,
 	linked_list_t *my_ts, linked_list_t *other_ts)
 {
-	u_int16_t enc_alg = ENCR_UNDEFINED, int_alg = AUTH_UNDEFINED, size;
-	u_int16_t esn = NO_EXT_SEQ_NUMBERS;
-	traffic_selector_t *src_ts = NULL, *dst_ts = NULL;
+	uint16_t enc_alg = ENCR_UNDEFINED, int_alg = AUTH_UNDEFINED, size;
+	uint16_t esn = NO_EXT_SEQ_NUMBERS;
+	linked_list_t *src_ts = NULL, *dst_ts = NULL;
 	time_t now;
+	kernel_ipsec_sa_id_t id;
+	kernel_ipsec_add_sa_t sa;
 	lifetime_cfg_t *lifetime;
-	u_int32_t tfc = 0;
+	uint32_t tfc = 0;
 	host_t *src, *dst;
 	status_t status;
 	bool update = FALSE;
@@ -680,7 +745,18 @@ METHOD(child_sa_t, install, status_t,
 	this->proposal->get_algorithm(this->proposal, EXTENDED_SEQUENCE_NUMBERS,
 								  &esn, NULL);
 
-	lifetime = this->config->get_lifetime(this->config);
+	if (!this->reqid_allocated && !this->static_reqid)
+	{
+		status = charon->kernel->alloc_reqid(charon->kernel, my_ts, other_ts,
+								this->mark_in, this->mark_out, &this->reqid);
+		if (status != SUCCESS)
+		{
+			return status;
+		}
+		this->reqid_allocated = TRUE;
+	}
+
+	lifetime = this->config->get_lifetime(this->config, TRUE);
 
 	now = time_monotonic(NULL);
 	if (lifetime->time.rekey)
@@ -704,26 +780,48 @@ METHOD(child_sa_t, install, status_t,
 		lifetime->time.rekey = 0;
 	}
 
-	/* BEET requires the bound address from the traffic selectors.
-	 * TODO: We add just the first traffic selector for now, as the
-	 * kernel accepts a single TS per SA only */
+	/* BEET requires the bound address from the traffic selectors */
 	if (inbound)
 	{
-		my_ts->get_first(my_ts, (void**)&dst_ts);
-		other_ts->get_first(other_ts, (void**)&src_ts);
+		dst_ts = my_ts;
+		src_ts = other_ts;
 	}
 	else
 	{
-		my_ts->get_first(my_ts, (void**)&src_ts);
-		other_ts->get_first(other_ts, (void**)&dst_ts);
+		src_ts = my_ts;
+		dst_ts = other_ts;
 	}
 
-	status = hydra->kernel_interface->add_sa(hydra->kernel_interface,
-				src, dst, spi, proto_ike2ip(this->protocol), this->reqid,
-				inbound ? this->mark_in : this->mark_out, tfc,
-				lifetime, enc_alg, encr, int_alg, integ, this->mode,
-				this->ipcomp, cpi, this->config->get_replay_window(this->config),
-				initiator, this->encap, esn, update, src_ts, dst_ts);
+	id = (kernel_ipsec_sa_id_t){
+		.src = src,
+		.dst = dst,
+		.spi = spi,
+		.proto = proto_ike2ip(this->protocol),
+		.mark = inbound ? this->mark_in : this->mark_out,
+	};
+	sa = (kernel_ipsec_add_sa_t){
+		.reqid = this->reqid,
+		.mode = this->mode,
+		.src_ts = src_ts,
+		.dst_ts = dst_ts,
+		.interface = inbound ? NULL : this->config->get_interface(this->config),
+		.lifetime = lifetime,
+		.enc_alg = enc_alg,
+		.enc_key = encr,
+		.int_alg = int_alg,
+		.int_key = integ,
+		.replay_window = this->config->get_replay_window(this->config),
+		.tfc = tfc,
+		.ipcomp = this->ipcomp,
+		.cpi = cpi,
+		.encap = this->encap,
+		.esn = esn,
+		.initiator = initiator,
+		.inbound = inbound,
+		.update = update,
+	};
+
+	status = charon->kernel->add_sa(charon->kernel, &id, &sa);
 
 	free(lifetime);
 
@@ -737,8 +835,52 @@ static bool require_policy_update()
 {
 	kernel_feature_t f;
 
-	f = hydra->kernel_interface->get_features(hydra->kernel_interface);
+	f = charon->kernel->get_features(charon->kernel);
 	return !(f & KERNEL_NO_POLICY_UPDATES);
+}
+
+/**
+ * Prepare SA config to install/delete policies
+ */
+static void prepare_sa_cfg(private_child_sa_t *this, ipsec_sa_cfg_t *my_sa,
+						   ipsec_sa_cfg_t *other_sa)
+{
+	enumerator_t *enumerator;
+
+	*my_sa = (ipsec_sa_cfg_t){
+		.mode = this->mode,
+		.reqid = this->reqid,
+		.ipcomp = {
+			.transform = this->ipcomp,
+		},
+	};
+	*other_sa = *my_sa;
+
+	my_sa->ipcomp.cpi = this->my_cpi;
+	other_sa->ipcomp.cpi = this->other_cpi;
+
+	if (this->protocol == PROTO_ESP)
+	{
+		my_sa->esp.use = TRUE;
+		my_sa->esp.spi = this->my_spi;
+		other_sa->esp.use = TRUE;
+		other_sa->esp.spi = this->other_spi;
+	}
+	else
+	{
+		my_sa->ah.use = TRUE;
+		my_sa->ah.spi = this->my_spi;
+		other_sa->ah.use = TRUE;
+		other_sa->ah.spi = this->other_spi;
+	}
+
+	enumerator = create_policy_enumerator(this);
+	while (enumerator->enumerate(enumerator, NULL, NULL))
+	{
+		my_sa->policy_count++;
+		other_sa->policy_count++;
+	}
+	enumerator->destroy(enumerator);
 }
 
 /**
@@ -747,24 +889,66 @@ static bool require_policy_update()
 static status_t install_policies_internal(private_child_sa_t *this,
 	host_t *my_addr, host_t *other_addr, traffic_selector_t *my_ts,
 	traffic_selector_t *other_ts, ipsec_sa_cfg_t *my_sa,
-	ipsec_sa_cfg_t *other_sa, policy_type_t type, policy_priority_t priority)
+	ipsec_sa_cfg_t *other_sa, policy_type_t type,
+	policy_priority_t priority,	uint32_t manual_prio)
 {
+	kernel_ipsec_policy_id_t out_id = {
+		.dir = POLICY_OUT,
+		.src_ts = my_ts,
+		.dst_ts = other_ts,
+		.mark = this->mark_out,
+		.interface = this->config->get_interface(this->config),
+	}, in_id = {
+		.dir = POLICY_IN,
+		.src_ts = other_ts,
+		.dst_ts = my_ts,
+		.mark = this->mark_in,
+	};
+	kernel_ipsec_manage_policy_t out_policy = {
+		.type = type,
+		.prio = priority,
+		.manual_prio = manual_prio,
+		.src = my_addr,
+		.dst = other_addr,
+		.sa = other_sa,
+	}, in_policy = {
+		.type = type,
+		.prio = priority,
+		.manual_prio = manual_prio,
+		.src = other_addr,
+		.dst = my_addr,
+		.sa = my_sa,
+	};
 	status_t status = SUCCESS;
-	status |= hydra->kernel_interface->add_policy(hydra->kernel_interface,
-							my_addr, other_addr, my_ts, other_ts,
-							POLICY_OUT, type, other_sa,
-							this->mark_out, priority);
 
-	status |= hydra->kernel_interface->add_policy(hydra->kernel_interface,
-							other_addr, my_addr, other_ts, my_ts,
-							POLICY_IN, type, my_sa,
-							this->mark_in, priority);
+	status |= charon->kernel->add_policy(charon->kernel, &out_id, &out_policy);
+	status |= charon->kernel->add_policy(charon->kernel, &in_id, &in_policy);
 	if (this->mode != MODE_TRANSPORT)
 	{
-		status |= hydra->kernel_interface->add_policy(hydra->kernel_interface,
-							other_addr, my_addr, other_ts, my_ts,
-							POLICY_FWD, type, my_sa,
-							this->mark_in, priority);
+		in_id.dir = POLICY_FWD;
+		status |= charon->kernel->add_policy(charon->kernel, &in_id, &in_policy);
+
+		/* install an "outbound" FWD policy in case there is a drop policy
+		 * matching outbound forwarded traffic, to allow another tunnel to use
+		 * the reversed subnets and do the same we don't set a reqid (this also
+		 * allows the kernel backend to distinguish between the two types of
+		 * FWD policies). To avoid problems with symmetrically overlapping
+		 * policies of two SAs we install them with reduced priority.  As they
+		 * basically act as bypass policies for drop policies we use a higher
+		 * priority than is used for them. */
+		if (this->policies_fwd_out)
+		{
+			out_id.dir = POLICY_FWD;
+			other_sa->reqid = 0;
+			if (priority == POLICY_PRIORITY_DEFAULT)
+			{
+				out_policy.prio = POLICY_PRIORITY_ROUTED;
+			}
+			status |= charon->kernel->add_policy(charon->kernel, &out_id,
+												 &out_policy);
+			/* reset the reqid for any other further policies */
+			other_sa->reqid = this->reqid;
+		}
 	}
 	return status;
 }
@@ -773,20 +957,57 @@ static status_t install_policies_internal(private_child_sa_t *this,
  * Delete 3 policies: out, in and forward
  */
 static void del_policies_internal(private_child_sa_t *this,
-		traffic_selector_t *my_ts, traffic_selector_t *other_ts,
-		policy_priority_t priority)
+	host_t *my_addr, host_t *other_addr, traffic_selector_t *my_ts,
+	traffic_selector_t *other_ts, ipsec_sa_cfg_t *my_sa,
+	ipsec_sa_cfg_t *other_sa, policy_type_t type,
+	policy_priority_t priority, uint32_t manual_prio)
 {
-	hydra->kernel_interface->del_policy(hydra->kernel_interface,
-						my_ts, other_ts, POLICY_OUT, this->reqid,
-						this->mark_out, priority);
-	hydra->kernel_interface->del_policy(hydra->kernel_interface,
-						other_ts, my_ts,  POLICY_IN, this->reqid,
-						this->mark_in, priority);
+	kernel_ipsec_policy_id_t out_id = {
+		.dir = POLICY_OUT,
+		.src_ts = my_ts,
+		.dst_ts = other_ts,
+		.mark = this->mark_out,
+		.interface = this->config->get_interface(this->config),
+	}, in_id = {
+		.dir = POLICY_IN,
+		.src_ts = other_ts,
+		.dst_ts = my_ts,
+		.mark = this->mark_in,
+	};
+	kernel_ipsec_manage_policy_t out_policy = {
+		.type = type,
+		.prio = priority,
+		.manual_prio = manual_prio,
+		.src = my_addr,
+		.dst = other_addr,
+		.sa = other_sa,
+	}, in_policy = {
+		.type = type,
+		.prio = priority,
+		.manual_prio = manual_prio,
+		.src = other_addr,
+		.dst = my_addr,
+		.sa = my_sa,
+	};
+
+	charon->kernel->del_policy(charon->kernel, &out_id, &out_policy);
+	charon->kernel->del_policy(charon->kernel, &in_id, &in_policy);
 	if (this->mode != MODE_TRANSPORT)
 	{
-		hydra->kernel_interface->del_policy(hydra->kernel_interface,
-						other_ts, my_ts, POLICY_FWD, this->reqid,
-						this->mark_in, priority);
+		in_id.dir = POLICY_FWD;
+		charon->kernel->del_policy(charon->kernel, &in_id, &in_policy);
+
+		if (this->policies_fwd_out)
+		{
+			out_id.dir = POLICY_FWD;
+			other_sa->reqid = 0;
+			if (priority == POLICY_PRIORITY_DEFAULT)
+			{
+				out_policy.prio = POLICY_PRIORITY_ROUTED;
+			}
+			charon->kernel->del_policy(charon->kernel, &out_id, &out_policy);
+			other_sa->reqid = this->reqid;
+		}
 	}
 }
 
@@ -798,6 +1019,19 @@ METHOD(child_sa_t, add_policies, status_t,
 	traffic_selector_t *my_ts, *other_ts;
 	status_t status = SUCCESS;
 
+	if (!this->reqid_allocated && !this->static_reqid)
+	{
+		/* trap policy, get or confirm reqid */
+		status = charon->kernel->alloc_reqid(
+							charon->kernel, my_ts_list, other_ts_list,
+							this->mark_in, this->mark_out, &this->reqid);
+		if (status != SUCCESS)
+		{
+			return status;
+		}
+		this->reqid_allocated = TRUE;
+	}
+
 	/* apply traffic selectors */
 	enumerator = my_ts_list->create_enumerator(my_ts_list);
 	while (enumerator->enumerate(enumerator, &my_ts))
@@ -805,41 +1039,24 @@ METHOD(child_sa_t, add_policies, status_t,
 		array_insert(this->my_ts, ARRAY_TAIL, my_ts->clone(my_ts));
 	}
 	enumerator->destroy(enumerator);
+	array_sort(this->my_ts, (void*)traffic_selector_cmp, NULL);
+
 	enumerator = other_ts_list->create_enumerator(other_ts_list);
 	while (enumerator->enumerate(enumerator, &other_ts))
 	{
 		array_insert(this->other_ts, ARRAY_TAIL, other_ts->clone(other_ts));
 	}
 	enumerator->destroy(enumerator);
+	array_sort(this->other_ts, (void*)traffic_selector_cmp, NULL);
 
 	if (this->config->install_policy(this->config))
 	{
 		policy_priority_t priority;
-		ipsec_sa_cfg_t my_sa = {
-			.mode = this->mode,
-			.reqid = this->reqid,
-			.ipcomp = {
-				.transform = this->ipcomp,
-			},
-		}, other_sa = my_sa;
+		ipsec_sa_cfg_t my_sa, other_sa;
+		uint32_t manual_prio;
 
-		my_sa.ipcomp.cpi = this->my_cpi;
-		other_sa.ipcomp.cpi = this->other_cpi;
-
-		if (this->protocol == PROTO_ESP)
-		{
-			my_sa.esp.use = TRUE;
-			my_sa.esp.spi = this->my_spi;
-			other_sa.esp.use = TRUE;
-			other_sa.esp.spi = this->other_spi;
-		}
-		else
-		{
-			my_sa.ah.use = TRUE;
-			my_sa.ah.spi = this->my_spi;
-			other_sa.ah.use = TRUE;
-			other_sa.ah.spi = this->other_spi;
-		}
+		prepare_sa_cfg(this, &my_sa, &other_sa);
+		manual_prio = this->config->get_manual_prio(this->config);
 
 		/* if we're not in state CHILD_INSTALLING (i.e. if there is no SAD
 		 * entry) we install a trap policy */
@@ -847,32 +1064,26 @@ METHOD(child_sa_t, add_policies, status_t,
 		priority = this->trap ? POLICY_PRIORITY_ROUTED
 							  : POLICY_PRIORITY_DEFAULT;
 
-		enumerator = create_policy_enumerator(this);
-		while (enumerator->enumerate(enumerator, &my_ts, &other_ts))
-		{
-			my_sa.policy_count++;
-			other_sa.policy_count++;
-		}
-		enumerator->destroy(enumerator);
-
 		/* enumerate pairs of traffic selectors */
 		enumerator = create_policy_enumerator(this);
 		while (enumerator->enumerate(enumerator, &my_ts, &other_ts))
 		{
 			/* install outbound drop policy to avoid packets leaving unencrypted
 			 * when updating policies */
-			if (priority == POLICY_PRIORITY_DEFAULT && require_policy_update())
+			if (priority == POLICY_PRIORITY_DEFAULT && manual_prio == 0 &&
+				require_policy_update())
 			{
 				status |= install_policies_internal(this, this->my_addr,
 									this->other_addr, my_ts, other_ts,
 									&my_sa, &other_sa, POLICY_DROP,
-									POLICY_PRIORITY_FALLBACK);
+									POLICY_PRIORITY_FALLBACK, 0);
 			}
 
 			/* install policies */
 			status |= install_policies_internal(this, this->my_addr,
 									this->other_addr, my_ts, other_ts,
-									&my_sa, &other_sa, POLICY_IPSEC, priority);
+									&my_sa, &other_sa, POLICY_IPSEC,
+									priority, manual_prio);
 
 			if (status != SUCCESS)
 			{
@@ -896,11 +1107,10 @@ static void reinstall_vip(host_t *vip, host_t *me)
 {
 	char *iface;
 
-	if (hydra->kernel_interface->get_interface(hydra->kernel_interface,
-											   me, &iface))
+	if (charon->kernel->get_interface(charon->kernel, me, &iface))
 	{
-		hydra->kernel_interface->del_ip(hydra->kernel_interface, vip, -1, TRUE);
-		hydra->kernel_interface->add_ip(hydra->kernel_interface, vip, -1, iface);
+		charon->kernel->del_ip(charon->kernel, vip, -1, TRUE);
+		charon->kernel->add_ip(charon->kernel, vip, -1, iface);
 		free(iface);
 	}
 }
@@ -929,11 +1139,22 @@ METHOD(child_sa_t, update, status_t,
 		/* update our (initiator) SA */
 		if (this->my_spi)
 		{
-			if (hydra->kernel_interface->update_sa(hydra->kernel_interface,
-							this->my_spi, proto_ike2ip(this->protocol),
-							this->ipcomp != IPCOMP_NONE ? this->my_cpi : 0,
-							this->other_addr, this->my_addr, other, me,
-							this->encap, encap, this->mark_in) == NOT_SUPPORTED)
+			kernel_ipsec_sa_id_t id = {
+				.src = this->other_addr,
+				.dst = this->my_addr,
+				.spi = this->my_spi,
+				.proto = proto_ike2ip(this->protocol),
+				.mark = this->mark_in,
+			};
+			kernel_ipsec_update_sa_t sa = {
+				.cpi = this->ipcomp != IPCOMP_NONE ? this->my_cpi : 0,
+				.new_src = other,
+				.new_dst = me,
+				.encap = this->encap,
+				.new_encap = encap,
+			};
+			if (charon->kernel->update_sa(charon->kernel, &id,
+										  &sa) == NOT_SUPPORTED)
 			{
 				set_state(this, old);
 				return NOT_SUPPORTED;
@@ -943,11 +1164,22 @@ METHOD(child_sa_t, update, status_t,
 		/* update his (responder) SA */
 		if (this->other_spi)
 		{
-			if (hydra->kernel_interface->update_sa(hydra->kernel_interface,
-							this->other_spi, proto_ike2ip(this->protocol),
-							this->ipcomp != IPCOMP_NONE ? this->other_cpi : 0,
-							this->my_addr, this->other_addr, me, other,
-							this->encap, encap, this->mark_out) == NOT_SUPPORTED)
+			kernel_ipsec_sa_id_t id = {
+				.src = this->my_addr,
+				.dst = this->other_addr,
+				.spi = this->other_spi,
+				.proto = proto_ike2ip(this->protocol),
+				.mark = this->mark_out,
+			};
+			kernel_ipsec_update_sa_t sa = {
+				.cpi = this->ipcomp != IPCOMP_NONE ? this->other_cpi : 0,
+				.new_src = me,
+				.new_dst = other,
+				.encap = this->encap,
+				.new_encap = encap,
+			};
+			if (charon->kernel->update_sa(charon->kernel, &id,
+										  &sa) == NOT_SUPPORTED)
 			{
 				set_state(this, old);
 				return NOT_SUPPORTED;
@@ -957,47 +1189,27 @@ METHOD(child_sa_t, update, status_t,
 
 	if (this->config->install_policy(this->config) && require_policy_update())
 	{
-		ipsec_sa_cfg_t my_sa = {
-			.mode = this->mode,
-			.reqid = this->reqid,
-			.ipcomp = {
-				.transform = this->ipcomp,
-			},
-		}, other_sa = my_sa;
-
-		my_sa.ipcomp.cpi = this->my_cpi;
-		other_sa.ipcomp.cpi = this->other_cpi;
-
-		if (this->protocol == PROTO_ESP)
-		{
-			my_sa.esp.use = TRUE;
-			my_sa.esp.spi = this->my_spi;
-			other_sa.esp.use = TRUE;
-			other_sa.esp.spi = this->other_spi;
-		}
-		else
-		{
-			my_sa.ah.use = TRUE;
-			my_sa.ah.spi = this->my_spi;
-			other_sa.ah.use = TRUE;
-			other_sa.ah.spi = this->other_spi;
-		}
-
-		/* update policies */
 		if (!me->ip_equals(me, this->my_addr) ||
 			!other->ip_equals(other, this->other_addr))
 		{
+			ipsec_sa_cfg_t my_sa, other_sa;
 			enumerator_t *enumerator;
 			traffic_selector_t *my_ts, *other_ts;
+			uint32_t manual_prio;
+
+			prepare_sa_cfg(this, &my_sa, &other_sa);
+			manual_prio = this->config->get_manual_prio(this->config);
 
 			/* always use high priorities, as hosts getting updated are INSTALLED */
 			enumerator = create_policy_enumerator(this);
 			while (enumerator->enumerate(enumerator, &my_ts, &other_ts))
 			{
 				traffic_selector_t *old_my_ts = NULL, *old_other_ts = NULL;
+
 				/* remove old policies first */
-				del_policies_internal(this, my_ts, other_ts,
-									  POLICY_PRIORITY_DEFAULT);
+				del_policies_internal(this, this->my_addr, this->other_addr,
+							my_ts, other_ts, &my_sa, &other_sa, POLICY_IPSEC,
+							POLICY_PRIORITY_DEFAULT, manual_prio);
 
 				/* check if we have to update a "dynamic" traffic selector */
 				if (!me->ip_equals(me, this->my_addr) &&
@@ -1019,21 +1231,23 @@ METHOD(child_sa_t, update, status_t,
 
 				/* reinstall updated policies */
 				install_policies_internal(this, me, other, my_ts, other_ts,
-								&my_sa, &other_sa, POLICY_IPSEC,
-								POLICY_PRIORITY_DEFAULT);
+										  &my_sa, &other_sa, POLICY_IPSEC,
+										  POLICY_PRIORITY_DEFAULT, manual_prio);
 
 				/* update fallback policies after the new policy is in place */
-				if (old_my_ts || old_other_ts)
+				if (manual_prio == 0)
 				{
-					del_policies_internal(this, old_my_ts ?: my_ts,
+					del_policies_internal(this, this->my_addr, this->other_addr,
+										  old_my_ts ?: my_ts,
 										  old_other_ts ?: other_ts,
-										  POLICY_PRIORITY_FALLBACK);
+										  &my_sa, &other_sa, POLICY_DROP,
+										  POLICY_PRIORITY_FALLBACK, 0);
 					install_policies_internal(this, me, other, my_ts, other_ts,
-								&my_sa, &other_sa, POLICY_DROP,
-								POLICY_PRIORITY_FALLBACK);
-					DESTROY_IF(old_my_ts);
-					DESTROY_IF(old_other_ts);
+										  &my_sa, &other_sa, POLICY_DROP,
+										  POLICY_PRIORITY_FALLBACK, 0);
 				}
+				DESTROY_IF(old_my_ts);
+				DESTROY_IF(old_other_ts);
 			}
 			enumerator->destroy(enumerator);
 		}
@@ -1071,36 +1285,69 @@ METHOD(child_sa_t, destroy, void,
 
 	set_state(this, CHILD_DESTROYING);
 
-	/* delete SAs in the kernel, if they are set up */
-	if (this->my_spi)
-	{
-		hydra->kernel_interface->del_sa(hydra->kernel_interface,
-					this->other_addr, this->my_addr, this->my_spi,
-					proto_ike2ip(this->protocol), this->my_cpi,
-					this->mark_in);
-	}
-	if (this->other_spi)
-	{
-		hydra->kernel_interface->del_sa(hydra->kernel_interface,
-					this->my_addr, this->other_addr, this->other_spi,
-					proto_ike2ip(this->protocol), this->other_cpi,
-					this->mark_out);
-	}
-
 	if (this->config->install_policy(this->config))
 	{
+		ipsec_sa_cfg_t my_sa, other_sa;
+		uint32_t manual_prio;
+
+		prepare_sa_cfg(this, &my_sa, &other_sa);
+		manual_prio = this->config->get_manual_prio(this->config);
+
 		/* delete all policies in the kernel */
 		enumerator = create_policy_enumerator(this);
 		while (enumerator->enumerate(enumerator, &my_ts, &other_ts))
 		{
-			del_policies_internal(this, my_ts, other_ts, priority);
-			if (priority == POLICY_PRIORITY_DEFAULT && require_policy_update())
+			del_policies_internal(this, this->my_addr, this->other_addr,
+								  my_ts, other_ts, &my_sa, &other_sa,
+								  POLICY_IPSEC, priority, manual_prio);
+			if (priority == POLICY_PRIORITY_DEFAULT && manual_prio == 0 &&
+				require_policy_update())
 			{
-				del_policies_internal(this, my_ts, other_ts,
-									  POLICY_PRIORITY_FALLBACK);
+				del_policies_internal(this, this->my_addr, this->other_addr,
+									  my_ts, other_ts, &my_sa, &other_sa,
+									  POLICY_DROP, POLICY_PRIORITY_FALLBACK, 0);
 			}
 		}
 		enumerator->destroy(enumerator);
+	}
+
+	/* delete SAs in the kernel, if they are set up */
+	if (this->my_spi)
+	{
+		kernel_ipsec_sa_id_t id = {
+			.src = this->other_addr,
+			.dst = this->my_addr,
+			.spi = this->my_spi,
+			.proto = proto_ike2ip(this->protocol),
+			.mark = this->mark_in,
+		};
+		kernel_ipsec_del_sa_t sa = {
+			.cpi = this->my_cpi,
+		};
+		charon->kernel->del_sa(charon->kernel, &id, &sa);
+	}
+	if (this->other_spi)
+	{
+		kernel_ipsec_sa_id_t id = {
+			.src = this->my_addr,
+			.dst = this->other_addr,
+			.spi = this->other_spi,
+			.proto = proto_ike2ip(this->protocol),
+			.mark = this->mark_out,
+		};
+		kernel_ipsec_del_sa_t sa = {
+			.cpi = this->other_cpi,
+		};
+		charon->kernel->del_sa(charon->kernel, &id, &sa);
+	}
+
+	if (this->reqid_allocated)
+	{
+		if (charon->kernel->release_reqid(charon->kernel,
+						this->reqid, this->mark_in, this->mark_out) != SUCCESS)
+		{
+			DBG1(DBG_CHD, "releasing reqid %u failed", this->reqid);
+		}
 	}
 
 	array_destroy_offset(this->my_ts, offsetof(traffic_selector_t, destroy));
@@ -1118,7 +1365,7 @@ METHOD(child_sa_t, destroy, void,
 static host_t* get_proxy_addr(child_cfg_t *config, host_t *ike, bool local)
 {
 	host_t *host = NULL;
-	u_int8_t mask;
+	uint8_t mask;
 	enumerator_t *enumerator;
 	linked_list_t *ts_list, *list;
 	traffic_selector_t *ts;
@@ -1151,15 +1398,18 @@ static host_t* get_proxy_addr(child_cfg_t *config, host_t *ike, bool local)
  * Described in header.
  */
 child_sa_t * child_sa_create(host_t *me, host_t* other,
-							 child_cfg_t *config, u_int32_t rekey, bool encap)
+							 child_cfg_t *config, uint32_t rekey, bool encap,
+							 u_int mark_in, u_int mark_out)
 {
-	static refcount_t reqid = 0;
 	private_child_sa_t *this;
+	static refcount_t unique_id = 0, unique_mark = 0;
+	refcount_t mark;
 
 	INIT(this,
 		.public = {
 			.get_name = _get_name,
 			.get_reqid = _get_reqid,
+			.get_unique_id = _get_unique_id,
 			.get_config = _get_config,
 			.get_state = _get_state,
 			.set_state = _set_state,
@@ -1201,17 +1451,47 @@ child_sa_t * child_sa_create(host_t *me, host_t* other,
 		.close_action = config->get_close_action(config),
 		.dpd_action = config->get_dpd_action(config),
 		.reqid = config->get_reqid(config),
+		.unique_id = ref_get(&unique_id),
 		.mark_in = config->get_mark(config, TRUE),
 		.mark_out = config->get_mark(config, FALSE),
 		.install_time = time_monotonic(NULL),
+		.policies_fwd_out = config->install_fwd_out_policy(config),
 	);
 
 	this->config = config;
 	config->get_ref(config);
 
+	if (mark_in)
+	{
+		this->mark_in.value = mark_in;
+	}
+	if (mark_out)
+	{
+		this->mark_out.value = mark_out;
+	}
+	if (this->mark_in.value == MARK_UNIQUE ||
+		this->mark_out.value == MARK_UNIQUE)
+	{
+		mark = ref_get(&unique_mark);
+		if (this->mark_in.value == MARK_UNIQUE)
+		{
+			this->mark_in.value = mark;
+		}
+		if (this->mark_out.value == MARK_UNIQUE)
+		{
+			this->mark_out.value = mark;
+		}
+	}
+
 	if (!this->reqid)
 	{
-		/* reuse old reqid if we are rekeying an existing CHILD_SA */
+		/* reuse old reqid if we are rekeying an existing CHILD_SA. While the
+		 * reqid cache would find the same reqid for our selectors, this does
+		 * not work in a special case: If an SA is triggered by a trap policy,
+		 * but the negotiated SA gets narrowed, we still must reuse the same
+		 * reqid to successfully "trigger" the SA on the kernel level. Rekeying
+		 * such an SA requires an explicit reqid, as the cache currently knows
+		 * the original selectors only for that reqid. */
 		if (rekey)
 		{
 			this->reqid = rekey;
@@ -1219,20 +1499,11 @@ child_sa_t * child_sa_create(host_t *me, host_t* other,
 		else
 		{
 			this->reqid = charon->traps->find_reqid(charon->traps, config);
-			if (!this->reqid)
-			{
-				this->reqid = ref_get(&reqid);
-			}
 		}
 	}
-
-	if (this->mark_in.value == MARK_REQID)
+	else
 	{
-		this->mark_in.value = this->reqid;
-	}
-	if (this->mark_out.value == MARK_REQID)
-	{
-		this->mark_out.value = this->reqid;
+		this->static_reqid = TRUE;
 	}
 
 	/* MIPv6 proxy transport mode sets SA endpoints to TS hosts */

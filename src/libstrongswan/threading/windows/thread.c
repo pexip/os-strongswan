@@ -516,7 +516,11 @@ thread_t *thread_current()
  */
 u_int thread_current_id()
 {
+#ifdef USE_THREAD_IDS
+	return get_current_thread()->id;
+#else
 	return get_current_thread()->tid;
+#endif
 }
 
 /**
@@ -555,6 +559,26 @@ void thread_cleanup_pop(bool execute)
 
 	if (execute)
 	{
+		cleanup.cb(cleanup.arg);
+	}
+}
+
+/**
+ * Described in header.
+ */
+void thread_cleanup_popall()
+{
+	private_thread_t *this;
+	cleanup_t cleanup = {};
+	bool old;
+
+	this = get_current_thread();
+	while (array_count(this->cleanup))
+	{
+		old = set_leak_detective(FALSE);
+		array_remove(this->cleanup, -1, &cleanup);
+		set_leak_detective(old);
+
 		cleanup.cb(cleanup.arg);
 	}
 }

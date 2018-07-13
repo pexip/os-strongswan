@@ -18,7 +18,6 @@
 #include <netdb.h>
 
 #include <daemon.h>
-#include <hydra.h>
 #include <attributes/mem_pool.h>
 #include <collections/hashtable.h>
 #include <threading/mutex.h>
@@ -125,7 +124,7 @@ struct private_load_tester_config_t {
 	/**
 	 * Current port for unique initiator ports
 	 */
-	u_int16_t unique_port;
+	uint16_t unique_port;
 
 	/**
 	 * IKE_SA rekeying delay
@@ -155,7 +154,7 @@ struct private_load_tester_config_t {
 	/**
 	 * Dynamic source port, if used
 	 */
-	u_int16_t port;
+	uint16_t port;
 
 	/**
 	 * IKE version to use for load testing
@@ -394,6 +393,28 @@ static void generate_auth_cfg(private_load_tester_config_t *this, char *str,
 				}
 			}
 		}
+		else if (strpfx(str, "xauth"))
+		{	/* XAuth, use a username */
+			class = AUTH_CLASS_XAUTH;
+			if (*(str + strlen("xauth")) == '-')
+			{
+				auth->add(auth, AUTH_RULE_XAUTH_BACKEND, str + strlen("xauth-"));
+			}
+			if (!id)
+			{
+				if (local && num)
+				{
+					snprintf(buf, sizeof(buf), "cli-%.6d-%.2d", num, rnd);
+					id = identification_create_from_string(buf);
+				}
+				else
+				{
+					id = identification_create_from_encoding(ID_ANY, chunk_empty);
+				}
+			}
+			/* additionally set the ID as XAuth identity */
+			auth->add(auth, AUTH_RULE_XAUTH_IDENTITY, id->clone(id));
+		}
 		else
 		{
 			if (!streq(str, "pubkey"))
@@ -433,8 +454,8 @@ static void generate_auth_cfg(private_load_tester_config_t *this, char *str,
 /**
  * Parse a protoport specifier
  */
-static bool parse_protoport(char *token, u_int16_t *from_port,
-							u_int16_t *to_port, u_int8_t *protocol)
+static bool parse_protoport(char *token, uint16_t *from_port,
+							uint16_t *to_port, uint8_t *protocol)
 {
 	char *sep, *port = "", *endptr;
 	struct protoent *proto;
@@ -473,7 +494,7 @@ static bool parse_protoport(char *token, u_int16_t *from_port,
 			{
 				return FALSE;
 			}
-			*protocol = (u_int8_t)p;
+			*protocol = (uint8_t)p;
 		}
 	}
 	if (streq(port, "%any"))
@@ -536,8 +557,8 @@ static void add_ts(private_load_tester_config_t *this,
 	{
 		enumerator_t *enumerator;
 		char *subnet, *pos;
-		u_int16_t from_port, to_port;
-		u_int8_t proto;
+		uint16_t from_port, to_port;
+		uint8_t proto;
 
 		enumerator = enumerator_create_token(string, ",", " ");
 		while (enumerator->enumerate(enumerator, &subnet))
@@ -618,7 +639,7 @@ static host_t *allocate_addr(private_load_tester_config_t *this, uint num)
 	enumerator = this->pools->create_enumerator(this->pools);
 	while (enumerator->enumerate(enumerator, &pool))
 	{
-		found = pool->acquire_address(pool, id, requested, MEM_POOL_NEW);
+		found = pool->acquire_address(pool, id, requested, MEM_POOL_NEW, NULL);
 		if (found)
 		{
 			iface = (char*)pool->get_name(pool);
@@ -634,8 +655,8 @@ static host_t *allocate_addr(private_load_tester_config_t *this, uint num)
 		id->destroy(id);
 		return NULL;
 	}
-	if (hydra->kernel_interface->add_ip(hydra->kernel_interface,
-										found, this->prefix, iface) != SUCCESS)
+	if (charon->kernel->add_ip(charon->kernel, found, this->prefix,
+							   iface) != SUCCESS)
 	{
 		DBG1(DBG_CFG, "installing load-tester IP %H on %s failed", found, iface);
 		found->destroy(found);
@@ -667,13 +688,25 @@ static peer_cfg_t* generate_config(private_load_tester_config_t *this, uint num)
 	peer_cfg_t *peer_cfg;
 	char local[32], *remote;
 	host_t *addr;
-	ipsec_mode_t mode = MODE_TUNNEL;
-	lifetime_cfg_t lifetime = {
-		.time = {
-			.life = this->child_rekey * 2,
-			.rekey = this->child_rekey,
-			.jitter = 0
-		}
+	peer_cfg_create_t peer = {
+		.cert_policy = CERT_SEND_IF_ASKED,
+		.unique = UNIQUE_NO,
+		.keyingtries = 1,
+		.rekey_time = this->ike_rekey,
+		.over_time = this->ike_rekey,
+		.no_mobike = TRUE,
+		.dpd = this->dpd_delay,
+		.dpd_timeout = this->dpd_timeout,
+	};
+	child_cfg_create_t child = {
+		.lifetime = {
+			.time = {
+				.life = this->child_rekey * 2,
+				.rekey = this->child_rekey,
+				.jitter = 0
+			},
+		},
+		.mode = MODE_TUNNEL,
 	};
 
 	if (num)
@@ -716,14 +749,8 @@ static peer_cfg_t* generate_config(private_load_tester_config_t *this, uint num)
 								 FRAGMENTATION_NO, 0);
 	}
 	ike_cfg->add_proposal(ike_cfg, this->proposal->clone(this->proposal));
-	peer_cfg = peer_cfg_create("load-test", ike_cfg,
-							   CERT_SEND_IF_ASKED, UNIQUE_NO, 1, /* keytries */
-							   this->ike_rekey, 0, /* rekey, reauth */
-							   0, this->ike_rekey, /* jitter, overtime */
-							   FALSE, FALSE, TRUE, /* mobike, aggressive, pull */
-							   this->dpd_delay,   /* dpd_delay */
-							   this->dpd_timeout, /* dpd_timeout */
-							   FALSE, NULL, NULL);
+	peer_cfg = peer_cfg_create("load-test", ike_cfg, &peer);
+
 	if (this->vip)
 	{
 		peer_cfg->add_virtual_ip(peer_cfg, this->vip->clone(this->vip));
@@ -747,17 +774,15 @@ static peer_cfg_t* generate_config(private_load_tester_config_t *this, uint num)
 	{
 		if (streq(this->mode, "transport"))
 		{
-			mode = MODE_TRANSPORT;
+			child.mode = MODE_TRANSPORT;
 		}
 		else if (streq(this->mode, "beet"))
 		{
-			mode = MODE_BEET;
+			child.mode = MODE_BEET;
 		}
 	}
 
-	child_cfg = child_cfg_create("load-test", &lifetime, NULL, TRUE, mode,
-								 ACTION_NONE, ACTION_NONE, ACTION_NONE, FALSE,
-								 0, 0, NULL, NULL, 0);
+	child_cfg = child_cfg_create("load-test", &child);
 	child_cfg->add_proposal(child_cfg, this->esp->clone(this->esp));
 
 	if (num)
@@ -830,8 +855,8 @@ METHOD(load_tester_config_t, delete_ip, void,
 		{
 			if (pool->release_address(pool, entry->host, entry->id))
 			{
-				hydra->kernel_interface->del_ip(hydra->kernel_interface,
-											entry->host, this->prefix, FALSE);
+				charon->kernel->del_ip(charon->kernel, entry->host,
+									   this->prefix, FALSE);
 				break;
 			}
 		}
@@ -860,8 +885,8 @@ static void cleanup_leases(private_load_tester_config_t *this)
 		{
 			if (online)
 			{
-				hydra->kernel_interface->del_ip(hydra->kernel_interface,
-												addr, this->prefix, FALSE);
+				charon->kernel->del_ip(charon->kernel, addr, this->prefix,
+									   FALSE);
 				entry = this->leases->remove(this->leases, addr);
 				if (entry)
 				{

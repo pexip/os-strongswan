@@ -17,17 +17,15 @@
  */
 
 #include <stdio.h>
-#define _POSIX_PTHREAD_SEMANTICS /* for two param sigwait on OpenSolaris */
 #include <signal.h>
-#undef _POSIX_PTHREAD_SEMANTICS
 #include <pthread.h>
 #include <sys/types.h>
 #include <sys/utsname.h>
 #include <unistd.h>
 #include <getopt.h>
+#include <errno.h>
 
 #include <library.h>
-#include <hydra.h>
 #include <daemon.h>
 #include <utils/backtrace.h>
 #include <threading/thread.h>
@@ -112,12 +110,15 @@ static int run()
 	while (TRUE)
 	{
 		int sig;
-		int error;
 
-		error = sigwait(&set, &sig);
-		if (error)
+		sig = sigwaitinfo(&set, NULL);
+		if (sig == -1)
 		{
-			DBG1(DBG_DMN, "error %d while waiting for a signal", error);
+			if (errno == EINTR)
+			{	/* ignore signals we didn't wait for */
+				continue;
+			}
+			DBG1(DBG_DMN, "waiting for signal failed: %s", strerror(errno));
 			return 1;
 		}
 		switch (sig)
@@ -153,11 +154,6 @@ static int run()
 			{	/* an error occurred */
 				charon->bus->alert(charon->bus, ALERT_SHUTDOWN_SIGNAL, sig);
 				return 1;
-			}
-			default:
-			{
-				DBG1(DBG_DMN, "unknown signal %d received. Ignored", sig);
-				break;
 			}
 		}
 	}
@@ -333,11 +329,6 @@ int main(int argc, char *argv[])
 			exit(SS_RC_DAEMON_INTEGRITY);
 		}
 	}
-	atexit(libhydra_deinit);
-	if (!libhydra_init())
-	{
-		exit(SS_RC_INITIALIZATION_FAILED);
-	}
 	atexit(libcharon_deinit);
 	if (!libcharon_init())
 	{
@@ -382,7 +373,7 @@ int main(int argc, char *argv[])
 	lib->plugins->status(lib->plugins, LEVEL_CTRL);
 
 	/* add handler for SEGV and ILL,
-	 * INT, TERM and HUP are handled by sigwait() in run() */
+	 * INT, TERM and HUP are handled by sigwaitinfo() in run() */
 	action.sa_handler = segv_handler;
 	action.sa_flags = 0;
 	sigemptyset(&action.sa_mask);

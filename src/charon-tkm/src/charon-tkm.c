@@ -24,8 +24,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <libgen.h>
+#include <errno.h>
 
-#include <hydra.h>
 #include <daemon.h>
 #include <library.h>
 #include <utils/backtrace.h>
@@ -42,6 +42,7 @@
 #include "tkm_public_key.h"
 #include "tkm_cred.h"
 #include "tkm_encoder.h"
+#include "tkm_spi_generator.h"
 
 /**
  * TKM bus listener for IKE authorize events.
@@ -98,12 +99,15 @@ static void run()
 	while (TRUE)
 	{
 		int sig;
-		int error;
 
-		error = sigwait(&set, &sig);
-		if (error)
+		sig = sigwaitinfo(&set, NULL);
+		if (sig == -1)
 		{
-			DBG1(DBG_DMN, "error %d while waiting for a signal", error);
+			if (errno == EINTR)
+			{	/* ignore signals we didn't wait for */
+				continue;
+			}
+			DBG1(DBG_DMN, "waiting for signal failed: %s", strerror(errno));
 			return;
 		}
 		switch (sig)
@@ -119,11 +123,6 @@ static void run()
 				DBG1(DBG_DMN, "signal of type SIGTERM received. Shutting down");
 				charon->bus->alert(charon->bus, ALERT_SHUTDOWN_SIGNAL, sig);
 				return;
-			}
-			default:
-			{
-				DBG1(DBG_DMN, "unknown signal %d received. Ignored", sig);
-				break;
 			}
 		}
 	}
@@ -256,14 +255,6 @@ int main(int argc, char *argv[])
 		exit(status);
 	}
 
-	if (!libhydra_init())
-	{
-		dbg_syslog(DBG_DMN, 1, "initialization failed - aborting %s", dmn_name);
-		libhydra_deinit();
-		library_deinit();
-		exit(status);
-	}
-
 	if (!libcharon_init())
 	{
 		dbg_syslog(DBG_DMN, 1, "initialization failed - aborting %s", dmn_name);
@@ -275,6 +266,10 @@ int main(int argc, char *argv[])
 		dbg_syslog(DBG_DMN, 1, "invalid uid/gid - aborting %s", dmn_name);
 		goto deinit;
 	}
+
+	/* the authorize hook currently does not support RFC 7427 signature auth */
+	lib->settings->set_bool(lib->settings, "%s.signature_authentication", FALSE,
+							dmn_name);
 
 	/* make sure we log to the DAEMON facility by default */
 	lib->settings->set_int(lib->settings, "%s.syslog.daemon.default",
@@ -291,9 +286,12 @@ int main(int argc, char *argv[])
 		PLUGIN_REGISTER(PUBKEY, tkm_public_key_load, TRUE),
 			PLUGIN_PROVIDE(PUBKEY, KEY_RSA),
 			PLUGIN_PROVIDE(PUBKEY_VERIFY, SIGN_RSA_EMSA_PKCS1_SHA1),
-			PLUGIN_PROVIDE(PUBKEY_VERIFY, SIGN_RSA_EMSA_PKCS1_SHA256),
+			PLUGIN_PROVIDE(PUBKEY_VERIFY, SIGN_RSA_EMSA_PKCS1_SHA2_256),
 		PLUGIN_CALLBACK(kernel_ipsec_register, tkm_kernel_ipsec_create),
 			PLUGIN_PROVIDE(CUSTOM, "kernel-ipsec"),
+		PLUGIN_CALLBACK(tkm_spi_generator_register, NULL),
+			PLUGIN_PROVIDE(CUSTOM, "tkm-spi-generator"),
+				PLUGIN_DEPENDS(CUSTOM, "libcharon-sa-managers"),
 	};
 	lib->plugins->add_static_features(lib->plugins, "tkm-backend", features,
 			countof(features), TRUE, NULL, NULL);
@@ -354,7 +352,7 @@ int main(int argc, char *argv[])
 	lib->encoding->add_encoder(lib->encoding, tkm_encoder_encode);
 
 	/* add handler for SEGV and ILL,
-	 * INT and TERM are handled by sigwait() in run() */
+	 * INT and TERM are handled by sigwaitinfo() in run() */
 	action.sa_handler = segv_handler;
 	action.sa_flags = 0;
 	sigemptyset(&action.sa_mask);
@@ -375,6 +373,7 @@ int main(int argc, char *argv[])
 	run();
 
 	unlink_pidfile();
+	free(pidfile_name);
 	status = 0;
 	charon->bus->remove_listener(charon->bus, &listener->listener);
 	listener->destroy(listener);
@@ -384,8 +383,7 @@ int main(int argc, char *argv[])
 deinit:
 	destroy_dh_mapping();
 	libcharon_deinit();
-	libhydra_deinit();
-	library_deinit();
 	tkm_deinit();
+	library_deinit();
 	return status;
 }

@@ -18,8 +18,8 @@
 #include <signal.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <errno.h>
 
-#include <hydra.h>
 #include <daemon.h>
 
 #include <library.h>
@@ -80,12 +80,15 @@ static void run()
 	while (TRUE)
 	{
 		int sig;
-		int error;
 
-		error = sigwait(&set, &sig);
-		if (error)
+		sig = sigwaitinfo(&set, NULL);
+		if (sig == -1)
 		{
-			DBG1(DBG_DMN, "error %d while waiting for a signal", error);
+			if (errno == EINTR)
+			{	/* ignore signals we didn't wait for */
+				continue;
+			}
+			DBG1(DBG_DMN, "waiting for signal failed: %s", strerror(errno));
 			return;
 		}
 		switch (sig)
@@ -101,11 +104,6 @@ static void run()
 				DBG1(DBG_DMN, "signal of type SIGTERM received. Shutting down");
 				charon->bus->alert(charon->bus, ALERT_SHUTDOWN_SIGNAL, sig);
 				return;
-			}
-			default:
-			{
-				DBG1(DBG_DMN, "unknown signal %d received. Ignored", sig);
-				break;
 			}
 		}
 	}
@@ -160,6 +158,9 @@ int main(int argc, char *argv[])
 	/* logging for library during initialization, as we have no bus yet */
 	dbg = dbg_syslog;
 
+	/* LD causes a crash probably due to Glib */
+	setenv("LEAK_DETECTIVE_DISABLE", "1", 1);
+
 	/* initialize library */
 	if (!library_init(NULL, "charon-nm"))
 	{
@@ -173,14 +174,6 @@ int main(int argc, char *argv[])
 		dbg_syslog(DBG_DMN, 1, "integrity check of charon-nm failed");
 		library_deinit();
 		exit(SS_RC_DAEMON_INTEGRITY);
-	}
-
-	if (!libhydra_init())
-	{
-		dbg_syslog(DBG_DMN, 1, "initialization failed - aborting charon-nm");
-		libhydra_deinit();
-		library_deinit();
-		exit(SS_RC_INITIALIZATION_FAILED);
 	}
 
 	if (!libcharon_init())
@@ -210,7 +203,6 @@ int main(int argc, char *argv[])
 	{
 		DBG1(DBG_DMN, "integrity tests enabled:");
 		DBG1(DBG_DMN, "lib    'libstrongswan': passed file and segment integrity tests");
-		DBG1(DBG_DMN, "lib    'libhydra': passed file and segment integrity tests");
 		DBG1(DBG_DMN, "lib    'libcharon': passed file and segment integrity tests");
 		DBG1(DBG_DMN, "daemon 'charon-nm': passed file integrity test");
 	}
@@ -234,7 +226,7 @@ int main(int argc, char *argv[])
 	}
 
 	/* add handler for SEGV and ILL,
-	 * INT and TERM are handled by sigwait() in run() */
+	 * INT and TERM are handled by sigwaitinfo() in run() */
 	action.sa_handler = segv_handler;
 	action.sa_flags = 0;
 	sigemptyset(&action.sa_mask);
@@ -258,7 +250,6 @@ int main(int argc, char *argv[])
 
 deinit:
 	libcharon_deinit();
-	libhydra_deinit();
 	library_deinit();
 	return status;
 }

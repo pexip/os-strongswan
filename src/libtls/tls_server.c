@@ -213,7 +213,7 @@ static bool select_suite_and_key(private_tls_server_t *this,
 static status_t process_client_hello(private_tls_server_t *this,
 									 bio_reader_t *reader)
 {
-	u_int16_t version, extension;
+	uint16_t version, extension;
 	chunk_t random, session, ciphers, compression, ext = chunk_empty;
 	bio_reader_t *extensions;
 	tls_cipher_suite_t *suites;
@@ -304,12 +304,12 @@ static status_t process_client_hello(private_tls_server_t *this,
 	}
 	else
 	{
-		count = ciphers.len / sizeof(u_int16_t);
+		count = ciphers.len / sizeof(uint16_t);
 		suites = alloca(count * sizeof(tls_cipher_suite_t));
 		DBG2(DBG_TLS, "received %d TLS cipher suites:", count);
 		for (i = 0; i < count; i++)
 		{
-			suites[i] = untoh16(&ciphers.ptr[i * sizeof(u_int16_t)]);
+			suites[i] = untoh16(&ciphers.ptr[i * sizeof(uint16_t)]);
 			DBG2(DBG_TLS, "  %N", tls_cipher_suite_names, suites[i]);
 		}
 		if (!select_suite_and_key(this, suites, count))
@@ -494,8 +494,13 @@ static status_t process_key_exchange_dhe(private_tls_server_t *this,
 		}
 		pub = chunk_skip(pub, 1);
 	}
-	this->dh->set_other_public_value(this->dh, pub);
-	if (this->dh->get_shared_secret(this->dh, &premaster) != SUCCESS)
+	if (!this->dh->set_other_public_value(this->dh, pub))
+	{
+		DBG1(DBG_TLS, "applying DH public value failed");
+		this->alert->add(this->alert, TLS_FATAL, TLS_INTERNAL_ERROR);
+		return NEED_MORE;
+	}
+	if (!this->dh->get_shared_secret(this->dh, &premaster))
 	{
 		DBG1(DBG_TLS, "calculating premaster from DH failed");
 		this->alert->add(this->alert, TLS_FATAL, TLS_INTERNAL_ERROR);
@@ -543,7 +548,7 @@ static status_t process_cert_verify(private_tls_server_t *this,
 	bio_reader_t *sig;
 
 	enumerator = lib->credmgr->create_public_enumerator(lib->credmgr,
-										KEY_ANY, this->peer, this->peer_auth);
+									KEY_ANY, this->peer, this->peer_auth, TRUE);
 	while (enumerator->enumerate(enumerator, &public, &auth))
 	{
 		sig = bio_reader_create(reader->peek(reader));
@@ -551,6 +556,7 @@ static status_t process_cert_verify(private_tls_server_t *this,
 		sig->destroy(sig);
 		if (verified)
 		{
+			this->peer_auth->merge(this->peer_auth, auth, FALSE);
 			break;
 		}
 		DBG1(DBG_TLS, "signature verification failed, trying another key");
@@ -601,7 +607,7 @@ static status_t process_finished(private_tls_server_t *this,
 		this->alert->add(this->alert, TLS_FATAL, TLS_INTERNAL_ERROR);
 		return NEED_MORE;
 	}
-	if (!chunk_equals(received, chunk_from_thing(buf)))
+	if (!chunk_equals_const(received, chunk_from_thing(buf)))
 	{
 		DBG1(DBG_TLS, "received client finished invalid");
 		this->alert->add(this->alert, TLS_FATAL, TLS_DECRYPT_ERROR);
@@ -825,7 +831,7 @@ static tls_named_curve_t ec_group_to_curve(private_tls_server_t *this,
 bool peer_supports_curve(private_tls_server_t *this, tls_named_curve_t curve)
 {
 	bio_reader_t *reader;
-	u_int16_t current;
+	uint16_t current;
 
 	if (!this->curves_received)
 	{	/* none received, assume yes */
@@ -914,7 +920,11 @@ static status_t send_server_key_exchange(private_tls_server_t *this,
 		this->alert->add(this->alert, TLS_FATAL, TLS_INTERNAL_ERROR);
 		return NEED_MORE;
 	}
-	this->dh->get_my_public_value(this->dh, &chunk);
+	if (!this->dh->get_my_public_value(this->dh, &chunk))
+	{
+		this->alert->add(this->alert, TLS_FATAL, TLS_INTERNAL_ERROR);
+		return NEED_MORE;
+	}
 	if (params)
 	{
 		writer->write_data16(writer, chunk);
@@ -1073,6 +1083,12 @@ METHOD(tls_handshake_t, get_server_id, identification_t*,
 	return this->server;
 }
 
+METHOD(tls_handshake_t, get_auth, auth_cfg_t*,
+	private_tls_server_t *this)
+{
+	return this->peer_auth;
+}
+
 METHOD(tls_handshake_t, destroy, void,
 	private_tls_server_t *this)
 {
@@ -1107,6 +1123,7 @@ tls_server_t *tls_server_create(tls_t *tls,
 				.finished = _finished,
 				.get_peer_id = _get_peer_id,
 				.get_server_id = _get_server_id,
+				.get_auth = _get_auth,
 				.destroy = _destroy,
 			},
 		},

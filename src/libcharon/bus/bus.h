@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2014 Tobias Brunner
+ * Copyright (C) 2012-2016 Tobias Brunner
  * Copyright (C) 2006-2009 Martin Willi
  * Hochschule fuer Technik Rapperswil
  *
@@ -101,9 +101,13 @@ enum alert_t {
 	/** received IKE message with invalid body, argument is message_t*,
 	 *  followed by a status_t result returned by message_t.parse_body(). */
 	ALERT_PARSE_ERROR_BODY,
-	/** sending a retransmit for a message, argument is packet_t, if the message
-	 *  got fragmented only the first fragment is passed */
+	/** sending a retransmit for a message, arguments are packet_t and number
+	 * of the retransmit, if the message got fragmented only the first fragment
+	 * is passed */
 	ALERT_RETRANSMIT_SEND,
+	/** received response for retransmitted request, argument is packet_t, if
+	 * the message got fragmented only the first fragment is passed */
+	ALERT_RETRANSMIT_SEND_CLEARED,
 	/** sending retransmits timed out, argument is packet_t, if available and if
 	 *  the message got fragmented only the first fragment is passed */
 	ALERT_RETRANSMIT_SEND_TIMEOUT,
@@ -130,7 +134,8 @@ enum alert_t {
 	ALERT_UNIQUE_REPLACE,
 	/** IKE_SA deleted because of "keep" unique policy, no argument */
 	ALERT_UNIQUE_KEEP,
-	/** IKE_SA kept on failed child SA establishment, no argument */
+	/** IKE_SA kept on failed child SA establishment, argument is an int (!=0 if
+	 * first child SA) */
 	ALERT_KEEP_ON_CHILD_SA_FAILURE,
 	/** allocating virtual IP failed, linked_list_t of host_t requested */
 	ALERT_VIP_FAILURE,
@@ -344,8 +349,8 @@ struct bus_t {
 	 * @param ike_sa	IKE_SA this keymat belongs to
 	 * @param dh		diffie hellman shared secret
 	 * @param dh_other	others DH public value (IKEv1 only)
-	 * @param nonce_i	initiators nonce
-	 * @param nonce_r	responders nonce
+	 * @param nonce_i	initiator's nonce
+	 * @param nonce_r	responder's nonce
 	 * @param rekey		IKE_SA we are rekeying, if any (IKEv2 only)
 	 * @param shared	shared key used for key derivation (IKEv1-PSK only)
 	 */
@@ -354,16 +359,41 @@ struct bus_t {
 					 ike_sa_t *rekey, shared_key_t *shared);
 
 	/**
+	 * IKE_SA derived keys hook.
+	 *
+	 * @param sk_ei		SK_ei, or Ka for IKEv1
+	 * @param sk_er		SK_er
+	 * @param sk_ai		SK_ai, or SKEYID_a for IKEv1
+	 * @param sk_ar		SK_ar
+	 */
+	void (*ike_derived_keys)(bus_t *this, chunk_t sk_ei, chunk_t sk_er,
+							 chunk_t sk_ai, chunk_t sk_ar);
+
+	/**
 	 * CHILD_SA keymat hook.
 	 *
 	 * @param child_sa	CHILD_SA this keymat is used for
 	 * @param initiator	initiator of the CREATE_CHILD_SA exchange
 	 * @param dh		diffie hellman shared secret
-	 * @param nonce_i	initiators nonce
-	 * @param nonce_r	responders nonce
+	 * @param nonce_i	initiator's nonce
+	 * @param nonce_r	responder's nonce
 	 */
 	void (*child_keys)(bus_t *this, child_sa_t *child_sa, bool initiator,
 					   diffie_hellman_t *dh, chunk_t nonce_i, chunk_t nonce_r);
+
+	/**
+	 * CHILD_SA derived keys hook.
+	 *
+	 * @param child_sa	CHILD_SA these keys are used for
+	 * @param initiator	initiator of the CREATE_CHILD_SA exchange
+	 * @param encr_i	initiator's encryption key
+	 * @param encr_o	responder's encryption key
+	 * @param integ_i	initiator's integrity key
+	 * @param integ_r	responder's integrity key
+	 */
+	void (*child_derived_keys)(bus_t *this, child_sa_t *child_sa,
+							   bool initiator, chunk_t encr_i, chunk_t encr_r,
+							   chunk_t integ_i, chunk_t integ_r);
 
 	/**
 	 * IKE_SA up/down hook.
@@ -380,6 +410,15 @@ struct bus_t {
 	 * @param new		new IKE_SA replacing old
 	 */
 	void (*ike_rekey)(bus_t *this, ike_sa_t *old, ike_sa_t *new);
+
+	/**
+	 * IKE_SA peer endpoint update hook.
+	 *
+	 * @param ike_sa	updated IKE_SA, having old endpoints set
+	 * @param local		TRUE if local endpoint gets updated, FALSE for remote
+	 * @param new		new endpoint address and port
+	 */
+	void (*ike_update)(bus_t *this, ike_sa_t *ike_sa, bool local, host_t *new);
 
 	/**
 	 * IKE_SA reestablishing hook (before resolving hosts).
@@ -415,6 +454,14 @@ struct bus_t {
 	 * @param new		new CHILD_SA replacing old
 	 */
 	void (*child_rekey)(bus_t *this, child_sa_t *old, child_sa_t *new);
+
+	/**
+	 * CHILD_SA migration hook.
+	 *
+	 * @param new		ID of new SA when called for the old, NULL otherwise
+	 * @param uniue		unique ID of new SA when called for the old, 0 otherwise
+	 */
+	void (*children_migrate)(bus_t *this, ike_sa_id_t *new, uint32_t unique);
 
 	/**
 	 * Virtual IP assignment hook.

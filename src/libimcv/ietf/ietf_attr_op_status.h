@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-14 Andreas Steffen
+ * Copyright (C) 2012-2014 Andreas Steffen
  * HSR Hochschule fuer Technik Rapperswil
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -70,14 +70,14 @@ struct ietf_attr_op_status_t {
 	 *
 	 * @return				Operational Status
 	 */
-	u_int8_t (*get_status)(ietf_attr_op_status_t *this);
+	uint8_t (*get_status)(ietf_attr_op_status_t *this);
 
 	/**
 	 * Gets the Operational Result
 	 *
 	 * @return				Operational Result
 	 */
-	u_int8_t (*get_result)(ietf_attr_op_status_t *this);
+	uint8_t (*get_result)(ietf_attr_op_status_t *this);
 
 	/**
 	 * Gets the time of last use
@@ -94,7 +94,7 @@ struct ietf_attr_op_status_t {
  * @param result			Operational Result
  * @param last_use			Time of last use
  */
-pa_tnc_attr_t* ietf_attr_op_status_create(u_int8_t status, u_int8_t result,
+pa_tnc_attr_t* ietf_attr_op_status_create(uint8_t status, uint8_t result,
 										  time_t last_use);
 
 /**

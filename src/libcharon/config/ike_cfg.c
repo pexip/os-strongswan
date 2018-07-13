@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2012-2016 Tobias Brunner
  * Copyright (C) 2005-2007 Martin Willi
  * Copyright (C) 2005 Jan Hutter
  * Hochschule fuer Technik Rapperswil
@@ -82,12 +83,12 @@ struct private_ike_cfg_t {
 	/**
 	 * our source port
 	 */
-	u_int16_t my_port;
+	uint16_t my_port;
 
 	/**
 	 * destination port
 	 */
-	u_int16_t other_port;
+	uint16_t other_port;
 
 	/**
 	 * should we send a certificate request?
@@ -107,7 +108,7 @@ struct private_ike_cfg_t {
 	/**
 	 * DSCP value to use on sent IKE packets
 	 */
-	u_int8_t dscp;
+	uint8_t dscp;
 
 	/**
 	 * List of proposals to use
@@ -142,7 +143,7 @@ METHOD(ike_cfg_t, fragmentation, fragmentation_t,
 /**
  * Common function for resolve_me/other
  */
-static host_t* resolve(linked_list_t *hosts, int family, u_int16_t port)
+static host_t* resolve(linked_list_t *hosts, int family, uint16_t port)
 {
 	enumerator_t *enumerator;
 	host_t *host = NULL;
@@ -191,7 +192,7 @@ static u_int match(linked_list_t *hosts, linked_list_t *ranges, host_t *cand)
 	traffic_selector_t *ts;
 	char *str;
 	host_t *host;
-	u_int8_t mask;
+	uint8_t mask;
 	u_int quality = 0;
 
 	/* try single hosts first */
@@ -260,19 +261,19 @@ METHOD(ike_cfg_t, get_other_addr, char*,
 	return this->other;
 }
 
-METHOD(ike_cfg_t, get_my_port, u_int16_t,
+METHOD(ike_cfg_t, get_my_port, uint16_t,
 	private_ike_cfg_t *this)
 {
 	return this->my_port;
 }
 
-METHOD(ike_cfg_t, get_other_port, u_int16_t,
+METHOD(ike_cfg_t, get_other_port, uint16_t,
 	private_ike_cfg_t *this)
 {
 	return this->other_port;
 }
 
-METHOD(ike_cfg_t, get_dscp, u_int8_t,
+METHOD(ike_cfg_t, get_dscp, uint8_t,
 	private_ike_cfg_t *this)
 {
 	return this->dscp;
@@ -309,42 +310,57 @@ METHOD(ike_cfg_t, get_proposals, linked_list_t*,
 }
 
 METHOD(ike_cfg_t, select_proposal, proposal_t*,
-	private_ike_cfg_t *this, linked_list_t *proposals, bool private)
+	private_ike_cfg_t *this, linked_list_t *proposals, bool private,
+	bool prefer_self)
 {
-	enumerator_t *stored_enum, *supplied_enum;
-	proposal_t *stored, *supplied, *selected;
+	enumerator_t *prefer_enum, *match_enum;
+	proposal_t *proposal, *match, *selected = NULL;
 
-	stored_enum = this->proposals->create_enumerator(this->proposals);
-	supplied_enum = proposals->create_enumerator(proposals);
-
-
-	/* compare all stored proposals with all supplied. Stored ones are preferred.*/
-	while (stored_enum->enumerate(stored_enum, (void**)&stored))
+	if (prefer_self)
 	{
-		proposals->reset_enumerator(proposals, supplied_enum);
+		prefer_enum = this->proposals->create_enumerator(this->proposals);
+		match_enum = proposals->create_enumerator(proposals);
+	}
+	else
+	{
+		prefer_enum = proposals->create_enumerator(proposals);
+		match_enum = this->proposals->create_enumerator(this->proposals);
+	}
 
-		while (supplied_enum->enumerate(supplied_enum, (void**)&supplied))
+	while (prefer_enum->enumerate(prefer_enum, (void**)&proposal))
+	{
+		if (prefer_self)
 		{
-			selected = stored->select(stored, supplied, private);
+			proposals->reset_enumerator(proposals, match_enum);
+		}
+		else
+		{
+			this->proposals->reset_enumerator(this->proposals, match_enum);
+		}
+		while (match_enum->enumerate(match_enum, (void**)&match))
+		{
+			selected = proposal->select(proposal, match, private);
 			if (selected)
 			{
-				/* they match, return */
-				stored_enum->destroy(stored_enum);
-				supplied_enum->destroy(supplied_enum);
 				DBG2(DBG_CFG, "received proposals: %#P", proposals);
 				DBG2(DBG_CFG, "configured proposals: %#P", this->proposals);
 				DBG2(DBG_CFG, "selected proposal: %P", selected);
-				return selected;
+				break;
 			}
 		}
+		if (selected)
+		{
+			break;
+		}
 	}
-	/* no proposal match :-(, will result in a NO_PROPOSAL_CHOSEN... */
-	stored_enum->destroy(stored_enum);
-	supplied_enum->destroy(supplied_enum);
-	DBG1(DBG_CFG, "received proposals: %#P", proposals);
-	DBG1(DBG_CFG, "configured proposals: %#P", this->proposals);
-
-	return NULL;
+	prefer_enum->destroy(prefer_enum);
+	match_enum->destroy(match_enum);
+	if (!selected)
+	{
+		DBG1(DBG_CFG, "received proposals: %#P", proposals);
+		DBG1(DBG_CFG, "configured proposals: %#P", this->proposals);
+	}
+	return selected;
 }
 
 METHOD(ike_cfg_t, get_dh_group, diffie_hellman_group_t,
@@ -352,7 +368,7 @@ METHOD(ike_cfg_t, get_dh_group, diffie_hellman_group_t,
 {
 	enumerator_t *enumerator;
 	proposal_t *proposal;
-	u_int16_t dh_group = MODP_NONE;
+	uint16_t dh_group = MODP_NONE;
 
 	enumerator = this->proposals->create_enumerator(this->proposals);
 	while (enumerator->enumerate(enumerator, &proposal))
@@ -370,9 +386,6 @@ METHOD(ike_cfg_t, equals, bool,
 	private_ike_cfg_t *this, ike_cfg_t *other_public)
 {
 	private_ike_cfg_t *other = (private_ike_cfg_t*)other_public;
-	enumerator_t *e1, *e2;
-	proposal_t *p1, *p2;
-	bool eq = TRUE;
 
 	if (this == other)
 	{
@@ -382,25 +395,12 @@ METHOD(ike_cfg_t, equals, bool,
 	{
 		return FALSE;
 	}
-	if (this->proposals->get_count(this->proposals) !=
-		other->proposals->get_count(other->proposals))
+	if (!this->proposals->equals_offset(this->proposals, other->proposals,
+										offsetof(proposal_t, equals)))
 	{
 		return FALSE;
 	}
-	e1 = this->proposals->create_enumerator(this->proposals);
-	e2 = other->proposals->create_enumerator(other->proposals);
-	while (e1->enumerate(e1, &p1) && e2->enumerate(e2, &p2))
-	{
-		if (!p1->equals(p1, p2))
-		{
-			eq = FALSE;
-			break;
-		}
-	}
-	e1->destroy(e1);
-	e2->destroy(e2);
-
-	return (eq &&
+	return
 		this->version == other->version &&
 		this->certreq == other->certreq &&
 		this->force_encap == other->force_encap &&
@@ -408,7 +408,7 @@ METHOD(ike_cfg_t, equals, bool,
 		streq(this->me, other->me) &&
 		streq(this->other, other->other) &&
 		this->my_port == other->my_port &&
-		this->other_port == other->other_port);
+		this->other_port == other->other_port;
 }
 
 METHOD(ike_cfg_t, get_ref, ike_cfg_t*,
@@ -459,25 +459,10 @@ static traffic_selector_t* make_range(char *str)
 {
 	traffic_selector_t *ts;
 	ts_type_t type;
-	char *pos;
 	host_t *from, *to;
 
-	pos = strchr(str, '-');
-	if (!pos)
+	if (!host_create_from_range(str, &from, &to))
 	{
-		return NULL;
-	}
-	to = host_create_from_string(pos + 1, 0);
-	if (!to)
-	{
-		return NULL;
-	}
-	str = strndup(str, pos - str);
-	from = host_create_from_string_and_family(str, to->get_family(to), 0);
-	free(str);
-	if (!from)
-	{
-		to->destroy(to);
 		return NULL;
 	}
 	if (to->get_family(to) == AF_INET)
@@ -528,10 +513,56 @@ static void parse_addresses(char *str, linked_list_t *hosts,
 /**
  * Described in header.
  */
+int ike_cfg_get_family(ike_cfg_t *cfg, bool local)
+{
+	private_ike_cfg_t *this = (private_ike_cfg_t*)cfg;
+	enumerator_t *enumerator;
+	host_t *host;
+	char *str;
+	int family = AF_UNSPEC;
+
+	if (local)
+	{
+		enumerator = this->my_hosts->create_enumerator(this->my_hosts);
+	}
+	else
+	{
+		enumerator = this->other_hosts->create_enumerator(this->other_hosts);
+	}
+	while (enumerator->enumerate(enumerator, &str))
+	{
+		if (streq(str, "%any"))
+		{	/* ignore %any as its family is undetermined */
+			continue;
+		}
+		host = host_create_from_string(str, 0);
+		if (host)
+		{
+			if (family == AF_UNSPEC)
+			{
+				family = host->get_family(host);
+			}
+			else if (family != host->get_family(host))
+			{
+				/* more than one address family defined */
+				family = AF_UNSPEC;
+				host->destroy(host);
+				break;
+			}
+		}
+		DESTROY_IF(host);
+	}
+	enumerator->destroy(enumerator);
+	return family;
+}
+
+/**
+ * Described in header.
+ */
 ike_cfg_t *ike_cfg_create(ike_version_t version, bool certreq, bool force_encap,
-						  char *me, u_int16_t my_port,
-						  char *other, u_int16_t other_port,
-						  fragmentation_t fragmentation, u_int8_t dscp)
+						  char *me, uint16_t my_port,
+						  char *other, uint16_t other_port,
+						  fragmentation_t fragmentation, uint8_t dscp)
 {
 	private_ike_cfg_t *this;
 

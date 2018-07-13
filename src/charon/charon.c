@@ -17,9 +17,7 @@
  */
 
 #include <stdio.h>
-#define _POSIX_PTHREAD_SEMANTICS /* for two param sigwait on OpenSolaris */
 #include <signal.h>
-#undef _POSIX_PTHREAD_SEMANTICS
 #include <pthread.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -29,7 +27,6 @@
 #include <fcntl.h>
 #include <errno.h>
 
-#include <hydra.h>
 #include <daemon.h>
 
 #include <library.h>
@@ -100,7 +97,7 @@ static void run()
 {
 	sigset_t set;
 
-	/* handle SIGINT, SIGHUP ans SIGTERM in this handler */
+	/* handle SIGINT, SIGHUP and SIGTERM in this handler */
 	sigemptyset(&set);
 	sigaddset(&set, SIGINT);
 	sigaddset(&set, SIGHUP);
@@ -110,12 +107,15 @@ static void run()
 	while (TRUE)
 	{
 		int sig;
-		int error;
 
-		error = sigwait(&set, &sig);
-		if (error)
+		sig = sigwaitinfo(&set, NULL);
+		if (sig == -1)
 		{
-			DBG1(DBG_DMN, "error %d while waiting for a signal", error);
+			if (errno == EINTR)
+			{	/* ignore signals we didn't wait for */
+				continue;
+			}
+			DBG1(DBG_DMN, "waiting for signal failed: %s", strerror(errno));
 			return;
 		}
 		switch (sig)
@@ -146,11 +146,6 @@ static void run()
 				DBG1(DBG_DMN, "signal of type SIGTERM received. Shutting down");
 				charon->bus->alert(charon->bus, ALERT_SHUTDOWN_SIGNAL, sig);
 				return;
-			}
-			default:
-			{
-				DBG1(DBG_DMN, "unknown signal %d received. Ignored", sig);
-				break;
 			}
 		}
 	}
@@ -313,14 +308,6 @@ int main(int argc, char *argv[])
 		exit(SS_RC_DAEMON_INTEGRITY);
 	}
 
-	if (!libhydra_init())
-	{
-		dbg_stderr(DBG_DMN, 1, "initialization failed - aborting charon");
-		libhydra_deinit();
-		library_deinit();
-		exit(SS_RC_INITIALIZATION_FAILED);
-	}
-
 	if (!libcharon_init())
 	{
 		dbg_stderr(DBG_DMN, 1, "initialization failed - aborting charon");
@@ -407,7 +394,6 @@ int main(int argc, char *argv[])
 	{
 		DBG1(DBG_DMN, "integrity tests enabled:");
 		DBG1(DBG_DMN, "lib    'libstrongswan': passed file and segment integrity tests");
-		DBG1(DBG_DMN, "lib    'libhydra': passed file and segment integrity tests");
 		DBG1(DBG_DMN, "lib    'libcharon': passed file and segment integrity tests");
 		DBG1(DBG_DMN, "daemon 'charon': passed file integrity test");
 	}
@@ -434,7 +420,7 @@ int main(int argc, char *argv[])
 	}
 
 	/* add handler for SEGV and ILL,
-	 * INT, TERM and HUP are handled by sigwait() in run() */
+	 * INT, TERM and HUP are handled by sigwaitinfo() in run() */
 	action.sa_handler = segv_handler;
 	action.sa_flags = 0;
 	sigemptyset(&action.sa_mask);
@@ -461,7 +447,6 @@ int main(int argc, char *argv[])
 
 deinit:
 	libcharon_deinit();
-	libhydra_deinit();
 	library_deinit();
 	return status;
 }

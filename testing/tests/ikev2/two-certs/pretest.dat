@@ -2,7 +2,9 @@ moon::iptables-restore < /etc/iptables.rules
 carol::iptables-restore < /etc/iptables.rules
 moon::ipsec start
 carol::ipsec start
-carol::sleep 1
+moon::expect-connection alice
+moon::expect-connection venus
+carol::expect-connection alice
+carol::expect-connection venus
 carol::ipsec up alice
 carol::ipsec up venus
-carol::sleep 1

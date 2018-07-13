@@ -19,12 +19,10 @@
 #include <utils/debug.h>
 #include <threading/rwlock.h>
 
-#define TKM_LIMIT 100
-
 ENUM_BEGIN(tkm_context_kind_names, TKM_CTX_NONCE, TKM_CTX_ESA,
 	"NONCE_CONTEXT",
 	"DH_CONTEXT",
-	"CC_CONTEXT"
+	"CC_CONTEXT",
 	"ISA_CONTEXT",
 	"AE_CONTEXT",
 	"ESA_CONTEXT");

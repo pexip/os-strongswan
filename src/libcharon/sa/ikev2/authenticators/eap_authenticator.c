@@ -104,7 +104,7 @@ struct private_eap_authenticator_t {
  * load an EAP method
  */
 static eap_method_t *load_method(private_eap_authenticator_t *this,
-							eap_type_t type, u_int32_t vendor, eap_role_t role)
+							eap_type_t type, uint32_t vendor, eap_role_t role)
 {
 	identification_t *server, *peer, *aaa;
 	auth_cfg_t *auth;
@@ -143,7 +143,7 @@ static eap_payload_t* server_initiate_eap(private_eap_authenticator_t *this,
 	auth_cfg_t *auth;
 	eap_type_t type;
 	identification_t *id;
-	u_int32_t vendor;
+	uint32_t vendor;
 	eap_payload_t *out;
 	char *action;
 
@@ -237,7 +237,7 @@ static eap_payload_t* server_process_eap(private_eap_authenticator_t *this,
 										 eap_payload_t *in)
 {
 	eap_type_t type, received_type, conf_type;
-	u_int32_t vendor, received_vendor, conf_vendor;
+	uint32_t vendor, received_vendor, conf_vendor;
 	eap_payload_t *out;
 	auth_cfg_t *auth;
 
@@ -341,7 +341,7 @@ static eap_payload_t* client_process_eap(private_eap_authenticator_t *this,
 										 eap_payload_t *in)
 {
 	eap_type_t type, conf_type;
-	u_int32_t vendor, conf_vendor;
+	uint32_t vendor, conf_vendor;
 	auth_cfg_t *auth;
 	eap_payload_t *out;
 	identification_t *id;
@@ -448,6 +448,8 @@ static bool verify_auth(private_eap_authenticator_t *this, message_t *message,
 	identification_t *other_id;
 	auth_cfg_t *auth;
 	keymat_v2_t *keymat;
+	eap_type_t type;
+	uint32_t vendor;
 
 	auth_payload = (auth_payload_t*)message->get_payload(message,
 														 PLV2_AUTH);
@@ -464,7 +466,7 @@ static bool verify_auth(private_eap_authenticator_t *this, message_t *message,
 		return FALSE;
 	}
 	recv_auth_data = auth_payload->get_data(auth_payload);
-	if (!auth_data.len || !chunk_equals(auth_data, recv_auth_data))
+	if (!auth_data.len || !chunk_equals_const(auth_data, recv_auth_data))
 	{
 		DBG1(DBG_IKE, "verification of AUTH payload with%s EAP MSK failed",
 			 this->msk.ptr ? "" : "out");
@@ -478,6 +480,13 @@ static bool verify_auth(private_eap_authenticator_t *this, message_t *message,
 	this->auth_complete = TRUE;
 	auth = this->ike_sa->get_auth_cfg(this->ike_sa, FALSE);
 	auth->add(auth, AUTH_RULE_AUTH_CLASS, AUTH_CLASS_EAP);
+
+	type = this->method->get_type(this->method, &vendor);
+	auth->add(auth, AUTH_RULE_EAP_TYPE, type);
+	if (vendor)
+	{
+		auth->add(auth, AUTH_RULE_EAP_VENDOR, vendor);
+	}
 	return TRUE;
 }
 
@@ -521,6 +530,13 @@ METHOD(authenticator_t, process_server, status_t,
 		if (!verify_auth(this, message, this->sent_nonce, this->received_init))
 		{
 			return FAILED;
+		}
+		if (this->method->get_auth)
+		{
+			auth_cfg_t *auth;
+
+			auth = this->ike_sa->get_auth_cfg(this->ike_sa, FALSE);
+			auth->merge(auth, this->method->get_auth(this->method), FALSE);
 		}
 		return NEED_MORE;
 	}
@@ -579,7 +595,7 @@ METHOD(authenticator_t, process_client, status_t,
 		}
 		if (this->require_mutual && !this->method->is_mutual(this->method))
 		{	/* we require mutual authentication due to EAP-only */
-			u_int32_t vendor;
+			uint32_t vendor;
 
 			DBG1(DBG_IKE, "EAP-only authentication requires a mutual and "
 				 "MSK deriving EAP method, but %N is not",
@@ -607,7 +623,7 @@ METHOD(authenticator_t, process_client, status_t,
 			case EAP_SUCCESS:
 			{
 				eap_type_t type;
-				u_int32_t vendor;
+				uint32_t vendor;
 				auth_cfg_t *cfg;
 
 				if (this->method->get_msk(this->method, &this->msk) == SUCCESS)
@@ -669,7 +685,7 @@ METHOD(authenticator_t, is_mutual, bool,
 {
 	if (this->method)
 	{
-		u_int32_t vendor;
+		uint32_t vendor;
 
 		if (this->method->get_type(this->method, &vendor) != EAP_IDENTITY ||
 			vendor != 0)

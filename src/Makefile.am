@@ -4,10 +4,6 @@ if USE_LIBSTRONGSWAN
   SUBDIRS += libstrongswan
 endif
 
-if USE_LIBHYDRA
-  SUBDIRS += libhydra
-endif
-
 if USE_LIBIPSEC
   SUBDIRS += libipsec
 endif
@@ -34,6 +30,10 @@ endif
 
 if USE_LIBPTTLS
   SUBDIRS += libpttls
+endif
+
+if USE_LIBTPMTSS
+  SUBDIRS += libtpmtss
 endif
 
 if USE_IMCV
@@ -69,7 +69,7 @@ if USE_STROKE
 endif
 
 if USE_UPDOWN
-  SUBDIRS += _updown _updown_espmark
+  SUBDIRS += _updown
 endif
 
 if USE_SCEPCLIENT
@@ -134,4 +134,8 @@ endif
 
 if USE_AIKGEN
   SUBDIRS += aikgen
+endif
+
+if USE_AIKPUB2
+  SUBDIRS += aikpub2
 endif

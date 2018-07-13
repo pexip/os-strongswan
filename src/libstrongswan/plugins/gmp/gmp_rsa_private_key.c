@@ -142,7 +142,7 @@ chunk_t gmp_mpz_to_chunk(const mpz_t value)
 static void mpz_clear_sensitive(mpz_t z)
 {
 	size_t len = mpz_size(z) * GMP_LIMB_BITS / BITS_PER_BYTE;
-	u_int8_t *zeros = alloca(len);
+	uint8_t *zeros = alloca(len);
 
 	memset(zeros, 0, len);
 	/* overwrite mpz_t with zero bytes before clearing it */
@@ -347,16 +347,24 @@ METHOD(private_key_t, sign, bool,
 	{
 		case SIGN_RSA_EMSA_PKCS1_NULL:
 			return build_emsa_pkcs1_signature(this, HASH_UNKNOWN, data, signature);
+		case SIGN_RSA_EMSA_PKCS1_SHA2_224:
+			return build_emsa_pkcs1_signature(this, HASH_SHA224, data, signature);
+		case SIGN_RSA_EMSA_PKCS1_SHA2_256:
+			return build_emsa_pkcs1_signature(this, HASH_SHA256, data, signature);
+		case SIGN_RSA_EMSA_PKCS1_SHA2_384:
+			return build_emsa_pkcs1_signature(this, HASH_SHA384, data, signature);
+		case SIGN_RSA_EMSA_PKCS1_SHA2_512:
+			return build_emsa_pkcs1_signature(this, HASH_SHA512, data, signature);
+		case SIGN_RSA_EMSA_PKCS1_SHA3_224:
+			return build_emsa_pkcs1_signature(this, HASH_SHA3_224, data, signature);
+		case SIGN_RSA_EMSA_PKCS1_SHA3_256:
+			return build_emsa_pkcs1_signature(this, HASH_SHA3_256, data, signature);
+		case SIGN_RSA_EMSA_PKCS1_SHA3_384:
+			return build_emsa_pkcs1_signature(this, HASH_SHA3_384, data, signature);
+		case SIGN_RSA_EMSA_PKCS1_SHA3_512:
+			return build_emsa_pkcs1_signature(this, HASH_SHA3_512, data, signature);
 		case SIGN_RSA_EMSA_PKCS1_SHA1:
 			return build_emsa_pkcs1_signature(this, HASH_SHA1, data, signature);
-		case SIGN_RSA_EMSA_PKCS1_SHA224:
-			return build_emsa_pkcs1_signature(this, HASH_SHA224, data, signature);
-		case SIGN_RSA_EMSA_PKCS1_SHA256:
-			return build_emsa_pkcs1_signature(this, HASH_SHA256, data, signature);
-		case SIGN_RSA_EMSA_PKCS1_SHA384:
-			return build_emsa_pkcs1_signature(this, HASH_SHA384, data, signature);
-		case SIGN_RSA_EMSA_PKCS1_SHA512:
-			return build_emsa_pkcs1_signature(this, HASH_SHA512, data, signature);
 		case SIGN_RSA_EMSA_PKCS1_MD5:
 			return build_emsa_pkcs1_signature(this, HASH_MD5, data, signature);
 		default:

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2014 Andreas Steffen
+ * Copyright (C) 2013-2015 Andreas Steffen
  * HSR Hochschule fuer Technik Rapperswil
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -35,7 +35,7 @@ typedef struct private_imv_scanner_agent_t private_imv_scanner_agent_t;
 
 /* Subscribed PA-TNC message subtypes */
 static pen_type_t msg_types[] = {
-	{ PEN_IETF, PA_SUBTYPE_IETF_VPN }
+	{ PEN_IETF, PA_SUBTYPE_IETF_FIREWALL }
 };
 
 /**
@@ -185,13 +185,13 @@ METHOD(imv_agent_if_t, receive_message_long, TNC_Result,
 typedef struct port_range_t port_range_t;
 
 struct port_range_t {
-	u_int16_t start, stop;
+	uint16_t start, stop;
 };
 
 /**
  * Parse a TCP or UDP port list from an argument string
  */
-static linked_list_t* get_port_list(u_int8_t protocol_family,
+static linked_list_t* get_port_list(uint8_t protocol_family,
 									bool closed_port_policy, char *arg_str)
 {
 	chunk_t port_list, port_item, port_start;
@@ -336,8 +336,8 @@ METHOD(imv_agent_if_t, batch_ending, TNC_Result,
 	{
 		TNC_IMV_Evaluation_Result eval;
 		TNC_IMV_Action_Recommendation rec;
-		u_int8_t protocol_family, protocol;
-		u_int16_t port;
+		uint8_t protocol_family, protocol;
+		uint16_t port;
 		bool closed_port_policy, blocked, first;
 		char result_str[BUF_LEN], *pos, *protocol_str;
 		size_t len;

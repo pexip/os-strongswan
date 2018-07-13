@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2013 Andreas Steffen
+ * Copyright (C) 2010-2015 Andreas Steffen
  * HSR Hochschule fuer Technik Rapperswil
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -15,7 +15,7 @@
 
 /**
  * @defgroup tnccs tnccs
- * @ingroup tnc
+ * @ingroup libtnccs
  *
  * @defgroup tnccst tnccs
  * @{ @ingroup tnccs
@@ -87,6 +87,20 @@ struct tnccs_t {
 	tls_t tls;
 
 	/**
+	 * Get server IP address
+	 *
+	 * @return				Server IP address
+	 */
+	host_t* (*get_server_ip)(tnccs_t *this);
+
+	/**
+	 * Get peer IP address
+	 *
+	 * @return				Peer IP address
+	 */
+	host_t* (*get_peer_ip)(tnccs_t *this);
+
+	/**
 	 * Get underlying TNC IF-T transport protocol
 	 *
 	 * @return				TNC IF-T transport protocol
@@ -105,14 +119,14 @@ struct tnccs_t {
 	 *
 	 * @return				TNC Client authentication type
 	 */
-	u_int32_t (*get_auth_type)(tnccs_t *this);
+	uint32_t (*get_auth_type)(tnccs_t *this);
 
 	/**
 	 * Set type of TNC Client authentication
 	 *
 	 * @param auth_type		TNC Client authentication type
 	 */
-	void (*set_auth_type)(tnccs_t *this, u_int32_t auth_type);
+	void (*set_auth_type)(tnccs_t *this, uint32_t auth_type);
 
 	/**
 	 * Get PDP server name and port number
@@ -120,7 +134,7 @@ struct tnccs_t {
 	 * @param port		PDP port number
 	 * @return			PDP server name
 	 */
-	chunk_t (*get_pdp_server)(tnccs_t *this, u_int16_t *port);
+	chunk_t (*get_pdp_server)(tnccs_t *this, uint16_t *port);
 
 	/**
 	 * Get a new reference to the TNCCS object.
@@ -135,15 +149,19 @@ struct tnccs_t {
  * Constructor definition for a pluggable TNCCS protocol implementation.
  *
  * @param is_server		TRUE if TNC Server, FALSE if TNC Client
- * @param server		Server identity
- * @param peer			Client identity
+ * @param server_id		Server identity
+ * @param peer_id		Client identity
+ * @param server_ip		Server IP address
+ * @param peer_ip		Client IP address
  * @param transport		Underlying TNC IF-T transport protocol used
  * @param cb			Callback function if TNC Server, NULL if TNC Client
  * @return				implementation of the tnccs_t interface
  */
 typedef tnccs_t *(*tnccs_constructor_t)(bool is_server,
-										identification_t *server,
-										identification_t *peer,
+										identification_t *server_id,
+										identification_t *peer_id,
+										host_t *server_ip,
+										host_t *peer_ip,
 										tnc_ift_type_t transport,
 										tnccs_cb_t cb);
 

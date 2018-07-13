@@ -1,3 +1,295 @@
+strongswan-5.5.1
+----------------
+
+- The newhope plugin implements the post-quantum NewHope key exchange algorithm
+  proposed in their 2015 paper by Erdem Alkim, Léo Ducas, Thomas Pöppelmann and
+  Peter Schwabe.
+
+- The libstrongswan crypto factory now offers the registration of Extended
+  Output Functions (XOFs). Currently supported XOFs are SHAKE128 and SHAKE256
+  implemented by the sha3 plugin, ChaCHa20 implemented by the chapoly plugin
+  and the more traditional MGF1 Mask Generation Functions based on the SHA-1,
+  SHA-256 and SHA-512 hash algorithms implemented by the new mgf1 plugin.
+
+- The pki tool, with help of the pkcs1 or openssl plugins, can parse private
+  keys in any of the supported formats without having to know the exact type.
+  So instead of having to specify rsa or ecdsa explicitly the keyword priv may
+  be used to indicate a private key of any type. Similarly, swanctl can load
+  any type of private key from the swanctl/private directory.
+
+- The pki tool can handle RSASSA-PKCS1v1.5-with-SHA-3 signatures using the
+  sha3 and gmp plugins.
+
+- The VICI flush-certs command flushes certificates from the volatile
+  certificate cache. Optionally the type of the certificates to be
+  flushed  (e.g. type = x509_crl) can be specified.
+
+- Setting cache_crls = yes in strongswan.conf the vici plugin saves regular,
+  base and delta CRLs to disk.
+
+- IKE fragmentation is now enabled by default with the default fragment size
+  set to 1280 bytes for both IP address families.
+
+- libtpmtss: In the TSS2 API the function TeardownSocketTcti() was replaced by
+  tss2_tcti_finalize().
+
+
+strongswan-5.5.0
+----------------
+
+- The new libtpmtss library offers support for both TPM 1.2 and TPM 2.0
+  Trusted Platform Modules. This allows the Attestation IMC/IMV pair to
+  do TPM 2.0 based attestation.
+
+- The behavior during IKEv2 exchange collisions has been improved/fixed in
+  several corner cases and support for TEMPORARY_FAILURE and CHILD_SA_NOT_FOUND
+  notifies, as defined by RFC 7296, has been added.
+
+- IPsec policy priorities can be set manually (e.g. for high-priority drop
+  policies) and outbound policies may be restricted to a network interface.
+
+- The scheme for the automatically calculated default priorities has been
+  changed and now also considers port masks, which were added with 5.4.0.
+
+- FWD policies are now installed in both directions in regards to the traffic
+  selectors.  Because such "outbound" FWD policies could conflict with "inbound"
+  FWD policies of other SAs they are installed with a lower priority and don't
+  have a reqid set, which allows kernel plugins to distinguish between the two
+  and prefer those with a reqid.
+
+- For outbound IPsec SAs no replay window is configured anymore.
+
+- Enhanced the functionality of the swanctl --list-conns command by listing
+  IKE_SA and CHILD_SA reauthentication and rekeying settings, and EAP/XAuth
+  identities and EAP types.
+
+- DNS servers installed by the resolve plugin are now refcounted, which should
+  fix its use with make-before-break reauthentication.  Any output written to
+  stderr/stdout by resolvconf is now logged.
+
+- The methods in the kernel interfaces have been changed to take structs instead
+  of long lists of arguments.  Similarly the constructors for peer_cfg_t and
+  child_cfg_t now take structs.
+
+
+strongswan-5.4.0
+----------------
+
+- Support for IKEv2 redirection (RFC 5685) has been added.  Plugins may
+  implement the redirect_provider_t interface to decide if and when to redirect
+  connecting clients.  It is also possible to redirect established IKE_SAs based
+  on different selectors via VICI/swanctl.  Unless disabled in strongswan.conf
+  the charon daemon will follow redirect requests received from servers.
+
+- The ike: prefix enables the explicit configuration of signature scheme
+  constraints against IKEv2 authentication in rightauth, which allows the use
+  of different signature schemes for trustchain verification and authentication.
+
+- The initiator of an IKEv2 make-before-break reauthentication now suspends
+  online certificate revocation checks (OCSP, CRLs) until the new IKE_SA and all
+  CHILD_SAs are established.  This is required if the checks are done over the
+  CHILD_SA established with the new IKE_SA.  This is not possible until the
+  initiator installs this SA and that only happens after the authentication is
+  completed successfully.  So we suspend the checks during the reauthentication
+  and do them afterwards, if they fail the IKE_SA is closed.  This change has no
+  effect on the behavior during the authentication of the initial IKE_SA.
+
+- For the vici plugin a Vici:Session Perl CPAN module has been added to allow
+  Perl applications to control and/or monitor the IKE daemon using the VICI
+  interface, similar to the existing Python egg or Ruby gem.
+
+- Traffic selectors with port ranges can now be configured in the Linux kernel:
+  e.g. remote_ts = 10.1.0.0/16[tcp/20-23] local_ts = dynamic[tcp/32768-65535].
+  The port range must map to a port mask, though since the kernel does not
+  support arbitrary ranges.
+
+- The vici plugin allows the configuration of IPv4 and IPv6 address ranges
+  in local and remote traffic selectors. Since both the Linux kernel and
+  iptables cannot handle arbitrary ranges, address ranges are mapped to the next
+  larger CIDR subnet by the kernel-netlink and updown plugins, respectively.
+
+- Implemented IKEv1 IPv4/IPv6 address subnet and range identities that can be
+  used as owners of shared secrets.
+
+
+strongswan-5.3.5
+----------------
+
+- Properly handle potential EINTR errors in sigwaitinfo(2) calls that replaced
+  sigwait(3) calls with 5.3.4.
+
+- RADIUS retransmission timeouts are now configurable, courtesy of Thom Troy.
+
+
+strongswan-5.3.4
+----------------
+
+- Fixed an authentication bypass vulnerability in the eap-mschapv2 plugin that
+  was caused by insufficient verification of the internal state when handling
+  MSCHAPv2 Success messages received by the client.
+  This vulnerability has been registered as CVE-2015-8023.
+
+- The sha3 plugin implements the SHA3 Keccak-F1600 hash algorithm family.
+  Within the strongSwan framework SHA3 is currently used for BLISS signatures
+  only because the OIDs for other signature algorithms haven't been defined
+  yet. Also the use of SHA3 for IKEv2 has not been standardized yet.
+
+
+strongswan-5.3.3
+----------------
+
+- Added support for the ChaCha20/Poly1305 AEAD cipher specified in RFC 7539 and
+  RFC 7634 using the chacha20poly1305 ike/esp proposal keyword. The new chapoly
+  plugin implements the cipher, if possible SSE-accelerated on x86/x64
+  architectures. It is usable both in IKEv2 and the strongSwan libipsec ESP
+  backend. On Linux 4.2 or newer the kernel-netlink plugin can configure the
+  cipher for ESP SAs.
+
+- The vici interface now supports the configuration of auxiliary certification
+  authority information as CRL and OCSP URIs.
+
+- In the bliss plugin the c_indices derivation using a SHA-512 based random
+  oracle has been fixed, generalized and standardized by employing the MGF1 mask
+  generation function with SHA-512. As a consequence BLISS signatures unsing the
+  improved oracle are not compatible with the earlier implementation.
+
+- Support for auto=route with right=%any for transport mode connections has
+  been added (the ikev2/trap-any scenario provides examples).
+
+- The starter daemon does not flush IPsec policies and SAs anymore when it is
+  stopped.  Already existing duplicate policies are now overwritten by the IKE
+  daemon when it installs its policies.
+
+- Init limits (like charon.init_limit_half_open) can now optionally be enforced
+  when initiating SAs via VICI. For this, IKE_SAs initiated by the daemon are
+  now also counted as half-open SAs, which, as a side-effect, fixes the status
+  output while connecting (e.g. in ipsec status).
+
+- Symmetric configuration of EAP methods in left|rightauth is now possible when
+  mutual EAP-only authentication is used (previously, the client had to
+  configure rightauth=eap or rightauth=any, which prevented it from using this
+  same config as responder).
+
+- The initiator flag in the IKEv2 header is compared again (wasn't the case
+  since 5.0.0) and packets that have the flag set incorrectly are again ignored.
+
+- Implemented a demo Hardcopy Device IMC/IMV pair based on the "Hardcopy
+  Device Health Assessment Trusted Network Connect Binding" (HCD-TNC)
+  document drafted by the IEEE Printer Working Group (PWG).
+
+- Fixed IF-M segmentation which failed in the presence of multiple small
+  attributes in front of a huge attribute to be segmented.
+
+
+strongswan-5.3.2
+----------------
+
+- Fixed a vulnerability that allowed rogue servers with a valid certificate
+  accepted by the client to trick it into disclosing its username and even
+  password (if the client accepts EAP-GTC).  This was caused because constraints
+  against the responder's authentication were enforced too late.
+  This vulnerability has been registered as CVE-2015-4171.
+
+
+strongswan-5.3.1
+----------------
+
+- Fixed a denial-of-service and potential remote code execution vulnerability
+  triggered by IKEv1/IKEv2 messages that contain payloads for the respective
+  other IKE version. Such payload are treated specially since 5.2.2 but because
+  they were still identified by their original payload type they were used as
+  such in some places causing invalid function pointer dereferences.
+  The vulnerability has been registered as CVE-2015-3991.
+
+- The new aesni plugin provides CBC, CTR, XCBC, CMAC, CCM and GCM crypto
+  primitives for AES-128/192/256. The plugin requires AES-NI and PCLMULQDQ
+  instructions and works on both x86 and x64 architectures. It provides
+  superior crypto performance in userland without any external libraries.
+
+
+strongswan-5.3.0
+----------------
+
+- Added support for IKEv2 make-before-break reauthentication. By using a global
+  CHILD_SA reqid allocation mechanism, charon supports overlapping CHILD_SAs.
+  This allows the use of make-before-break instead of the previously supported
+  break-before-make reauthentication, avoiding connectivity gaps during that
+  procedure. As the new mechanism may fail with peers not supporting it (such
+  as any previous strongSwan release) it must be explicitly enabled using
+  the charon.make_before_break strongswan.conf option.
+
+- Support for "Signature Authentication in IKEv2" (RFC 7427) has been added.
+  This allows the use of stronger hash algorithms for public key authentication.
+  By default, signature schemes are chosen based on the strength of the
+  signature key, but specific hash algorithms may be configured in leftauth.
+
+- Key types and hash algorithms specified in rightauth are now also checked
+  against IKEv2 signature schemes.  If such constraints are used for certificate
+  chain validation in existing configurations, in particular with peers that
+  don't support RFC 7427, it may be necessary to disable this feature with the
+  charon.signature_authentication_constraints setting, because the signature
+  scheme used in classic IKEv2 public key authentication may not be strong
+  enough.
+
+- The new connmark plugin allows a host to bind conntrack flows to a specific
+  CHILD_SA by applying and restoring the SA mark to conntrack entries. This
+  allows a peer to handle multiple transport mode connections coming over the
+  same NAT device for client-initiated flows. A common use case is to protect
+  L2TP/IPsec, as supported by some systems.
+
+- The forecast plugin can forward broadcast and multicast messages between
+  connected clients and a LAN. For CHILD_SA using unique marks, it sets up
+  the required Netfilter rules and uses a multicast/broadcast listener that
+  forwards such messages to all connected clients. This plugin is designed for
+  Windows 7 IKEv2 clients, which announces its services over the tunnel if the
+  negotiated IPsec policy allows it.
+
+- For the vici plugin a Python Egg has been added to allow Python applications
+  to control or monitor the IKE daemon using the VICI interface, similar to the
+  existing ruby gem. The Python library has been contributed by Björn Schuberg.
+
+- EAP server methods now can fulfill public key constraints, such as rightcert
+  or rightca. Additionally, public key and signature constraints can be
+  specified for EAP methods in the rightauth keyword. Currently the EAP-TLS and
+  EAP-TTLS methods provide verification details to constraints checking.
+
+- Upgrade of the BLISS post-quantum signature algorithm to the improved BLISS-B
+  variant. Can be used in conjunction with the SHA256, SHA384 and SHA512 hash
+  algorithms with SHA512 being the default.
+
+- The IF-IMV 1.4 interface now makes the IP address of the TNC access requestor
+  as seen by the TNC server available to all IMVs. This information can be
+  forwarded to policy enforcement points (e.g. firewalls or routers).
+
+- The new mutual tnccs-20 plugin parameter activates mutual TNC measurements
+  in PB-TNC half-duplex mode between two endpoints over either a PT-EAP or
+  PT-TLS transport medium.
+
+
+strongswan-5.2.2
+----------------
+
+- Fixed a denial-of-service vulnerability triggered by an IKEv2 Key Exchange
+  payload that contains the Diffie-Hellman group 1025.  This identifier was
+  used internally for DH groups with custom generator and prime.  Because
+  these arguments are missing when creating DH objects based on the KE payload
+  an invalid pointer dereference occurred.  This allowed an attacker to crash
+  the IKE daemon with a single IKE_SA_INIT message containing such a KE
+  payload.  The vulnerability has been registered as CVE-2014-9221.
+
+- The left/rightid options in ipsec.conf, or any other identity in strongSwan,
+  now accept prefixes to enforce an explicit type, such as email: or fqdn:.
+  Note that no conversion is done for the remaining string, refer to
+  ipsec.conf(5) for details.
+
+- The post-quantum Bimodal Lattice Signature Scheme (BLISS) can be used as
+  an IKEv2 public key authentication method. The pki tool offers full support
+  for the generation of BLISS key pairs and certificates.
+
+- Fixed mapping of integrity algorithms negotiated for AH via IKEv1. This could
+  cause interoperability issues when connecting to older versions of charon.
+
+
 strongswan-5.2.1
 ----------------
 

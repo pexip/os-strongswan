@@ -55,6 +55,9 @@
    don't. */
 #undef HAVE_DECL_STRERROR_R
 
+/* Define to 1 if you have the `dirfd' function. */
+#undef HAVE_DIRFD
+
 /* have dladdr() */
 #undef HAVE_DLADDR
 
@@ -96,6 +99,9 @@
 
 /* have struct in6_pktinfo.ipi6_ifindex */
 #undef HAVE_IN6_PKTINFO
+
+/* have __int128 type support */
+#undef HAVE_INT128
 
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
@@ -199,6 +205,9 @@
 /* Define to 1 if you have the `setlinebuf' function. */
 #undef HAVE_SETLINEBUF
 
+/* Define to 1 if you have the `sigwaitinfo' function. */
+#undef HAVE_SIGWAITINFO
+
 /* have sqlite3_prepare_v2() */
 #undef HAVE_SQLITE3_PREPARE_V2
 
@@ -239,11 +248,17 @@
 /* have syscall(SYS_gettid) */
 #undef HAVE_SYS_GETTID
 
+/* Define to 1 if you have the <sys/param.h> header file. */
+#undef HAVE_SYS_PARAM_H
+
 /* Define to 1 if you have the <sys/sockio.h> header file. */
 #undef HAVE_SYS_SOCKIO_H
 
 /* Define to 1 if you have the <sys/stat.h> header file. */
 #undef HAVE_SYS_STAT_H
+
+/* Define to 1 if you have the <sys/syscall.h> header file. */
+#undef HAVE_SYS_SYSCALL_H
 
 /* Define to 1 if you have the <sys/types.h> header file. */
 #undef HAVE_SYS_TYPES_H
@@ -260,8 +275,7 @@
 /* username to run daemon with */
 #undef IPSEC_USER
 
-/* Define to the sub-directory in which libtool stores uninstalled libraries.
-   */
+/* Define to the sub-directory where libtool stores uninstalled libraries. */
 #undef LT_OBJDIR
 
 /* mediation extension support */
@@ -305,8 +319,11 @@
 /* Define to 1 if strerror_r returns char *. */
 #undef STRERROR_R_CHAR_P
 
-/* use TrouSerS library libtspi as TSS implementation */
+/* use TrouSerS library libtspi */
 #undef TSS_TROUSERS
+
+/* use TSS 2.0 libraries */
+#undef TSS_TSS2
 
 /* using builtin printf for printf hooks */
 #undef USE_BUILTIN_PRINTF
@@ -316,6 +333,9 @@
 
 /* support for IKEv2 protocol */
 #undef USE_IKEV2
+
+/* use thread ID for thread identification, if available */
+#undef USE_THREAD_IDS
 
 /* use Vstr string library for printf hooks */
 #undef USE_VSTR

@@ -18,6 +18,7 @@ NUM_CPUS := $(shell getconf _NPROCESSORS_ONLN)
 
 CONFIG_OPTS = \
 	--sysconfdir=/etc \
+	--with-strongswan-conf=/etc/strongswan.conf.testing \
 	--with-random-device=/dev/urandom \
 	--disable-load-warning \
 	--enable-curl \
@@ -54,6 +55,8 @@ CONFIG_OPTS = \
 	--enable-imv-attestation \
 	--enable-imc-swid \
 	--enable-imv-swid \
+	--enable-imc-hcd \
+	--enable-imv-hcd \
 	--enable-sql \
 	--enable-sqlite \
 	--enable-attr-sql \
@@ -70,11 +73,14 @@ CONFIG_OPTS = \
 	--enable-socket-dynamic \
 	--enable-dhcp \
 	--enable-farp \
+	--enable-connmark \
+	--enable-forecast \
 	--enable-addrblock \
 	--enable-ctr \
 	--enable-ccm \
 	--enable-gcm \
 	--enable-cmac \
+	--enable-chapoly \
 	--enable-ha \
 	--enable-af-alg \
 	--enable-whitelist \
@@ -92,7 +98,9 @@ CONFIG_OPTS = \
 	--enable-tkm \
 	--enable-ntru \
 	--enable-lookip \
-	--enable-swanctl
+	--enable-bliss \
+	--enable-sha3 \
+	--enable-newhope
 
 export ADA_PROJECT_PATH=/usr/local/ada/lib/gnat
 
@@ -103,6 +111,7 @@ $(TAR):
 
 $(PKG): $(TAR)
 	tar xfj $(TAR)
+	echo "$(SWANVERSION)" > /root/shared/.strongswan-version
 
 configure: $(BUILDDIR)
 	cd $(BUILDDIR) && $(DIR)/configure $(CONFIG_OPTS)

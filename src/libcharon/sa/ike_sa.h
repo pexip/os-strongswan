@@ -1,9 +1,9 @@
 /*
- * Copyright (C) 2006-2014 Tobias Brunner
+ * Copyright (C) 2006-2016 Tobias Brunner
  * Copyright (C) 2006 Daniel Roethlisberger
  * Copyright (C) 2005-2009 Martin Willi
  * Copyright (C) 2005 Jan Hutter
- * Hochschule fuer Technik Rapperswil
+ * HSR Hochschule fuer Technik Rapperswil
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -58,12 +58,22 @@ typedef struct ike_sa_t ike_sa_t;
 /**
  * After which time rekeying should be retried if it failed, in seconds.
  */
-#define RETRY_INTERVAL 30
+#define RETRY_INTERVAL 15
 
 /**
  * Jitter to subtract from RETRY_INTERVAL to randomize rekey retry.
  */
-#define RETRY_JITTER 20
+#define RETRY_JITTER 10
+
+/**
+ * Number of redirects allowed within REDIRECT_LOOP_DETECT_PERIOD.
+ */
+#define MAX_REDIRECTS 5
+
+/**
+ * Time period in seconds in which at most MAX_REDIRECTS are allowed.
+ */
+#define REDIRECT_LOOP_DETECT_PERIOD 300
 
 /**
  * Extensions (or optional features) the peer supports
@@ -131,6 +141,16 @@ enum ike_extension_t {
 	 * peer supports proprietary IKEv1 or standardized IKEv2 fragmentation
 	 */
 	EXT_IKE_FRAGMENTATION = (1<<11),
+
+	/**
+	 * Signature Authentication, RFC 7427
+	 */
+	EXT_SIGNATURE_AUTH = (1<<12),
+
+	/**
+	 * IKEv2 Redirect Mechanism, RFC 5685
+	 */
+	EXT_IKE_REDIRECTION = (1<<13),
 };
 
 /**
@@ -192,6 +212,16 @@ enum ike_condition_t {
 	 * This IKE_SA is currently being reauthenticated
 	 */
 	COND_REAUTHENTICATING = (1<<10),
+
+	/**
+	 * This IKE_SA has been redirected
+	 */
+	COND_REDIRECTED = (1<<11),
+
+	/**
+	 * Online certificate revocation checking is suspended for this IKE_SA
+	 */
+	COND_ONLINE_VALIDATION_SUSPENDED = (1<<12),
 };
 
 /**
@@ -279,6 +309,11 @@ enum ike_sa_state_t {
 	IKE_REKEYING,
 
 	/**
+	 * IKE_SA has been rekeyed (or is redundant)
+	 */
+	IKE_REKEYED,
+
+	/**
 	 * IKE_SA is in progress of deletion
 	 */
 	IKE_DELETING,
@@ -323,7 +358,7 @@ struct ike_sa_t {
 	 *
 	 * @return				unique ID
 	 */
-	u_int32_t (*get_unique_id) (ike_sa_t *this);
+	uint32_t (*get_unique_id) (ike_sa_t *this);
 
 	/**
 	 * Get the state of the IKE_SA.
@@ -352,7 +387,7 @@ struct ike_sa_t {
 	 * @param kind			kind of requested value
 	 * @return				value as integer
 	 */
-	u_int32_t (*get_statistic)(ike_sa_t *this, statistic_t kind);
+	uint32_t (*get_statistic)(ike_sa_t *this, statistic_t kind);
 
 	/**
 	 * Set statistic value of the IKE_SA.
@@ -360,7 +395,7 @@ struct ike_sa_t {
 	 * @param kind			kind of value to update
 	 * @param value			value as integer
 	 */
-	void (*set_statistic)(ike_sa_t *this, statistic_t kind, u_int32_t value);
+	void (*set_statistic)(ike_sa_t *this, statistic_t kind, uint32_t value);
 
 	/**
 	 * Get the own host address.
@@ -497,6 +532,14 @@ struct ike_sa_t {
 	enumerator_t* (*create_auth_cfg_enumerator)(ike_sa_t *this, bool local);
 
 	/**
+	 * Verify the trustchains (validity, revocation) in completed public key
+	 * auth rounds.
+	 *
+	 * @return				TRUE if certificates were valid, FALSE otherwise
+	 */
+	bool (*verify_peer_certificate)(ike_sa_t *this);
+
+	/**
 	 * Get the selected proposal of this IKE_SA.
 	 *
 	 * @return				selected proposal
@@ -519,7 +562,7 @@ struct ike_sa_t {
 	 * @param initiate		TRUE to set message ID for initiating
 	 * @param mid			message id to set
 	 */
-	void (*set_message_id)(ike_sa_t *this, bool initiate, u_int32_t mid);
+	void (*set_message_id)(ike_sa_t *this, bool initiate, uint32_t mid);
 
 	/**
 	 * Add an additional address for the peer.
@@ -592,14 +635,14 @@ struct ike_sa_t {
 	 *
 	 * @return				number of pending updates
 	 */
-	u_int32_t (*get_pending_updates)(ike_sa_t *this);
+	uint32_t (*get_pending_updates)(ike_sa_t *this);
 
 	/**
 	 * Set the number of queued MOBIKE address updates.
 	 *
 	 * @param updates		number of pending updates
 	 */
-	void (*set_pending_updates)(ike_sa_t *this, u_int32_t updates);
+	void (*set_pending_updates)(ike_sa_t *this, uint32_t updates);
 
 #ifdef ME
 	/**
@@ -714,7 +757,7 @@ struct ike_sa_t {
 	 *						- DESTROY_ME if initialization failed
 	 */
 	status_t (*initiate) (ike_sa_t *this, child_cfg_t *child_cfg,
-						  u_int32_t reqid, traffic_selector_t *tsi,
+						  uint32_t reqid, traffic_selector_t *tsi,
 						  traffic_selector_t *tsr);
 
 	/**
@@ -812,7 +855,7 @@ struct ike_sa_t {
 	 *						- SUCCESS
 	 *						- NOT_FOUND if request doesn't have to be retransmited
 	 */
-	status_t (*retransmit) (ike_sa_t *this, u_int32_t message_id);
+	status_t (*retransmit) (ike_sa_t *this, uint32_t message_id);
 
 	/**
 	 * Sends a DPD request to the peer.
@@ -832,8 +875,36 @@ struct ike_sa_t {
 	 *
 	 * To refresh NAT tables in a NAT router between the peers, periodic empty
 	 * UDP packets are sent if no other traffic was sent.
+	 *
+	 * @param scheduled		if this is a scheduled keepalive
 	 */
-	void (*send_keepalive) (ike_sa_t *this);
+	void (*send_keepalive) (ike_sa_t *this, bool scheduled);
+
+	/**
+	 * Redirect an active IKE_SA.
+	 *
+	 * @param gateway		gateway ID (IP or FQDN) of the target
+	 * @return				state, including DESTROY_ME, if this IKE_SA MUST be
+	 * 						destroyed
+	 */
+	status_t (*redirect)(ike_sa_t *this, identification_t *gateway);
+
+	/**
+	 * Handle a redirect request.
+	 *
+	 * The behavior is different depending on the state of the IKE_SA.
+	 *
+	 * @param gateway		gateway ID (IP or FQDN) of the target
+	 * @return				FALSE if redirect not possible, TRUE otherwise
+	 */
+	bool (*handle_redirect)(ike_sa_t *this, identification_t *gateway);
+
+	/**
+	 * Get the address of the gateway that redirected us.
+	 *
+	 * @return				original gateway address
+	 */
+	host_t *(*get_redirected_from)(ike_sa_t *this);
 
 	/**
 	 * Get the keying material of this IKE_SA.
@@ -858,7 +929,7 @@ struct ike_sa_t {
 	 * @return				child_sa, or NULL if none found
 	 */
 	child_sa_t* (*get_child_sa) (ike_sa_t *this, protocol_id_t protocol,
-								 u_int32_t spi, bool inbound);
+								 uint32_t spi, bool inbound);
 
 	/**
 	 * Get the number of CHILD_SAs.
@@ -892,7 +963,7 @@ struct ike_sa_t {
 	 *						- NOT_FOUND, if IKE_SA has no such CHILD_SA
 	 *						- SUCCESS, if rekeying initiated
 	 */
-	status_t (*rekey_child_sa) (ike_sa_t *this, protocol_id_t protocol, u_int32_t spi);
+	status_t (*rekey_child_sa) (ike_sa_t *this, protocol_id_t protocol, uint32_t spi);
 
 	/**
 	 * Close the CHILD SA with the specified protocol/SPI.
@@ -909,7 +980,7 @@ struct ike_sa_t {
 	 *						- SUCCESS, if delete message sent
 	 */
 	status_t (*delete_child_sa)(ike_sa_t *this, protocol_id_t protocol,
-								u_int32_t spi, bool expired);
+								uint32_t spi, bool expired);
 
 	/**
 	 * Destroy a CHILD SA with the specified protocol/SPI.
@@ -922,7 +993,7 @@ struct ike_sa_t {
 	 *						- NOT_FOUND, if IKE_SA has no such CHILD_SA
 	 *						- SUCCESS
 	 */
-	status_t (*destroy_child_sa) (ike_sa_t *this, protocol_id_t protocol, u_int32_t spi);
+	status_t (*destroy_child_sa) (ike_sa_t *this, protocol_id_t protocol, uint32_t spi);
 
 	/**
 	 * Rekey the IKE_SA.
@@ -936,8 +1007,9 @@ struct ike_sa_t {
 	/**
 	 * Reauthenticate the IKE_SA.
 	 *
-	 * Create a completely new IKE_SA with authentication, recreates all children
-	 * within the IKE_SA, closes this IKE_SA.
+	 * Triggers a new IKE_SA that replaces this one. IKEv1 implicitly inherits
+	 * all Quick Modes, while IKEv2 recreates all active and queued CHILD_SAs
+	 * in the new IKE_SA.
 	 *
 	 * @return				DESTROY_ME to destroy the IKE_SA
 	 */
@@ -961,7 +1033,7 @@ struct ike_sa_t {
 	 * @param lifetime		lifetime in seconds
 	 * @return				DESTROY_ME to destroy the IKE_SA
 	 */
-	status_t (*set_auth_lifetime)(ike_sa_t *this, u_int32_t lifetime);
+	status_t (*set_auth_lifetime)(ike_sa_t *this, uint32_t lifetime);
 
 	/**
 	 * Add a virtual IP to use for this IKE_SA and its children.
@@ -1050,6 +1122,15 @@ struct ike_sa_t {
 	 * @param task			task to queue
 	 */
 	void (*queue_task)(ike_sa_t *this, task_t *task);
+
+	/**
+	 * Queue a task in the manager, but delay its initiation for at least the
+	 * given number of seconds.
+	 *
+	 * @param task			task to queue
+	 * @param delay			minimum delay in s before initiating the task
+	 */
+	void (*queue_task_delayed)(ike_sa_t *this, task_t *task, uint32_t delay);
 
 	/**
 	 * Inherit required attributes to new SA before rekeying.

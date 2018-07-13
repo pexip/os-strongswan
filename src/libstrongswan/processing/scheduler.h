@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Tobias Brunner
+ * Copyright (C) 2009-2015 Tobias Brunner
  * Copyright (C) 2005-2007 Martin Willi
  * Copyright (C) 2005 Jan Hutter
  * Hochschule fuer Technik Rapperswil
@@ -86,7 +86,7 @@ struct scheduler_t {
 	 * @param job			job to schedule
 	 * @param time			relative time to schedule job, in s
 	 */
-	void (*schedule_job) (scheduler_t *this, job_t *job, u_int32_t s);
+	void (*schedule_job) (scheduler_t *this, job_t *job, uint32_t s);
 
 	/**
 	 * Adds a event to the queue, using a relative time offset in ms.
@@ -94,7 +94,7 @@ struct scheduler_t {
 	 * @param job			job to schedule
 	 * @param time			relative time to schedule job, in ms
 	 */
-	void (*schedule_job_ms) (scheduler_t *this, job_t *job, u_int32_t ms);
+	void (*schedule_job_ms) (scheduler_t *this, job_t *job, uint32_t ms);
 
 	/**
 	 * Adds a event to the queue, using an absolut time.
@@ -113,6 +113,11 @@ struct scheduler_t {
 	 * @return				number of scheduled jobs
 	 */
 	u_int (*get_job_load) (scheduler_t *this);
+
+	/**
+	 * Remove all scheduled jobs.
+	 */
+	void (*flush)(scheduler_t *this);
 
 	/**
 	 * Destroys a scheduler object.

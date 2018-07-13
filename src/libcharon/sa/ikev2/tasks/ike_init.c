@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009 Tobias Brunner
+ * Copyright (C) 2008-2015 Tobias Brunner
  * Copyright (C) 2005-2008 Martin Willi
  * Copyright (C) 2005 Jan Hutter
  * Hochschule fuer Technik Rapperswil
@@ -20,8 +20,11 @@
 #include <string.h>
 
 #include <daemon.h>
+#include <bio/bio_reader.h>
+#include <bio/bio_writer.h>
 #include <sa/ikev2/keymat_v2.h>
 #include <crypto/diffie_hellman.h>
+#include <crypto/hashers/hash_algorithm_set.h>
 #include <encoding/payloads/sa_payload.h>
 #include <encoding/payloads/ke_payload.h>
 #include <encoding/payloads/nonce_payload.h>
@@ -67,6 +70,11 @@ struct private_ike_init_t {
 	diffie_hellman_t *dh;
 
 	/**
+	 * Applying DH public value failed?
+	 */
+	bool dh_failed;
+
+	/**
 	 * Keymat derivation (from IKE_SA)
 	 */
 	keymat_v2_t *keymat;
@@ -80,6 +88,11 @@ struct private_ike_init_t {
 	 * nonce chosen by peer
 	 */
 	chunk_t other_nonce;
+
+	/**
+	 * nonce generator
+	 */
+	nonce_gen_t *nonceg;
 
 	/**
 	 * Negotiated proposal used for IKE_SA
@@ -100,12 +113,138 @@ struct private_ike_init_t {
 	 * retries done so far after failure (cookie or bad dh group)
 	 */
 	u_int retry;
+
+	/**
+	 * Whether to use Signature Authentication as per RFC 7427
+	 */
+	bool signature_authentication;
+
+	/**
+	 * Whether to follow IKEv2 redirects as per RFC 5685
+	 */
+	bool follow_redirects;
 };
+
+/**
+ * Allocate our own nonce value
+ */
+static bool generate_nonce(private_ike_init_t *this)
+{
+	if (!this->nonceg)
+	{
+		DBG1(DBG_IKE, "no nonce generator found to create nonce");
+		return FALSE;
+	}
+	if (!this->nonceg->allocate_nonce(this->nonceg, NONCE_SIZE,
+									  &this->my_nonce))
+	{
+		DBG1(DBG_IKE, "nonce allocation failed");
+		return FALSE;
+	}
+	return TRUE;
+}
+
+/**
+ * Notify the peer about the hash algorithms we support or expect,
+ * as per RFC 7427
+ */
+static void send_supported_hash_algorithms(private_ike_init_t *this,
+										   message_t *message)
+{
+	hash_algorithm_set_t *algos;
+	enumerator_t *enumerator, *rounds;
+	bio_writer_t *writer;
+	hash_algorithm_t hash;
+	peer_cfg_t *peer;
+	auth_cfg_t *auth;
+	auth_rule_t rule;
+	uintptr_t config;
+	char *plugin_name;
+
+	algos = hash_algorithm_set_create();
+	peer = this->ike_sa->get_peer_cfg(this->ike_sa);
+	if (peer)
+	{
+		rounds = peer->create_auth_cfg_enumerator(peer, FALSE);
+		while (rounds->enumerate(rounds, &auth))
+		{
+			enumerator = auth->create_enumerator(auth);
+			while (enumerator->enumerate(enumerator, &rule, &config))
+			{
+				if (rule == AUTH_RULE_IKE_SIGNATURE_SCHEME)
+				{
+					hash = hasher_from_signature_scheme(config);
+					if (hasher_algorithm_for_ikev2(hash))
+					{
+						algos->add(algos, hash);
+					}
+				}
+			}
+			enumerator->destroy(enumerator);
+		}
+		rounds->destroy(rounds);
+	}
+
+	if (!algos->count(algos))
+	{
+		enumerator = lib->crypto->create_hasher_enumerator(lib->crypto);
+		while (enumerator->enumerate(enumerator, &hash, &plugin_name))
+		{
+			if (hasher_algorithm_for_ikev2(hash))
+			{
+				algos->add(algos, hash);
+			}
+		}
+		enumerator->destroy(enumerator);
+	}
+
+	if (algos->count(algos))
+	{
+		writer = bio_writer_create(0);
+		enumerator = algos->create_enumerator(algos);
+		while (enumerator->enumerate(enumerator, &hash))
+		{
+			writer->write_uint16(writer, hash);
+		}
+		enumerator->destroy(enumerator);
+		message->add_notify(message, FALSE, SIGNATURE_HASH_ALGORITHMS,
+							writer->get_buf(writer));
+		writer->destroy(writer);
+	}
+	algos->destroy(algos);
+}
+
+/**
+ * Store algorithms supported by other peer
+ */
+static void handle_supported_hash_algorithms(private_ike_init_t *this,
+											 notify_payload_t *notify)
+{
+	bio_reader_t *reader;
+	uint16_t algo;
+	bool added = FALSE;
+
+	reader = bio_reader_create(notify->get_notification_data(notify));
+	while (reader->remaining(reader) >= 2 && reader->read_uint16(reader, &algo))
+	{
+		if (hasher_algorithm_for_ikev2(algo))
+		{
+			this->keymat->add_hash_algorithm(this->keymat, algo);
+			added = TRUE;
+		}
+	}
+	reader->destroy(reader);
+
+	if (added)
+	{
+		this->ike_sa->enable_extension(this->ike_sa, EXT_SIGNATURE_AUTH);
+	}
+}
 
 /**
  * build the payloads for the message
  */
-static void build_payloads(private_ike_init_t *this, message_t *message)
+static bool build_payloads(private_ike_init_t *this, message_t *message)
 {
 	sa_payload_t *sa_payload;
 	ke_payload_t *ke_payload;
@@ -149,7 +288,13 @@ static void build_payloads(private_ike_init_t *this, message_t *message)
 
 	nonce_payload = nonce_payload_create(PLV2_NONCE);
 	nonce_payload->set_nonce(nonce_payload, this->my_nonce);
-	ke_payload = ke_payload_create_from_diffie_hellman(PLV2_KEY_EXCHANGE, this->dh);
+	ke_payload = ke_payload_create_from_diffie_hellman(PLV2_KEY_EXCHANGE,
+													   this->dh);
+	if (!ke_payload)
+	{
+		DBG1(DBG_IKE, "creating KE payload failed");
+		return FALSE;
+	}
 
 	if (this->old_sa)
 	{	/* payload order differs if we are rekeying */
@@ -174,6 +319,40 @@ static void build_payloads(private_ike_init_t *this, message_t *message)
 								chunk_empty);
 		}
 	}
+	/* submit supported hash algorithms for signature authentication */
+	if (!this->old_sa && this->signature_authentication)
+	{
+		if (this->initiator ||
+			this->ike_sa->supports_extension(this->ike_sa,
+											 EXT_SIGNATURE_AUTH))
+		{
+			send_supported_hash_algorithms(this, message);
+		}
+	}
+	/* notify other peer if we support redirection */
+	if (!this->old_sa && this->initiator && this->follow_redirects)
+	{
+		identification_t *gateway;
+		host_t *from;
+		chunk_t data;
+
+		from = this->ike_sa->get_redirected_from(this->ike_sa);
+		if (from)
+		{
+			gateway = identification_create_from_sockaddr(
+													from->get_sockaddr(from));
+			data = redirect_data_create(gateway, chunk_empty);
+			message->add_notify(message, FALSE, REDIRECTED_FROM, data);
+			chunk_free(&data);
+			gateway->destroy(gateway);
+		}
+		else
+		{
+			message->add_notify(message, FALSE, REDIRECT_SUPPORTED,
+								chunk_empty);
+		}
+	}
+	return TRUE;
 }
 
 /**
@@ -183,6 +362,7 @@ static void process_payloads(private_ike_init_t *this, message_t *message)
 {
 	enumerator_t *enumerator;
 	payload_t *payload;
+	ke_payload_t *ke_payload = NULL;
 
 	enumerator = message->create_payload_enumerator(message);
 	while (enumerator->enumerate(enumerator, &payload))
@@ -193,13 +373,15 @@ static void process_payloads(private_ike_init_t *this, message_t *message)
 			{
 				sa_payload_t *sa_payload = (sa_payload_t*)payload;
 				linked_list_t *proposal_list;
-				bool private;
+				bool private, prefer_configured;
 
 				proposal_list = sa_payload->get_proposals(sa_payload);
 				private = this->ike_sa->supports_extension(this->ike_sa,
 														   EXT_STRONGSWAN);
+				prefer_configured = lib->settings->get_bool(lib->settings,
+							"%s.prefer_configured_proposals", TRUE, lib->ns);
 				this->proposal = this->config->select_proposal(this->config,
-														proposal_list, private);
+									proposal_list, private, prefer_configured);
 				if (!this->proposal)
 				{
 					charon->bus->alert(charon->bus, ALERT_PROPOSAL_MISMATCH_IKE,
@@ -211,19 +393,9 @@ static void process_payloads(private_ike_init_t *this, message_t *message)
 			}
 			case PLV2_KEY_EXCHANGE:
 			{
-				ke_payload_t *ke_payload = (ke_payload_t*)payload;
+				ke_payload = (ke_payload_t*)payload;
 
 				this->dh_group = ke_payload->get_dh_group_number(ke_payload);
-				if (!this->initiator)
-				{
-					this->dh = this->keymat->keymat.create_dh(
-										&this->keymat->keymat, this->dh_group);
-				}
-				if (this->dh)
-				{
-					this->dh->set_other_public_value(this->dh,
-								ke_payload->get_key_exchange_data(ke_payload));
-				}
 				break;
 			}
 			case PLV2_NONCE:
@@ -237,17 +409,73 @@ static void process_payloads(private_ike_init_t *this, message_t *message)
 			{
 				notify_payload_t *notify = (notify_payload_t*)payload;
 
-				if (notify->get_notify_type(notify) == FRAGMENTATION_SUPPORTED)
+				switch (notify->get_notify_type(notify))
 				{
-					this->ike_sa->enable_extension(this->ike_sa,
-												   EXT_IKE_FRAGMENTATION);
+					case FRAGMENTATION_SUPPORTED:
+						this->ike_sa->enable_extension(this->ike_sa,
+													   EXT_IKE_FRAGMENTATION);
+						break;
+					case SIGNATURE_HASH_ALGORITHMS:
+						if (this->signature_authentication)
+						{
+							handle_supported_hash_algorithms(this, notify);
+						}
+						break;
+					case REDIRECTED_FROM:
+					{
+						identification_t *gateway;
+						chunk_t data;
+
+						data = notify->get_notification_data(notify);
+						gateway = redirect_data_parse(data, NULL);
+						if (!gateway)
+						{
+							DBG1(DBG_IKE, "received invalid REDIRECTED_FROM "
+								 "notify, ignored");
+							break;
+						}
+						DBG1(DBG_IKE, "client got redirected from %Y", gateway);
+						gateway->destroy(gateway);
+						/* fall-through */
+					}
+					case REDIRECT_SUPPORTED:
+						if (!this->old_sa)
+						{
+							this->ike_sa->enable_extension(this->ike_sa,
+														   EXT_IKE_REDIRECTION);
+						}
+						break;
+					default:
+						/* other notifies are handled elsewhere */
+						break;
 				}
+
 			}
 			default:
 				break;
 		}
 	}
 	enumerator->destroy(enumerator);
+
+	if (this->proposal)
+	{
+		this->ike_sa->set_proposal(this->ike_sa, this->proposal);
+	}
+
+	if (ke_payload && this->proposal &&
+		this->proposal->has_dh_group(this->proposal, this->dh_group))
+	{
+		if (!this->initiator)
+		{
+			this->dh = this->keymat->keymat.create_dh(
+								&this->keymat->keymat, this->dh_group);
+		}
+		if (this->dh)
+		{
+			this->dh_failed = !this->dh->set_other_public_value(this->dh,
+								ke_payload->get_key_exchange_data(ke_payload));
+		}
+	}
 }
 
 METHOD(task_t, build_i, status_t,
@@ -283,21 +511,10 @@ METHOD(task_t, build_i, status_t,
 	/* generate nonce only when we are trying the first time */
 	if (this->my_nonce.ptr == NULL)
 	{
-		nonce_gen_t *nonceg;
-
-		nonceg = this->keymat->keymat.create_nonce_gen(&this->keymat->keymat);
-		if (!nonceg)
+		if (!generate_nonce(this))
 		{
-			DBG1(DBG_IKE, "no nonce generator found to create nonce");
 			return FAILED;
 		}
-		if (!nonceg->allocate_nonce(nonceg, NONCE_SIZE, &this->my_nonce))
-		{
-			DBG1(DBG_IKE, "nonce allocation failed");
-			nonceg->destroy(nonceg);
-			return FAILED;
-		}
-		nonceg->destroy(nonceg);
 	}
 
 	if (this->cookie.ptr)
@@ -305,7 +522,10 @@ METHOD(task_t, build_i, status_t,
 		message->add_notify(message, FALSE, COOKIE, this->cookie);
 	}
 
-	build_payloads(this, message);
+	if (!build_payloads(this, message))
+	{
+		return FAILED;
+	}
 
 #ifdef ME
 	{
@@ -323,25 +543,14 @@ METHOD(task_t, build_i, status_t,
 METHOD(task_t, process_r,  status_t,
 	private_ike_init_t *this, message_t *message)
 {
-	nonce_gen_t *nonceg;
-
 	this->config = this->ike_sa->get_ike_cfg(this->ike_sa);
 	DBG0(DBG_IKE, "%H is initiating an IKE_SA", message->get_source(message));
 	this->ike_sa->set_state(this->ike_sa, IKE_CONNECTING);
 
-	nonceg = this->keymat->keymat.create_nonce_gen(&this->keymat->keymat);
-	if (!nonceg)
+	if (!generate_nonce(this))
 	{
-		DBG1(DBG_IKE, "no nonce generator found to create nonce");
 		return FAILED;
 	}
-	if (!nonceg->allocate_nonce(nonceg, NONCE_SIZE, &this->my_nonce))
-	{
-		DBG1(DBG_IKE, "nonce allocation failed");
-		nonceg->destroy(nonceg);
-		return FAILED;
-	}
-	nonceg->destroy(nonceg);
 
 #ifdef ME
 	{
@@ -400,6 +609,8 @@ static bool derive_keys(private_ike_init_t *this,
 METHOD(task_t, build_r, status_t,
 	private_ike_init_t *this, message_t *message)
 {
+	identification_t *gateway;
+
 	/* check if we have everything we need */
 	if (this->proposal == NULL ||
 		this->other_nonce.len == 0 || this->my_nonce.len == 0)
@@ -408,12 +619,27 @@ METHOD(task_t, build_r, status_t,
 		message->add_notify(message, TRUE, NO_PROPOSAL_CHOSEN, chunk_empty);
 		return FAILED;
 	}
-	this->ike_sa->set_proposal(this->ike_sa, this->proposal);
+
+	/* check if we'd have to redirect the client */
+	if (!this->old_sa &&
+		this->ike_sa->supports_extension(this->ike_sa, EXT_IKE_REDIRECTION) &&
+		charon->redirect->redirect_on_init(charon->redirect, this->ike_sa,
+										   &gateway))
+	{
+		chunk_t data;
+
+		DBG1(DBG_IKE, "redirecting peer to %Y", gateway);
+		data = redirect_data_create(gateway, this->other_nonce);
+		message->add_notify(message, TRUE, REDIRECT, data);
+		gateway->destroy(gateway);
+		chunk_free(&data);
+		return FAILED;
+	}
 
 	if (this->dh == NULL ||
 		!this->proposal->has_dh_group(this->proposal, this->dh_group))
 	{
-		u_int16_t group;
+		uint16_t group;
 
 		if (this->proposal->get_algorithm(this->proposal, DIFFIE_HELLMAN_GROUP,
 										  &group, NULL))
@@ -429,7 +655,15 @@ METHOD(task_t, build_r, status_t,
 		else
 		{
 			DBG1(DBG_IKE, "no acceptable proposal found");
+			message->add_notify(message, TRUE, NO_PROPOSAL_CHOSEN, chunk_empty);
 		}
+		return FAILED;
+	}
+
+	if (this->dh_failed)
+	{
+		DBG1(DBG_IKE, "applying DH public value failed");
+		message->add_notify(message, TRUE, NO_PROPOSAL_CHOSEN, chunk_empty);
 		return FAILED;
 	}
 
@@ -439,7 +673,11 @@ METHOD(task_t, build_r, status_t,
 		message->add_notify(message, TRUE, NO_PROPOSAL_CHOSEN, chunk_empty);
 		return FAILED;
 	}
-	build_payloads(this, message);
+	if (!build_payloads(this, message))
+	{
+		message->add_notify(message, TRUE, NO_PROPOSAL_CHOSEN, chunk_empty);
+		return FAILED;
+	}
 	return SUCCESS;
 }
 
@@ -460,6 +698,54 @@ static void raise_alerts(private_ike_init_t *this, notify_type_t type)
 		default:
 			break;
 	}
+}
+
+METHOD(task_t, pre_process_i, status_t,
+	private_ike_init_t *this, message_t *message)
+{
+	enumerator_t *enumerator;
+	payload_t *payload;
+
+	/* check for erroneous notifies */
+	enumerator = message->create_payload_enumerator(message);
+	while (enumerator->enumerate(enumerator, &payload))
+	{
+		if (payload->get_type(payload) == PLV2_NOTIFY)
+		{
+			notify_payload_t *notify = (notify_payload_t*)payload;
+			notify_type_t type = notify->get_notify_type(notify);
+
+			switch (type)
+			{
+				case REDIRECT:
+				{
+					identification_t *gateway;
+					chunk_t data, nonce = chunk_empty;
+					status_t status = SUCCESS;
+
+					if (this->old_sa)
+					{
+						break;
+					}
+					data = notify->get_notification_data(notify);
+					gateway = redirect_data_parse(data, &nonce);
+					if (!gateway || !chunk_equals(nonce, this->my_nonce))
+					{
+						DBG1(DBG_IKE, "received invalid REDIRECT notify");
+						status = FAILED;
+					}
+					DESTROY_IF(gateway);
+					chunk_free(&nonce);
+					enumerator->destroy(enumerator);
+					return status;
+				}
+				default:
+					break;
+			}
+		}
+	}
+	enumerator->destroy(enumerator);
+	return SUCCESS;
 }
 
 METHOD(task_t, process_i, status_t,
@@ -486,7 +772,7 @@ METHOD(task_t, process_i, status_t,
 
 					bad_group = this->dh_group;
 					data = notify->get_notification_data(notify);
-					this->dh_group = ntohs(*((u_int16_t*)data.ptr));
+					this->dh_group = ntohs(*((uint16_t*)data.ptr));
 					DBG1(DBG_IKE, "peer didn't accept DH group %N, "
 						 "it requested %N", diffie_hellman_group_names,
 						 bad_group, diffie_hellman_group_names, this->dh_group);
@@ -517,6 +803,29 @@ METHOD(task_t, process_i, status_t,
 					this->retry++;
 					return NEED_MORE;
 				}
+				case REDIRECT:
+				{
+					identification_t *gateway;
+					chunk_t data, nonce = chunk_empty;
+					status_t status = FAILED;
+
+					if (this->old_sa)
+					{
+						DBG1(DBG_IKE, "received REDIRECT notify during rekeying"
+						     ", ignored");
+						break;
+					}
+					data = notify->get_notification_data(notify);
+					gateway = redirect_data_parse(data, &nonce);
+					if (this->ike_sa->handle_redirect(this->ike_sa, gateway))
+					{
+						status = NEED_MORE;
+					}
+					DESTROY_IF(gateway);
+					chunk_free(&nonce);
+					enumerator->destroy(enumerator);
+					return status;
+				}
 				default:
 				{
 					if (type <= 16383)
@@ -545,12 +854,17 @@ METHOD(task_t, process_i, status_t,
 		DBG1(DBG_IKE, "peers proposal selection invalid");
 		return FAILED;
 	}
-	this->ike_sa->set_proposal(this->ike_sa, this->proposal);
 
 	if (this->dh == NULL ||
 		!this->proposal->has_dh_group(this->proposal, this->dh_group))
 	{
 		DBG1(DBG_IKE, "peer DH group selection invalid");
+		return FAILED;
+	}
+
+	if (this->dh_failed)
+	{
+		DBG1(DBG_IKE, "applying DH public value failed");
 		return FAILED;
 	}
 
@@ -577,6 +891,7 @@ METHOD(task_t, migrate, void,
 	this->ike_sa = ike_sa;
 	this->keymat = (keymat_v2_t*)ike_sa->get_keymat(ike_sa);
 	this->proposal = NULL;
+	this->dh_failed = FALSE;
 	if (this->dh && this->dh->get_dh_group(this->dh) != this->dh_group)
 	{	/* reset DH value only if group changed (INVALID_KE_PAYLOAD) */
 		this->dh->destroy(this->dh);
@@ -590,6 +905,7 @@ METHOD(task_t, destroy, void,
 {
 	DESTROY_IF(this->dh);
 	DESTROY_IF(this->proposal);
+	DESTROY_IF(this->nonceg);
 	chunk_free(&this->my_nonce);
 	chunk_free(&this->other_nonce);
 	chunk_free(&this->cookie);
@@ -631,18 +947,23 @@ ike_init_t *ike_init_create(ike_sa_t *ike_sa, bool initiator, ike_sa_t *old_sa)
 		.dh_group = MODP_NONE,
 		.keymat = (keymat_v2_t*)ike_sa->get_keymat(ike_sa),
 		.old_sa = old_sa,
+		.signature_authentication = lib->settings->get_bool(lib->settings,
+								"%s.signature_authentication", TRUE, lib->ns),
+		.follow_redirects = lib->settings->get_bool(lib->settings,
+								"%s.follow_redirects", TRUE, lib->ns),
 	);
+	this->nonceg = this->keymat->keymat.create_nonce_gen(&this->keymat->keymat);
 
 	if (initiator)
 	{
 		this->public.task.build = _build_i;
 		this->public.task.process = _process_i;
+		this->public.task.pre_process = _pre_process_i;
 	}
 	else
 	{
 		this->public.task.build = _build_r;
 		this->public.task.process = _process_r;
 	}
-
 	return &this->public;
 }

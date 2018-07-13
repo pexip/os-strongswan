@@ -1465,7 +1465,7 @@ static bool parse_certificate(private_x509_cert_t *this)
 				}
 				break;
 			case X509_OBJ_SIGNATURE:
-				this->signature = object;
+				this->signature = chunk_skip(object, 1);
 				break;
 			default:
 				break;
@@ -2143,8 +2143,8 @@ static bool generate(private_x509_cert_t *cert, certificate_t *sign_cert,
 		msSmartcardLogon = asn1_build_known_oid(OID_MS_SMARTCARD_LOGON);
 	}
 
-	if (serverAuth.ptr || clientAuth.ptr || ikeIntermediate.ptr ||
-		ocspSigning.ptr)
+	if (serverAuth.ptr  || clientAuth.ptr || ikeIntermediate.ptr ||
+		ocspSigning.ptr || msSmartcardLogon.ptr)
 	{
 		extendedKeyUsage = asn1_wrap(ASN1_SEQUENCE, "mm",
 								asn1_build_known_oid(OID_EXTENDED_KEY_USAGE),

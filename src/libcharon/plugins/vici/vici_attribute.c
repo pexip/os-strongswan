@@ -1,4 +1,7 @@
 /*
+ * Copyright (C) 2014-2015 Tobias Brunner
+ * Hochschule fuer Technik Rapperswil
+ *
  * Copyright (C) 2014 Martin Willi
  * Copyright (C) 2014 revosec AG
  *
@@ -93,7 +96,8 @@ static void pool_destroy(pool_t *pool)
  * Find an existing or not yet existing lease
  */
 static host_t *find_addr(private_vici_attribute_t *this, linked_list_t *pools,
-					identification_t *id, host_t *requested, mem_pool_op_t op)
+						 identification_t *id, host_t *requested,
+						 mem_pool_op_t op, host_t *peer)
 {
 	enumerator_t *enumerator;
 	host_t *addr = NULL;
@@ -106,7 +110,8 @@ static host_t *find_addr(private_vici_attribute_t *this, linked_list_t *pools,
 		pool = this->pools->get(this->pools, name);
 		if (pool)
 		{
-			addr = pool->vips->acquire_address(pool->vips, id, requested, op);
+			addr = pool->vips->acquire_address(pool->vips, id, requested,
+											   op, peer);
 			if (addr)
 			{
 				break;
@@ -119,20 +124,24 @@ static host_t *find_addr(private_vici_attribute_t *this, linked_list_t *pools,
 }
 
 METHOD(attribute_provider_t, acquire_address, host_t*,
-	private_vici_attribute_t *this, linked_list_t *pools, identification_t *id,
+	private_vici_attribute_t *this, linked_list_t *pools, ike_sa_t *ike_sa,
 	host_t *requested)
 {
-	host_t *addr;
+	identification_t *id;
+	host_t *addr, *peer;
+
+	id = ike_sa->get_other_eap_id(ike_sa);
+	peer = ike_sa->get_other_host(ike_sa);
 
 	this->lock->read_lock(this->lock);
 
-	addr = find_addr(this, pools, id, requested, MEM_POOL_EXISTING);
+	addr = find_addr(this, pools, id, requested, MEM_POOL_EXISTING, peer);
 	if (!addr)
 	{
-		addr = find_addr(this, pools, id, requested, MEM_POOL_NEW);
+		addr = find_addr(this, pools, id, requested, MEM_POOL_NEW, peer);
 		if (!addr)
 		{
-			addr = find_addr(this, pools, id, requested, MEM_POOL_REASSIGN);
+			addr = find_addr(this, pools, id, requested, MEM_POOL_REASSIGN, peer);
 		}
 	}
 
@@ -143,12 +152,15 @@ METHOD(attribute_provider_t, acquire_address, host_t*,
 
 METHOD(attribute_provider_t, release_address, bool,
 	private_vici_attribute_t *this, linked_list_t *pools, host_t *address,
-	identification_t *id)
+	ike_sa_t *ike_sa)
 {
 	enumerator_t *enumerator;
+	identification_t *id;
 	bool found = FALSE;
 	pool_t *pool;
 	char *name;
+
+	id = ike_sa->get_other_eap_id(ike_sa);
 
 	this->lock->read_lock(this->lock);
 
@@ -221,7 +233,7 @@ static bool have_vips_from_pool(mem_pool_t *pool, linked_list_t *vips)
 	enumerator_t *enumerator;
 	host_t *host;
 	chunk_t start, end, current;
-	u_int32_t size;
+	uint32_t size;
 	bool found = FALSE;
 
 	host = pool->get_base(pool);
@@ -256,7 +268,7 @@ static bool have_vips_from_pool(mem_pool_t *pool, linked_list_t *vips)
 
 METHOD(attribute_provider_t, create_attribute_enumerator, enumerator_t*,
 	private_vici_attribute_t *this, linked_list_t *pools,
-	identification_t *id, linked_list_t *vips)
+	ike_sa_t *ike_sa, linked_list_t *vips)
 {
 	enumerator_t *enumerator;
 	nested_data_t *data;
@@ -355,6 +367,24 @@ static vici_message_t* create_reply(char *fmt, ...)
 }
 
 /**
+ * Parse a range definition of an address pool
+ */
+static mem_pool_t *create_pool_range(char *name, char *buf)
+{
+	mem_pool_t *pool;
+	host_t *from, *to;
+
+	if (!host_create_from_range(buf, &from, &to))
+	{
+		return NULL;
+	}
+	pool = mem_pool_create_range(name, from, to);
+	from->destroy(from);
+	to->destroy(to);
+	return pool;
+}
+
+/**
  * Parse callback data, passed to each callback
  */
 typedef struct {
@@ -447,10 +477,10 @@ CALLBACK(pool_li, bool,
 		{
 			if (host->get_family(host) == AF_INET)
 			{	/* IPv4 attributes contain a subnet mask */
-				u_int32_t netmask = 0;
+				uint32_t netmask = 0;
 
 				if (mask)
-				{	/* shifting u_int32_t by 32 or more is undefined */
+				{	/* shifting uint32_t by 32 or more is undefined */
 					mask = 32 - mask;
 					netmask = htonl((0xFFFFFFFF >> mask) << mask);
 				}
@@ -490,7 +520,8 @@ CALLBACK(pool_kv, bool,
 	if (streq(name, "addrs"))
 	{
 		char buf[128];
-		host_t *base;
+		mem_pool_t *pool;
+		host_t *base = NULL;
 		int bits;
 
 		if (data->pool->vips)
@@ -503,14 +534,22 @@ CALLBACK(pool_kv, bool,
 			data->request->reply = create_reply("invalid addrs value");
 			return FALSE;
 		}
-		base = host_create_from_subnet(buf, &bits);
-		if (!base)
+		pool = create_pool_range(data->name, buf);
+		if (!pool)
+		{
+			base = host_create_from_subnet(buf, &bits);
+			if (base)
+			{
+				pool = mem_pool_create(data->name, base, bits);
+				base->destroy(base);
+			}
+		}
+		if (!pool)
 		{
 			data->request->reply = create_reply("invalid addrs value: %s", buf);
 			return FALSE;
 		}
-		data->pool->vips = mem_pool_create(data->name, base, bits);
-		base->destroy(base);
+		data->pool->vips = pool;
 		return TRUE;
 	}
 	data->request->reply = create_reply("invalid attribute: %s", name);
@@ -623,9 +662,16 @@ CALLBACK(get_pools, vici_message_t*,
 	vici_message_t *message)
 {
 	vici_builder_t *builder;
-	enumerator_t *enumerator;
+	enumerator_t *enumerator, *leases;
 	mem_pool_t *vips;
 	pool_t *pool;
+	identification_t *uid;
+	host_t *lease;
+	bool list_leases, on;
+	char buf[32];
+	int i;
+
+	list_leases = message->get_bool(message, FALSE, "leases");
 
 	builder = vici_builder_create();
 
@@ -642,6 +688,23 @@ CALLBACK(get_pools, vici_message_t*,
 		builder->add_kv(builder, "online", "%u", vips->get_online(vips));
 		builder->add_kv(builder, "offline", "%u", vips->get_offline(vips));
 
+		if (list_leases)
+		{
+			i = 0;
+			builder->begin_section(builder, "leases");
+			leases = vips->create_lease_enumerator(vips);
+			while (leases && leases->enumerate(leases, &uid, &lease, &on))
+			{
+				snprintf(buf, sizeof(buf), "%d", i++);
+				builder->begin_section(builder, buf);
+				builder->add_kv(builder, "address", "%H", lease);
+				builder->add_kv(builder, "identity", "%Y", uid);
+				builder->add_kv(builder, "status", on ? "online" : "offline");
+				builder->end_section(builder);
+			}
+			leases->destroy(leases);
+			builder->end_section(builder);
+		}
 		builder->end_section(builder);
 	}
 	enumerator->destroy(enumerator);

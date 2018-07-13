@@ -31,8 +31,6 @@ typedef struct tun_device_t tun_device_t;
  * Class to create TUN devices
  *
  * Creating such a device requires the CAP_NET_ADMIN capability.
- *
- * @note The implementation is currently very Linux specific
  */
 struct tun_device_t {
 
@@ -42,7 +40,7 @@ struct tun_device_t {
 	 * @note This call blocks until a packet is available. It is a thread
 	 * cancellation point.
 	 *
-	 * @param packet		the packet read from the device
+	 * @param packet		the packet read from the device, allocated
 	 * @return				TRUE if successful
 	 */
 	bool (*read_packet)(tun_device_t *this, chunk_t *packet);
@@ -62,7 +60,7 @@ struct tun_device_t {
 	 * @param netmask		the netmask to use
 	 * @return				TRUE if operation successful
 	 */
-	bool (*set_address)(tun_device_t *this, host_t *addr, u_int8_t netmask);
+	bool (*set_address)(tun_device_t *this, host_t *addr, uint8_t netmask);
 
 	/**
 	 * Get the IP address previously assigned to using set_address().
@@ -70,7 +68,7 @@ struct tun_device_t {
 	 * @param netmask		pointer receiving the configured netmask, or NULL
 	 * @return				address previously set, NULL if none
 	 */
-	host_t* (*get_address)(tun_device_t *this, u_int8_t *netmask);
+	host_t* (*get_address)(tun_device_t *this, uint8_t *netmask);
 
 	/**
 	 * Bring the TUN device up

@@ -124,17 +124,8 @@ int command_getopt(char **arg)
 		switch (op)
 		{
 			case '+':
-				if (!options->from(options, optarg, &argc, &argv, optind))
-				{
-					/* a error value */
-					return 255;
-				}
-				continue;
 			case 'v':
-				dbg_default_set_level(atoi(optarg));
-				continue;
 			case 'u':
-				uri = optarg;
 				continue;
 			default:
 				*arg = optarg;
@@ -185,6 +176,15 @@ void command_register(command_t command)
 				"uri",		'u', 1, "service URI to connect to"
 			};
 		}
+		for (i = 0; cmds[registered].line[i]; i++)
+		{
+			if (i == MAX_LINES - 1)
+			{
+				fprintf(stderr, "command '%s' specifies too many usage summary "
+						"lines, please increase MAX_LINES\n", command.cmd);
+				break;
+			}
+		}
 	}
 	registered++;
 }
@@ -220,13 +220,13 @@ int command_usage(char *error, ...)
 	{
 		for (i = 0; i < MAX_COMMANDS && cmds[i].cmd; i++)
 		{
-			fprintf(out, "  swanctl --%-15s (-%c)  %s\n",
+			fprintf(out, "  swanctl --%-16s (-%c)  %s\n",
 					cmds[i].cmd, cmds[i].op, cmds[i].description);
 		}
 	}
 	else
 	{
-		for (i = 0; cmds[active].line[i]; i++)
+		for (i = 0; i < MAX_LINES && cmds[active].line[i]; i++)
 		{
 			if (i == 0)
 			{
@@ -254,6 +254,37 @@ int command_usage(char *error, ...)
 static void cleanup()
 {
 	options->destroy(options);
+}
+
+/**
+ * Process options common for all commands
+ */
+static bool process_common_opts()
+{
+	while (TRUE)
+	{
+		switch (getopt_long(argc, argv, command_optstring, command_opts, NULL))
+		{
+			case '+':
+				if (!options->from(options, optarg, &argc, &argv, optind))
+				{
+					return FALSE;
+				}
+				continue;
+			case 'v':
+				dbg_default_set_level(atoi(optarg));
+				continue;
+			case 'u':
+				uri = optarg;
+				continue;
+			default:
+				continue;
+			case '?':
+				return FALSE;
+			case EOF:
+				return TRUE;
+		}
+	}
 }
 
 /**
@@ -303,6 +334,11 @@ int command_dispatch(int c, char *v[])
 			{
 				return command_usage(NULL);
 			}
+			if (!process_common_opts())
+			{
+				return command_usage("invalid options");
+			}
+			optind = 2;
 			return call_command(&cmds[i]);
 		}
 	}

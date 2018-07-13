@@ -1,9 +1,9 @@
 /*
- * Copyright (C) 2006-2014 Tobias Brunner
+ * Copyright (C) 2006-2016 Tobias Brunner
  * Copyright (C) 2006 Daniel Roethlisberger
  * Copyright (C) 2005-2009 Martin Willi
  * Copyright (C) 2005 Jan Hutter
- * Hochschule fuer Technik Rapperswil
+ * HSR Hochschule fuer Technik Rapperswil
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -46,7 +46,6 @@
 #include "ike_sa.h"
 
 #include <library.h>
-#include <hydra.h>
 #include <daemon.h>
 #include <collections/array.h>
 #include <utils/lexparser.h>
@@ -57,6 +56,9 @@
 #include <processing/jobs/rekey_ike_sa_job.h>
 #include <processing/jobs/retry_initiate_job.h>
 #include <sa/ikev2/tasks/ike_auth_lifetime.h>
+#include <sa/ikev2/tasks/ike_reauth_complete.h>
+#include <sa/ikev2/tasks/ike_redirect.h>
+#include <credentials/sets/auth_cfg_wrapper.h>
 
 #ifdef ME
 #include <sa/ikev2/tasks/ike_me.h>
@@ -69,6 +71,7 @@ ENUM(ike_sa_state_names, IKE_CREATED, IKE_DESTROYING,
 	"ESTABLISHED",
 	"PASSIVE",
 	"REKEYING",
+	"REKEYED",
 	"DELETING",
 	"DESTROYING",
 );
@@ -99,7 +102,7 @@ struct private_ike_sa_t {
 	/**
 	 * unique numerical ID for this IKE_SA.
 	 */
-	u_int32_t unique_id;
+	uint32_t unique_id;
 
 	/**
 	 * Current state of the IKE_SA
@@ -231,18 +234,23 @@ struct private_ike_sa_t {
 	/**
 	 * number pending UPDATE_SA_ADDRESS (MOBIKE)
 	 */
-	u_int32_t pending_updates;
+	uint32_t pending_updates;
 
 	/**
 	 * NAT keep alive interval
 	 */
-	u_int32_t keepalive_interval;
+	uint32_t keepalive_interval;
+
+	/**
+	 * The schedueld keep alive job, if any
+	 */
+	send_keepalive_job_t *keepalive_job;
 
 	/**
 	 * interval for retries during initiation (e.g. if DNS resolution failed),
 	 * 0 to disable (default)
 	 */
-	u_int32_t retry_initiate_interval;
+	uint32_t retry_initiate_interval;
 
 	/**
 	 * TRUE if a retry_initiate_job has been queued
@@ -252,12 +260,12 @@ struct private_ike_sa_t {
 	/**
 	 * Timestamps for this IKE_SA
 	 */
-	u_int32_t stats[STAT_MAX];
+	uint32_t stats[STAT_MAX];
 
 	/**
 	 * how many times we have retried so far (keyingtries)
 	 */
-	u_int32_t keyingtry;
+	uint32_t keyingtry;
 
 	/**
 	 * local host address to be used for IKE, set via MIGRATE kernel message
@@ -278,6 +286,21 @@ struct private_ike_sa_t {
 	 * Maximum length of a single fragment, 0 for address-specific defaults
 	 */
 	size_t fragment_size;
+
+	/**
+	 * Whether to follow IKEv2 redirects
+	 */
+	bool follow_redirects;
+
+	/**
+	 * Original gateway address from which we got redirected
+	 */
+	host_t *redirected_from;
+
+	/**
+	 * Timestamps of redirect attempts to handle loops
+	 */
+	array_t *redirected_at;
 };
 
 /**
@@ -321,7 +344,7 @@ static time_t get_use_time(private_ike_sa_t* this, bool inbound)
 	return use_time;
 }
 
-METHOD(ike_sa_t, get_unique_id, u_int32_t,
+METHOD(ike_sa_t, get_unique_id, uint32_t,
 	private_ike_sa_t *this)
 {
 	return this->unique_id;
@@ -337,7 +360,7 @@ METHOD(ike_sa_t, get_name, char*,
 	return "(unnamed)";
 }
 
-METHOD(ike_sa_t, get_statistic, u_int32_t,
+METHOD(ike_sa_t, get_statistic, uint32_t,
 	private_ike_sa_t *this, statistic_t kind)
 {
 	if (kind < STAT_MAX)
@@ -348,7 +371,7 @@ METHOD(ike_sa_t, get_statistic, u_int32_t,
 }
 
 METHOD(ike_sa_t, set_statistic, void,
-	private_ike_sa_t *this, statistic_t kind, u_int32_t value)
+	private_ike_sa_t *this, statistic_t kind, uint32_t value)
 {
 	if (kind < STAT_MAX)
 	{
@@ -380,6 +403,12 @@ METHOD(ike_sa_t, set_other_host, void,
 {
 	DESTROY_IF(this->other_host);
 	this->other_host = other;
+}
+
+METHOD(ike_sa_t, get_redirected_from, host_t*,
+	private_ike_sa_t *this)
+{
+	return this->redirected_from;
 }
 
 METHOD(ike_sa_t, get_peer_cfg, peer_cfg_t*,
@@ -455,6 +484,113 @@ static void flush_auth_cfgs(private_ike_sa_t *this)
 	}
 }
 
+METHOD(ike_sa_t, verify_peer_certificate, bool,
+	private_ike_sa_t *this)
+{
+	enumerator_t *e1, *e2, *certs;
+	auth_cfg_t *cfg, *cfg_done;
+	certificate_t *peer, *cert;
+	public_key_t *key;
+	auth_cfg_t *auth;
+	auth_cfg_wrapper_t *wrapper;
+	time_t not_before, not_after;
+	bool valid = TRUE, found;
+
+	if (this->state != IKE_ESTABLISHED)
+	{
+		DBG1(DBG_IKE, "unable to verify peer certificate in state %N",
+			 ike_sa_state_names, this->state);
+		return FALSE;
+	}
+
+	if (!this->flush_auth_cfg &&
+		lib->settings->get_bool(lib->settings,
+								"%s.flush_auth_cfg", FALSE, lib->ns))
+	{	/* we can do this check only once if auth configs are flushed */
+		DBG1(DBG_IKE, "unable to verify peer certificate as authentication "
+			 "information has been flushed");
+		return FALSE;
+	}
+	this->public.set_condition(&this->public, COND_ONLINE_VALIDATION_SUSPENDED,
+							   FALSE);
+
+	e1 = this->peer_cfg->create_auth_cfg_enumerator(this->peer_cfg, FALSE);
+	e2 = array_create_enumerator(this->other_auths);
+	while (e1->enumerate(e1, &cfg))
+	{
+		if (!e2->enumerate(e2, &cfg_done))
+		{	/* this should not happen as the authentication should never have
+			 * succeeded */
+			valid = FALSE;
+			break;
+		}
+		if ((uintptr_t)cfg_done->get(cfg_done,
+									 AUTH_RULE_AUTH_CLASS) != AUTH_CLASS_PUBKEY)
+		{
+			continue;
+		}
+		peer = cfg_done->get(cfg_done, AUTH_RULE_SUBJECT_CERT);
+		if (!peer)
+		{
+			DBG1(DBG_IKE, "no subject certificate found, skipping certificate "
+				 "verification");
+			continue;
+		}
+		if (!peer->get_validity(peer, NULL, &not_before, &not_after))
+		{
+			DBG1(DBG_IKE, "peer certificate invalid (valid from %T to %T)",
+				 &not_before, FALSE, &not_after, FALSE);
+			valid = FALSE;
+			break;
+		}
+		key = peer->get_public_key(peer);
+		if (!key)
+		{
+			DBG1(DBG_IKE, "unable to retrieve public key, skipping certificate "
+				 "verification");
+			continue;
+		}
+		DBG1(DBG_IKE, "verifying peer certificate");
+		/* serve received certificates */
+		wrapper = auth_cfg_wrapper_create(cfg_done);
+		lib->credmgr->add_local_set(lib->credmgr, &wrapper->set, FALSE);
+		certs = lib->credmgr->create_trusted_enumerator(lib->credmgr,
+							key->get_type(key), peer->get_subject(peer), TRUE);
+		key->destroy(key);
+
+		found = FALSE;
+		while (certs->enumerate(certs, &cert, &auth))
+		{
+			if (peer->equals(peer, cert))
+			{
+				cfg_done->add(cfg_done, AUTH_RULE_CERT_VALIDATION_SUSPENDED,
+							  FALSE);
+				cfg_done->merge(cfg_done, auth, FALSE);
+				valid = cfg_done->complies(cfg_done, cfg, TRUE);
+				found = TRUE;
+				break;
+			}
+		}
+		certs->destroy(certs);
+		lib->credmgr->remove_local_set(lib->credmgr, &wrapper->set);
+		wrapper->destroy(wrapper);
+		if (!found || !valid)
+		{
+			valid = FALSE;
+			break;
+		}
+	}
+	e1->destroy(e1);
+	e2->destroy(e2);
+
+	if (this->flush_auth_cfg)
+	{
+		this->flush_auth_cfg = FALSE;
+		flush_auth_cfgs(this);
+	}
+	return valid;
+}
+
 METHOD(ike_sa_t, get_proposal, proposal_t*,
 	private_ike_sa_t *this)
 {
@@ -469,7 +605,7 @@ METHOD(ike_sa_t, set_proposal, void,
 }
 
 METHOD(ike_sa_t, set_message_id, void,
-	private_ike_sa_t *this, bool initiate, u_int32_t mid)
+	private_ike_sa_t *this, bool initiate, uint32_t mid)
 {
 	if (initiate)
 	{
@@ -482,13 +618,20 @@ METHOD(ike_sa_t, set_message_id, void,
 }
 
 METHOD(ike_sa_t, send_keepalive, void,
-	private_ike_sa_t *this)
+	private_ike_sa_t *this, bool scheduled)
 {
-	send_keepalive_job_t *job;
 	time_t last_out, now, diff;
 
-	if (!(this->conditions & COND_NAT_HERE) || this->keepalive_interval == 0)
-	{	/* disable keep alives if we are not NATed anymore */
+	if (scheduled)
+	{
+		this->keepalive_job = NULL;
+	}
+	if (!this->keepalive_interval || this->state == IKE_PASSIVE)
+	{	/* keepalives disabled either by configuration or for passive IKE_SAs */
+		return;
+	}
+	if (!(this->conditions & COND_NAT_HERE) || (this->conditions & COND_STALE))
+	{	/* disable keepalives if we are not NATed anymore, or the SA is stale */
 		return;
 	}
 
@@ -513,9 +656,12 @@ METHOD(ike_sa_t, send_keepalive, void,
 		charon->sender->send_no_marker(charon->sender, packet);
 		diff = 0;
 	}
-	job = send_keepalive_job_create(this->ike_sa_id);
-	lib->scheduler->schedule_job(lib->scheduler, (job_t*)job,
-								 this->keepalive_interval - diff);
+	if (!this->keepalive_job)
+	{
+		this->keepalive_job = send_keepalive_job_create(this->ike_sa_id);
+		lib->scheduler->schedule_job(lib->scheduler, (job_t*)this->keepalive_job,
+									 this->keepalive_interval - diff);
+	}
 }
 
 METHOD(ike_sa_t, get_ike_cfg, ike_cfg_t*,
@@ -562,7 +708,7 @@ METHOD(ike_sa_t, set_condition, void,
 				case COND_NAT_HERE:
 					DBG1(DBG_IKE, "local host is behind NAT, sending keep alives");
 					this->conditions |= COND_NAT_ANY;
-					send_keepalive(this);
+					send_keepalive(this, FALSE);
 					break;
 				case COND_NAT_THERE:
 					DBG1(DBG_IKE, "remote host is behind NAT");
@@ -588,6 +734,9 @@ METHOD(ike_sa_t, set_condition, void,
 								  has_condition(this, COND_NAT_HERE) ||
 								  has_condition(this, COND_NAT_THERE) ||
 								  has_condition(this, COND_NAT_FAKE));
+					break;
+				case COND_STALE:
+					send_keepalive(this, FALSE);
 					break;
 				default:
 					break;
@@ -651,7 +800,7 @@ METHOD(ike_sa_t, get_state, ike_sa_state_t,
 METHOD(ike_sa_t, set_state, void,
 	private_ike_sa_t *this, ike_sa_state_t state)
 {
-	bool trigger_dpd = FALSE;
+	bool trigger_dpd = FALSE, keepalives = FALSE;
 
 	DBG2(DBG_IKE, "IKE_SA %s[%d] state change: %N => %N",
 		 get_name(this), this->unique_id,
@@ -666,7 +815,7 @@ METHOD(ike_sa_t, set_state, void,
 				this->state == IKE_PASSIVE)
 			{
 				job_t *job;
-				u_int32_t t;
+				uint32_t t;
 
 				/* calculate rekey, reauth and lifetime */
 				this->stats[STAT_ESTABLISHED] = time_monotonic(NULL);
@@ -722,6 +871,12 @@ METHOD(ike_sa_t, set_state, void,
 					 * so yet, so prevent that. */
 					this->stats[STAT_INBOUND] = this->stats[STAT_ESTABLISHED];
 				}
+				if (this->state == IKE_PASSIVE)
+				{
+					keepalives = TRUE;
+				}
+				DESTROY_IF(this->redirected_from);
+				this->redirected_from = NULL;
 			}
 			break;
 		}
@@ -741,6 +896,10 @@ METHOD(ike_sa_t, set_state, void,
 		{
 			DBG1(DBG_IKE, "DPD not supported by peer, disabled");
 		}
+	}
+	if (keepalives)
+	{
+		send_keepalive(this, FALSE);
 	}
 }
 
@@ -762,6 +921,7 @@ METHOD(ike_sa_t, reset, void,
 							this->ike_sa_id->is_initiator(this->ike_sa_id));
 
 	this->task_manager->reset(this->task_manager, 0, 0);
+	this->task_manager->queue_ike(this->task_manager);
 }
 
 METHOD(ike_sa_t, get_keymat, keymat_t*,
@@ -777,12 +937,12 @@ METHOD(ike_sa_t, add_virtual_ip, void,
 	{
 		char *iface;
 
-		if (hydra->kernel_interface->get_interface(hydra->kernel_interface,
-												   this->my_host, &iface))
+		if (charon->kernel->get_interface(charon->kernel, this->my_host,
+										  &iface))
 		{
 			DBG1(DBG_IKE, "installing new virtual IP %H", ip);
-			if (hydra->kernel_interface->add_ip(hydra->kernel_interface,
-												ip, -1, iface) == SUCCESS)
+			if (charon->kernel->add_ip(charon->kernel, ip, -1,
+									   iface) == SUCCESS)
 			{
 				array_insert_create(&this->my_vips, ARRAY_TAIL, ip->clone(ip));
 			}
@@ -819,8 +979,7 @@ METHOD(ike_sa_t, clear_virtual_ips, void,
 	{
 		if (local)
 		{
-			hydra->kernel_interface->del_ip(hydra->kernel_interface,
-											vip, -1, TRUE);
+			charon->kernel->del_ip(charon->kernel, vip, -1, TRUE);
 		}
 		vip->destroy(vip);
 	}
@@ -878,12 +1037,12 @@ METHOD(ike_sa_t, has_mapping_changed, bool,
 }
 
 METHOD(ike_sa_t, set_pending_updates, void,
-	private_ike_sa_t *this, u_int32_t updates)
+	private_ike_sa_t *this, uint32_t updates)
 {
 	this->pending_updates = updates;
 }
 
-METHOD(ike_sa_t, get_pending_updates, u_int32_t,
+METHOD(ike_sa_t, get_pending_updates, uint32_t,
 	private_ike_sa_t *this)
 {
 	return this->pending_updates;
@@ -932,6 +1091,7 @@ METHOD(ike_sa_t, update_hosts, void,
 		/* update our address in any case */
 		if (force && !me->equals(me, this->my_host))
 		{
+			charon->bus->ike_update(charon->bus, &this->public, TRUE, me);
 			set_my_host(this, me->clone(me));
 			update = TRUE;
 		}
@@ -945,6 +1105,7 @@ METHOD(ike_sa_t, update_hosts, void,
 				(!has_condition(this, COND_NAT_HERE) ||
 				 !has_condition(this, COND_ORIGINAL_INITIATOR)))
 			{
+				charon->bus->ike_update(charon->bus, &this->public, FALSE, other);
 				set_other_host(this, other->clone(other));
 				update = TRUE;
 			}
@@ -964,6 +1125,10 @@ METHOD(ike_sa_t, update_hosts, void,
 		enumerator = array_create_enumerator(this->child_sas);
 		while (enumerator->enumerate(enumerator, &child_sa))
 		{
+			charon->child_sa_manager->remove(charon->child_sa_manager, child_sa);
+			charon->child_sa_manager->add(charon->child_sa_manager,
+										  child_sa, &this->public);
+
 			if (child_sa->update(child_sa, this->my_host, this->other_host,
 					vips, has_condition(this, COND_NAT_ANY)) == NOT_SUPPORTED)
 			{
@@ -971,6 +1136,7 @@ METHOD(ike_sa_t, update_hosts, void,
 						child_sa->get_protocol(child_sa),
 						child_sa->get_spi(child_sa, TRUE));
 			}
+
 		}
 		enumerator->destroy(enumerator);
 
@@ -1039,6 +1205,7 @@ METHOD(ike_sa_t, generate_message_fragmented, status_t,
 	packet_t *packet;
 	status_t status;
 	bool use_frags = FALSE;
+	bool pre_generated = FALSE;
 
 	if (this->ike_cfg)
 	{
@@ -1073,14 +1240,21 @@ METHOD(ike_sa_t, generate_message_fragmented, status_t,
 		return SUCCESS;
 	}
 
+	pre_generated = message->is_encoded(message);
 	this->stats[STAT_OUTBOUND] = time_monotonic(NULL);
 	message->set_ike_sa_id(message, this->ike_sa_id);
-	charon->bus->message(charon->bus, message, FALSE, TRUE);
+	if (!pre_generated)
+	{
+		charon->bus->message(charon->bus, message, FALSE, TRUE);
+	}
 	status = message->fragment(message, this->keymat, this->fragment_size,
 							   &fragments);
 	if (status == SUCCESS)
 	{
-		charon->bus->message(charon->bus, message, FALSE, FALSE);
+		if (!pre_generated)
+		{
+			charon->bus->message(charon->bus, message, FALSE, FALSE);
+		}
 		*packets = enumerator_create_filter(fragments, (void*)filter_fragments,
 											this, NULL);
 	}
@@ -1193,6 +1367,19 @@ static void resolve_hosts(private_ike_sa_t *this)
 			break;
 	}
 
+	/* if an IP address is set locally, use the same family to resolve remote */
+	if (family == AF_UNSPEC && !this->remote_host)
+	{
+		if (this->local_host)
+		{
+			family = this->local_host->get_family(this->local_host);
+		}
+		else
+		{
+			family = ike_cfg_get_family(this->ike_cfg, TRUE);
+		}
+	}
+
 	if (this->remote_host)
 	{
 		host = this->remote_host->clone(this->remote_host);
@@ -1204,7 +1391,18 @@ static void resolve_hosts(private_ike_sa_t *this)
 	}
 	if (host)
 	{
-		set_other_host(this, host);
+		if (!host->is_anyaddr(host) ||
+			this->other_host->is_anyaddr(this->other_host))
+		{	/* don't set to %any if we currently have an address, but the
+			 * address family might have changed */
+			set_other_host(this, host);
+		}
+		else
+		{	/* reuse the original port as some implementations might not like
+			 * initial IKE messages on other ports */
+			this->other_host->set_port(this->other_host, host->get_port(host));
+			host->destroy(host);
+		}
 	}
 
 	if (this->local_host)
@@ -1225,8 +1423,8 @@ static void resolve_hosts(private_ike_sa_t *this)
 			!this->other_host->is_anyaddr(this->other_host))
 		{
 			host->destroy(host);
-			host = hydra->kernel_interface->get_source_addr(
-							hydra->kernel_interface, this->other_host, NULL);
+			host = charon->kernel->get_source_addr(charon->kernel,
+												   this->other_host, NULL);
 			if (host)
 			{
 				host->set_port(host, this->ike_cfg->get_my_port(this->ike_cfg));
@@ -1244,7 +1442,7 @@ static void resolve_hosts(private_ike_sa_t *this)
 }
 
 METHOD(ike_sa_t, initiate, status_t,
-	private_ike_sa_t *this, child_cfg_t *child_cfg, u_int32_t reqid,
+	private_ike_sa_t *this, child_cfg_t *child_cfg, uint32_t reqid,
 	traffic_selector_t *tsi, traffic_selector_t *tsr)
 {
 	bool defer_initiate = FALSE;
@@ -1361,9 +1559,14 @@ METHOD(ike_sa_t, process_message, status_t,
 	status = this->task_manager->process_message(this->task_manager, message);
 	if (this->flush_auth_cfg && this->state == IKE_ESTABLISHED)
 	{
-		/* authentication completed */
-		this->flush_auth_cfg = FALSE;
-		flush_auth_cfgs(this);
+		/* authentication completed but if the online validation is suspended we
+		 * need the auth cfgs until we did the delayed verification, we flush
+		 * them afterwards */
+		if (!has_condition(this, COND_ONLINE_VALIDATION_SUSPENDED))
+		{
+			this->flush_auth_cfg = FALSE;
+			flush_auth_cfgs(this);
+		}
 	}
 	return status;
 }
@@ -1444,10 +1647,12 @@ METHOD(ike_sa_t, add_child_sa, void,
 	private_ike_sa_t *this, child_sa_t *child_sa)
 {
 	array_insert_create(&this->child_sas, ARRAY_TAIL, child_sa);
+	charon->child_sa_manager->add(charon->child_sa_manager,
+								  child_sa, &this->public);
 }
 
 METHOD(ike_sa_t, get_child_sa, child_sa_t*,
-	private_ike_sa_t *this, protocol_id_t protocol, u_int32_t spi, bool inbound)
+	private_ike_sa_t *this, protocol_id_t protocol, uint32_t spi, bool inbound)
 {
 	enumerator_t *enumerator;
 	child_sa_t *current, *found = NULL;
@@ -1471,20 +1676,62 @@ METHOD(ike_sa_t, get_child_count, int,
 	return array_count(this->child_sas);
 }
 
+/**
+ * Private data of a create_child_sa_enumerator()
+ */
+typedef struct {
+	/** implements enumerator */
+	enumerator_t public;
+	/** inner array enumerator */
+	enumerator_t *inner;
+	/** current item */
+	child_sa_t *current;
+} child_enumerator_t;
+
+METHOD(enumerator_t, child_enumerate, bool,
+	child_enumerator_t *this, child_sa_t **child_sa)
+{
+	if (this->inner->enumerate(this->inner, &this->current))
+	{
+		*child_sa = this->current;
+		return TRUE;
+	}
+	return FALSE;
+}
+
+METHOD(enumerator_t, child_enumerator_destroy, void,
+	child_enumerator_t *this)
+{
+	this->inner->destroy(this->inner);
+	free(this);
+}
+
 METHOD(ike_sa_t, create_child_sa_enumerator, enumerator_t*,
 	private_ike_sa_t *this)
 {
-	return array_create_enumerator(this->child_sas);
+	child_enumerator_t *enumerator;
+
+	INIT(enumerator,
+		.public = {
+			.enumerate = (void*)_child_enumerate,
+			.destroy = _child_enumerator_destroy,
+		},
+		.inner = array_create_enumerator(this->child_sas),
+	);
+	return &enumerator->public;
 }
 
 METHOD(ike_sa_t, remove_child_sa, void,
 	private_ike_sa_t *this, enumerator_t *enumerator)
 {
-	array_remove_at(this->child_sas, enumerator);
+	child_enumerator_t *ce = (child_enumerator_t*)enumerator;
+
+	charon->child_sa_manager->remove(charon->child_sa_manager, ce->current);
+	array_remove_at(this->child_sas, ce->inner);
 }
 
 METHOD(ike_sa_t, rekey_child_sa, status_t,
-	private_ike_sa_t *this, protocol_id_t protocol, u_int32_t spi)
+	private_ike_sa_t *this, protocol_id_t protocol, uint32_t spi)
 {
 	if (this->state == IKE_PASSIVE)
 	{
@@ -1495,7 +1742,7 @@ METHOD(ike_sa_t, rekey_child_sa, status_t,
 }
 
 METHOD(ike_sa_t, delete_child_sa, status_t,
-	private_ike_sa_t *this, protocol_id_t protocol, u_int32_t spi, bool expired)
+	private_ike_sa_t *this, protocol_id_t protocol, uint32_t spi, bool expired)
 {
 	if (this->state == IKE_PASSIVE)
 	{
@@ -1507,19 +1754,19 @@ METHOD(ike_sa_t, delete_child_sa, status_t,
 }
 
 METHOD(ike_sa_t, destroy_child_sa, status_t,
-	private_ike_sa_t *this, protocol_id_t protocol, u_int32_t spi)
+	private_ike_sa_t *this, protocol_id_t protocol, uint32_t spi)
 {
 	enumerator_t *enumerator;
 	child_sa_t *child_sa;
 	status_t status = NOT_FOUND;
 
-	enumerator = array_create_enumerator(this->child_sas);
+	enumerator = create_child_sa_enumerator(this);
 	while (enumerator->enumerate(enumerator, (void**)&child_sa))
 	{
 		if (child_sa->get_protocol(child_sa) == protocol &&
 			child_sa->get_spi(child_sa, TRUE) == spi)
 		{
-			array_remove_at(this->child_sas, enumerator);
+			remove_child_sa(this, enumerator);
 			child_sa->destroy(child_sa);
 			status = SUCCESS;
 			break;
@@ -1534,16 +1781,12 @@ METHOD(ike_sa_t, delete_, status_t,
 {
 	switch (this->state)
 	{
-		case IKE_REKEYING:
-			if (this->version == IKEV1)
-			{	/* SA has been reauthenticated, delete */
-				charon->bus->ike_updown(charon->bus, &this->public, FALSE);
-				break;
-			}
-			/* FALL */
 		case IKE_ESTABLISHED:
-			if (time_monotonic(NULL) >= this->stats[STAT_DELETE])
-			{	/* IKE_SA hard lifetime hit */
+		case IKE_REKEYING:
+			if (time_monotonic(NULL) >= this->stats[STAT_DELETE] &&
+				!(this->version == IKEV1 && this->state == IKE_REKEYING))
+			{	/* IKE_SA hard lifetime hit, ignored for reauthenticated
+				 * IKEv1 SAs */
 				charon->bus->alert(charon->bus, ALERT_IKE_SA_EXPIRED);
 			}
 			this->task_manager->queue_ike_delete(this->task_manager);
@@ -1585,7 +1828,6 @@ METHOD(ike_sa_t, reauth, status_t,
 		DBG0(DBG_IKE, "reinitiating IKE_SA %s[%d]",
 			 get_name(this), this->unique_id);
 		reset(this);
-		this->task_manager->queue_ike(this->task_manager);
 		return this->task_manager->initiate(this->task_manager);
 	}
 	/* we can't reauthenticate as responder when we use EAP or virtual IPs.
@@ -1651,6 +1893,86 @@ static bool is_child_queued(private_ike_sa_t *this, task_queue_t queue)
 	return found;
 }
 
+/**
+ * Reestablish CHILD_SAs and migrate queued tasks.
+ *
+ * If force is true all SAs are restarted, otherwise their close/dpd_action
+ * is followed.
+ */
+static status_t reestablish_children(private_ike_sa_t *this, ike_sa_t *new,
+									 bool force)
+{
+	enumerator_t *enumerator;
+	child_sa_t *child_sa;
+	child_cfg_t *child_cfg;
+	action_t action;
+	status_t status = FAILED;
+
+	/* handle existing CHILD_SAs */
+	enumerator = create_child_sa_enumerator(this);
+	while (enumerator->enumerate(enumerator, (void**)&child_sa))
+	{
+		if (force)
+		{
+			switch (child_sa->get_state(child_sa))
+			{
+				case CHILD_ROUTED:
+				{	/* move routed child directly */
+					remove_child_sa(this, enumerator);
+					new->add_child_sa(new, child_sa);
+					action = ACTION_NONE;
+					break;
+				}
+				default:
+				{	/* initiate/queue all other CHILD_SAs */
+					action = ACTION_RESTART;
+					break;
+				}
+			}
+		}
+		else
+		{	/* only restart CHILD_SAs that are configured accordingly */
+			if (this->state == IKE_DELETING)
+			{
+				action = child_sa->get_close_action(child_sa);
+			}
+			else
+			{
+				action = child_sa->get_dpd_action(child_sa);
+			}
+		}
+		switch (action)
+		{
+			case ACTION_RESTART:
+				child_cfg = child_sa->get_config(child_sa);
+				DBG1(DBG_IKE, "restarting CHILD_SA %s",
+					 child_cfg->get_name(child_cfg));
+				child_cfg->get_ref(child_cfg);
+				status = new->initiate(new, child_cfg,
+								child_sa->get_reqid(child_sa), NULL, NULL);
+				break;
+			default:
+				continue;
+		}
+		if (status == DESTROY_ME)
+		{
+			break;
+		}
+	}
+	enumerator->destroy(enumerator);
+	/* adopt any active or queued CHILD-creating tasks */
+	if (status != DESTROY_ME)
+	{
+		task_manager_t *other_tasks = ((private_ike_sa_t*)new)->task_manager;
+		other_tasks->adopt_child_tasks(other_tasks, this->task_manager);
+		if (new->get_state(new) == IKE_CREATED)
+		{
+			status = new->initiate(new, NULL, 0, NULL, NULL);
+		}
+	}
+	return status;
+}
+
 METHOD(ike_sa_t, reestablish, status_t,
 	private_ike_sa_t *this)
 {
@@ -1659,7 +1981,6 @@ METHOD(ike_sa_t, reestablish, status_t,
 	action_t action;
 	enumerator_t *enumerator;
 	child_sa_t *child_sa;
-	child_cfg_t *child_cfg;
 	bool restart = FALSE;
 	status_t status = FAILED;
 
@@ -1752,8 +2073,11 @@ METHOD(ike_sa_t, reestablish, status_t,
 	host = this->my_host;
 	new->set_my_host(new, host->clone(host));
 	charon->bus->ike_reestablish_pre(charon->bus, &this->public, new);
-	/* resolve hosts but use the old addresses above as fallback */
-	resolve_hosts((private_ike_sa_t*)new);
+	if (!has_condition(this, COND_REAUTHENTICATING))
+	{	/* reauthenticate to the same addresses, but resolve hosts if
+		 * reestablishing (old addresses serve as fallback) */
+		resolve_hosts((private_ike_sa_t*)new);
+	}
 	/* if we already have a virtual IP, we reuse it */
 	enumerator = array_create_enumerator(this->my_vips);
 	while (enumerator->enumerate(enumerator, &host))
@@ -1770,68 +2094,8 @@ METHOD(ike_sa_t, reestablish, status_t,
 	else
 #endif /* ME */
 	{
-		/* handle existing CHILD_SAs */
-		enumerator = array_create_enumerator(this->child_sas);
-		while (enumerator->enumerate(enumerator, (void**)&child_sa))
-		{
-			if (has_condition(this, COND_REAUTHENTICATING))
-			{
-				switch (child_sa->get_state(child_sa))
-				{
-					case CHILD_ROUTED:
-					{	/* move routed child directly */
-						array_remove_at(this->child_sas, enumerator);
-						new->add_child_sa(new, child_sa);
-						action = ACTION_NONE;
-						break;
-					}
-					default:
-					{	/* initiate/queue all other CHILD_SAs */
-						action = ACTION_RESTART;
-						break;
-					}
-				}
-			}
-			else
-			{	/* only restart CHILD_SAs that are configured accordingly */
-				if (this->state == IKE_DELETING)
-				{
-					action = child_sa->get_close_action(child_sa);
-				}
-				else
-				{
-					action = child_sa->get_dpd_action(child_sa);
-				}
-			}
-			switch (action)
-			{
-				case ACTION_RESTART:
-					child_cfg = child_sa->get_config(child_sa);
-					DBG1(DBG_IKE, "restarting CHILD_SA %s",
-						 child_cfg->get_name(child_cfg));
-					child_cfg->get_ref(child_cfg);
-					status = new->initiate(new, child_cfg,
-									child_sa->get_reqid(child_sa), NULL, NULL);
-					break;
-				default:
-					continue;
-			}
-			if (status == DESTROY_ME)
-			{
-				break;
-			}
-		}
-		enumerator->destroy(enumerator);
-		/* adopt any active or queued CHILD-creating tasks */
-		if (status != DESTROY_ME)
-		{
-			task_manager_t *other_tasks = ((private_ike_sa_t*)new)->task_manager;
-			other_tasks->adopt_child_tasks(other_tasks, this->task_manager);
-			if (new->get_state(new) == IKE_CREATED)
-			{
-				status = new->initiate(new, NULL, 0, NULL, NULL);
-			}
-		}
+		status = reestablish_children(this, new,
+									has_condition(this, COND_REAUTHENTICATING));
 	}
 
 	if (status == DESTROY_ME)
@@ -1852,8 +2116,197 @@ METHOD(ike_sa_t, reestablish, status_t,
 	return status;
 }
 
+/**
+ * Resolve the given gateway ID
+ */
+static host_t *resolve_gateway_id(identification_t *gateway)
+{
+	char gw[BUF_LEN];
+	host_t *addr;
+
+	snprintf(gw, sizeof(gw), "%Y", gateway);
+	gw[sizeof(gw)-1] = '\0';
+	addr = host_create_from_dns(gw, AF_UNSPEC, IKEV2_UDP_PORT);
+	if (!addr)
+	{
+		DBG1(DBG_IKE, "unable to resolve gateway ID '%Y', redirect failed",
+			 gateway);
+	}
+	return addr;
+}
+
+/**
+ * Redirect the current SA to the given target host
+ */
+static bool redirect_established(private_ike_sa_t *this, identification_t *to)
+{
+	private_ike_sa_t *new_priv;
+	ike_sa_t *new;
+	host_t *other;
+	time_t redirect;
+
+	new = charon->ike_sa_manager->checkout_new(charon->ike_sa_manager,
+											   this->version, TRUE);
+	if (!new)
+	{
+		return FALSE;
+	}
+	new_priv = (private_ike_sa_t*)new;
+	new->set_peer_cfg(new, this->peer_cfg);
+	new_priv->redirected_from = this->other_host->clone(this->other_host);
+	charon->bus->ike_reestablish_pre(charon->bus, &this->public, new);
+	other = resolve_gateway_id(to);
+	if (other)
+	{
+		set_my_host(new_priv, this->my_host->clone(this->my_host));
+		/* this allows us to force the remote address while we still properly
+		 * resolve the local address */
+		new_priv->remote_host = other;
+		resolve_hosts(new_priv);
+		new_priv->redirected_at = array_create(sizeof(time_t), MAX_REDIRECTS);
+		while (array_remove(this->redirected_at, ARRAY_HEAD, &redirect))
+		{
+			array_insert(new_priv->redirected_at, ARRAY_TAIL, &redirect);
+		}
+		if (reestablish_children(this, new, TRUE) != DESTROY_ME)
+		{
+#ifdef USE_IKEV2
+			new->queue_task(new, (task_t*)ike_reauth_complete_create(new,
+															 this->ike_sa_id));
+#endif
+			charon->bus->ike_reestablish_post(charon->bus, &this->public, new,
+											  TRUE);
+			charon->ike_sa_manager->checkin(charon->ike_sa_manager, new);
+			charon->bus->set_sa(charon->bus, &this->public);
+			return TRUE;
+		}
+	}
+	charon->bus->ike_reestablish_post(charon->bus, &this->public, new,
+									  FALSE);
+	charon->ike_sa_manager->checkin_and_destroy(charon->ike_sa_manager, new);
+	charon->bus->set_sa(charon->bus, &this->public);
+	return FALSE;
+}
+
+/**
+ * Redirect the current connecting SA to the given target host
+ */
+static bool redirect_connecting(private_ike_sa_t *this, identification_t *to)
+{
+	host_t *other;
+
+	other = resolve_gateway_id(to);
+	if (!other)
+	{
+		return FALSE;
+	}
+	reset(this);
+	DESTROY_IF(this->redirected_from);
+	this->redirected_from = this->other_host->clone(this->other_host);
+	DESTROY_IF(this->remote_host);
+	/* this allows us to force the remote address while we still properly
+	 * resolve the local address */
+	this->remote_host = other;
+	resolve_hosts(this);
+	return TRUE;
+}
+
+/**
+ * Check if the current redirect exceeds the limits for redirects
+ */
+static bool redirect_count_exceeded(private_ike_sa_t *this)
+{
+	time_t now, redirect;
+
+	now = time_monotonic(NULL);
+	/* remove entries outside the defined period */
+	while (array_get(this->redirected_at, ARRAY_HEAD, &redirect) &&
+		   now - redirect >= REDIRECT_LOOP_DETECT_PERIOD)
+	{
+		array_remove(this->redirected_at, ARRAY_HEAD, NULL);
+	}
+	if (array_count(this->redirected_at) < MAX_REDIRECTS)
+	{
+		if (!this->redirected_at)
+		{
+			this->redirected_at = array_create(sizeof(time_t), MAX_REDIRECTS);
+		}
+		array_insert(this->redirected_at, ARRAY_TAIL, &now);
+		return FALSE;
+	}
+	return TRUE;
+}
+
+METHOD(ike_sa_t, handle_redirect, bool,
+	private_ike_sa_t *this, identification_t *gateway)
+{
+	DBG1(DBG_IKE, "redirected to %Y", gateway);
+	if (!this->follow_redirects)
+	{
+		DBG1(DBG_IKE, "server sent REDIRECT even though we disabled it");
+		return FALSE;
+	}
+	if (redirect_count_exceeded(this))
+	{
+		DBG1(DBG_IKE, "only %d redirects are allowed within %d seconds",
+			 MAX_REDIRECTS, REDIRECT_LOOP_DETECT_PERIOD);
+		return FALSE;
+	}
+
+	switch (this->state)
+	{
+		case IKE_CONNECTING:
+			return redirect_connecting(this, gateway);
+		case IKE_ESTABLISHED:
+			return redirect_established(this, gateway);
+		default:
+			DBG1(DBG_IKE, "unable to handle redirect for IKE_SA in state %N",
+				 ike_sa_state_names, this->state);
+			return FALSE;
+	}
+}
+
+METHOD(ike_sa_t, redirect, status_t,
+	private_ike_sa_t *this, identification_t *gateway)
+{
+	switch (this->state)
+	{
+		case IKE_CONNECTING:
+		case IKE_ESTABLISHED:
+		case IKE_REKEYING:
+			if (has_condition(this, COND_REDIRECTED))
+			{	/* IKE_SA already got redirected */
+				return SUCCESS;
+			}
+			if (has_condition(this, COND_ORIGINAL_INITIATOR))
+			{
+				DBG1(DBG_IKE, "unable to redirect IKE_SA as initiator");
+				return FAILED;
+			}
+			if (this->version == IKEV1)
+			{
+				DBG1(DBG_IKE, "unable to redirect IKEv1 SA");
+				return FAILED;
+			}
+			if (!supports_extension(this, EXT_IKE_REDIRECTION))
+			{
+				DBG1(DBG_IKE, "client does not support IKE redirection");
+				return FAILED;
+			}
+#ifdef USE_IKEV2
+			this->task_manager->queue_task(this->task_manager,
+						(task_t*)ike_redirect_create(&this->public, gateway));
+#endif
+			return this->task_manager->initiate(this->task_manager);
+		default:
+			DBG1(DBG_IKE, "unable to redirect IKE_SA in state %N",
+				 ike_sa_state_names, this->state);
+			return INVALID_STATE;
+	}
+}
+
 METHOD(ike_sa_t, retransmit, status_t,
-	private_ike_sa_t *this, u_int32_t message_id)
+	private_ike_sa_t *this, uint32_t message_id)
 {
 	if (this->state == IKE_PASSIVE)
 	{
@@ -1868,7 +2321,7 @@ METHOD(ike_sa_t, retransmit, status_t,
 			case IKE_CONNECTING:
 			{
 				/* retry IKE_SA_INIT/Main Mode if we have multiple keyingtries */
-				u_int32_t tries = this->peer_cfg->get_keyingtries(this->peer_cfg);
+				uint32_t tries = this->peer_cfg->get_keyingtries(this->peer_cfg);
 				charon->bus->alert(charon->bus, ALERT_PEER_INIT_UNREACHABLE,
 								   this->keyingtry);
 				this->keyingtry++;
@@ -1878,7 +2331,6 @@ METHOD(ike_sa_t, retransmit, status_t,
 						 this->keyingtry + 1, tries);
 					reset(this);
 					resolve_hosts(this);
-					this->task_manager->queue_ike(this->task_manager);
 					return this->task_manager->initiate(this->task_manager);
 				}
 				DBG1(DBG_IKE, "establishing IKE_SA failed, peer not responding");
@@ -1900,7 +2352,8 @@ METHOD(ike_sa_t, retransmit, status_t,
 				reestablish(this);
 				break;
 		}
-		if (this->state != IKE_CONNECTING)
+		if (this->state != IKE_CONNECTING &&
+			this->state != IKE_REKEYED)
 		{
 			charon->bus->ike_updown(charon->bus, &this->public, FALSE);
 		}
@@ -1910,9 +2363,9 @@ METHOD(ike_sa_t, retransmit, status_t,
 }
 
 METHOD(ike_sa_t, set_auth_lifetime, status_t,
-	private_ike_sa_t *this, u_int32_t lifetime)
+	private_ike_sa_t *this, uint32_t lifetime)
 {
-	u_int32_t diff, hard, soft, now;
+	uint32_t diff, hard, soft, now;
 	bool send_update;
 
 	diff = this->peer_cfg->get_over_time(this->peer_cfg);
@@ -1983,8 +2436,8 @@ static bool is_current_path_valid(private_ike_sa_t *this)
 {
 	bool valid = FALSE;
 	host_t *src;
-	src = hydra->kernel_interface->get_source_addr(hydra->kernel_interface,
-											this->other_host, this->my_host);
+	src = charon->kernel->get_source_addr(charon->kernel, this->other_host,
+										  this->my_host);
 	if (src)
 	{
 		if (src->ip_equals(src, this->my_host))
@@ -2028,8 +2481,7 @@ static bool is_any_path_valid(private_ike_sa_t *this)
 			continue;
 		}
 		DBG1(DBG_IKE, "looking for a route to %H ...", addr);
-		src = hydra->kernel_interface->get_source_addr(
-										hydra->kernel_interface, addr, NULL);
+		src = charon->kernel->get_source_addr(charon->kernel, addr, NULL);
 		if (src)
 		{
 			break;
@@ -2053,6 +2505,7 @@ METHOD(ike_sa_t, roam, status_t,
 		case IKE_DELETING:
 		case IKE_DESTROYING:
 		case IKE_PASSIVE:
+		case IKE_REKEYED:
 			return SUCCESS;
 		default:
 			break;
@@ -2162,6 +2615,12 @@ METHOD(ike_sa_t, queue_task, void,
 	this->task_manager->queue_task(this->task_manager, task);
 }
 
+METHOD(ike_sa_t, queue_task_delayed, void,
+	private_ike_sa_t *this, task_t *task, uint32_t delay)
+{
+	this->task_manager->queue_task_delayed(this->task_manager, task, delay);
+}
+
 METHOD(ike_sa_t, inherit_pre, void,
 	private_ike_sa_t *this, ike_sa_t *other_public)
 {
@@ -2209,6 +2668,12 @@ METHOD(ike_sa_t, inherit_post, void,
 		array_insert_create(&this->other_vips, ARRAY_TAIL, vip);
 	}
 
+	/* MOBIKE additional addresses */
+	while (array_remove(other->peer_addresses, ARRAY_HEAD, &vip))
+	{
+		array_insert_create(&this->peer_addresses, ARRAY_TAIL, vip);
+	}
+
 	/* authentication information */
 	enumerator = array_create_enumerator(other->my_auths);
 	while (enumerator->enumerate(enumerator, &cfg))
@@ -2233,7 +2698,7 @@ METHOD(ike_sa_t, inherit_post, void,
 	this->conditions = other->conditions;
 	if (this->conditions & COND_NAT_HERE)
 	{
-		send_keepalive(this);
+		send_keepalive(this, FALSE);
 	}
 
 #ifdef ME
@@ -2251,7 +2716,8 @@ METHOD(ike_sa_t, inherit_post, void,
 	/* adopt all children */
 	while (array_remove(other->child_sas, ARRAY_HEAD, &child_sa))
 	{
-		array_insert_create(&this->child_sas, ARRAY_TAIL, child_sa);
+		charon->child_sa_manager->remove(charon->child_sa_manager, child_sa);
+		add_child_sa(this, child_sa);
 	}
 
 	/* move pending tasks to the new IKE_SA */
@@ -2296,8 +2762,8 @@ METHOD(ike_sa_t, destroy, void,
 	{
 		if (entry.handler)
 		{
-			hydra->attributes->release(hydra->attributes, entry.handler,
-									   this->other_id, entry.type, entry.data);
+			charon->attributes->release(charon->attributes, entry.handler,
+										&this->public, entry.type, entry.data);
 		}
 		free(entry.data.ptr);
 	}
@@ -2305,11 +2771,12 @@ METHOD(ike_sa_t, destroy, void,
 	 * routes that the CHILD_SA tries to uninstall. */
 	while (array_remove(this->child_sas, ARRAY_TAIL, &child_sa))
 	{
+		charon->child_sa_manager->remove(charon->child_sa_manager, child_sa);
 		child_sa->destroy(child_sa);
 	}
 	while (array_remove(this->my_vips, ARRAY_TAIL, &vip))
 	{
-		hydra->kernel_interface->del_ip(hydra->kernel_interface, vip, -1, TRUE);
+		charon->kernel->del_ip(charon->kernel, vip, -1, TRUE);
 		vip->destroy(vip);
 	}
 	if (array_count(this->other_vips))
@@ -2321,12 +2788,11 @@ METHOD(ike_sa_t, destroy, void,
 		if (this->peer_cfg)
 		{
 			linked_list_t *pools;
-			identification_t *id;
 
-			id = get_other_eap_id(this);
 			pools = linked_list_create_from_enumerator(
 						this->peer_cfg->create_pool_enumerator(this->peer_cfg));
-			hydra->attributes->release_address(hydra->attributes, pools, vip, id);
+			charon->attributes->release_address(charon->attributes,
+												pools, vip, &this->public);
 			pools->destroy(pools);
 		}
 		vip->destroy(vip);
@@ -2359,6 +2825,8 @@ METHOD(ike_sa_t, destroy, void,
 	DESTROY_IF(this->other_id);
 	DESTROY_IF(this->local_host);
 	DESTROY_IF(this->remote_host);
+	DESTROY_IF(this->redirected_from);
+	array_destroy(this->redirected_at);
 
 	DESTROY_IF(this->ike_cfg);
 	DESTROY_IF(this->peer_cfg);
@@ -2407,6 +2875,7 @@ ike_sa_t * ike_sa_create(ike_sa_id_t *ike_sa_id, bool initiator,
 			.set_peer_cfg = _set_peer_cfg,
 			.get_auth_cfg = _get_auth_cfg,
 			.create_auth_cfg_enumerator = _create_auth_cfg_enumerator,
+			.verify_peer_certificate = _verify_peer_certificate,
 			.add_auth_cfg = _add_auth_cfg,
 			.get_proposal = _get_proposal,
 			.set_proposal = _set_proposal,
@@ -2438,6 +2907,9 @@ ike_sa_t * ike_sa_create(ike_sa_id_t *ike_sa_id, bool initiator,
 			.destroy = _destroy,
 			.send_dpd = _send_dpd,
 			.send_keepalive = _send_keepalive,
+			.redirect = _redirect,
+			.handle_redirect = _handle_redirect,
+			.get_redirected_from = _get_redirected_from,
 			.get_keymat = _get_keymat,
 			.add_child_sa = _add_child_sa,
 			.get_child_sa = _get_child_sa,
@@ -2467,6 +2939,7 @@ ike_sa_t * ike_sa_create(ike_sa_id_t *ike_sa_id, bool initiator,
 			.create_task_enumerator = _create_task_enumerator,
 			.flush_queue = _flush_queue,
 			.queue_task = _queue_task,
+			.queue_task_delayed = _queue_task_delayed,
 #ifdef ME
 			.act_as_mediation_server = _act_as_mediation_server,
 			.get_server_reflexive_host = _get_server_reflexive_host,
@@ -2502,7 +2975,9 @@ ike_sa_t * ike_sa_create(ike_sa_id_t *ike_sa_id, bool initiator,
 		.flush_auth_cfg = lib->settings->get_bool(lib->settings,
 								"%s.flush_auth_cfg", FALSE, lib->ns),
 		.fragment_size = lib->settings->get_int(lib->settings,
-								"%s.fragment_size", 0, lib->ns),
+								"%s.fragment_size", 1280, lib->ns),
+		.follow_redirects = lib->settings->get_bool(lib->settings,
+								"%s.follow_redirects", TRUE, lib->ns),
 	);
 
 	if (version == IKEV2)

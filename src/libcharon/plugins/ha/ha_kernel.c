@@ -15,8 +15,8 @@
 
 #include "ha_kernel.h"
 
-typedef u_int32_t u32;
-typedef u_int8_t u8;
+typedef uint32_t u32;
+typedef uint8_t u8;
 
 #include <sys/utsname.h>
 #include <string.h>
@@ -36,6 +36,8 @@ typedef enum {
 	JHASH_LOOKUP2,
 	/* new variant, http://burtleburtle.net/bob/c/lookup3.c, since 2.6.37 */
 	JHASH_LOOKUP3,
+	/* variant with different init values, since 4.1 */
+	JHASH_LOOKUP3_1,
 } jhash_version_t;
 
 typedef struct private_ha_kernel_t private_ha_kernel_t;
@@ -88,8 +90,15 @@ static jhash_version_t get_jhash_version()
 				}
 				/* FALL */
 			case 2:
-				DBG1(DBG_CFG, "detected Linux %d.%d, using new jhash", a, b);
-				return JHASH_LOOKUP3;
+				if (a < 4 || (a == 4 && b == 0))
+				{
+					DBG1(DBG_CFG, "detected Linux %d.%d, using new jhash",
+						 a, b);
+					return JHASH_LOOKUP3;
+				}
+				DBG1(DBG_CFG, "detected Linux %d.%d, using new jhash with "
+					 "updated init values", a, b);
+				return JHASH_LOOKUP3_1;
 			default:
 				break;
 		}
@@ -106,9 +115,9 @@ static jhash_version_t get_jhash_version()
 /**
  * jhash algorithm of two words, as used in kernel (using 0 as initval)
  */
-static u_int32_t jhash(jhash_version_t version, u_int32_t a, u_int32_t b)
+static uint32_t jhash(jhash_version_t version, uint32_t a, uint32_t b)
 {
-	u_int32_t c = 0;
+	uint32_t c = 0;
 
 	switch (version)
 	{
@@ -126,6 +135,14 @@ static u_int32_t jhash(jhash_version_t version, u_int32_t a, u_int32_t b)
 			b -= c; b -= a; b ^= (a << 10);
 			c -= a; c -= b; c ^= (b >> 15);
 			break;
+		case JHASH_LOOKUP3_1:
+			/* changed with 4.1: # of 32-bit words shifted by 2 and c is
+			 * initialized. we only use the two word variant with SPIs, so it's
+			 * unlikely that b is 0 in that case */
+			c += ((b ? 2 : 1) << 2) + 0xdeadbeef;
+			a += ((b ? 2 : 1) << 2);
+			b += ((b ? 2 : 1) << 2);
+			/* FALL */
 		case JHASH_LOOKUP3:
 			a += 0xdeadbeef;
 			b += 0xdeadbeef;
@@ -145,7 +162,7 @@ static u_int32_t jhash(jhash_version_t version, u_int32_t a, u_int32_t b)
 /**
  * Segmentate a calculated hash
  */
-static u_int hash2segment(private_ha_kernel_t *this, u_int64_t hash)
+static u_int hash2segment(private_ha_kernel_t *this, uint64_t hash)
 {
 	return ((hash * this->count) >> 32) + 1;
 }
@@ -153,11 +170,11 @@ static u_int hash2segment(private_ha_kernel_t *this, u_int64_t hash)
 /**
  * Get a host as an integer for hashing
  */
-static u_int32_t host2int(host_t *host)
+static uint32_t host2int(host_t *host)
 {
 	if (host->get_family(host) == AF_INET)
 	{
-		return *(u_int32_t*)host->get_address(host).ptr;
+		return *(uint32_t*)host->get_address(host).ptr;
 	}
 	return 0;
 }
@@ -166,7 +183,7 @@ METHOD(ha_kernel_t, get_segment, u_int,
 	private_ha_kernel_t *this, host_t *host)
 {
 	unsigned long hash;
-	u_int32_t addr;
+	uint32_t addr;
 
 	addr = host2int(host);
 	hash = jhash(this->version, ntohl(addr), 0);
@@ -175,10 +192,10 @@ METHOD(ha_kernel_t, get_segment, u_int,
 }
 
 METHOD(ha_kernel_t, get_segment_spi, u_int,
-	private_ha_kernel_t *this, host_t *host, u_int32_t spi)
+	private_ha_kernel_t *this, host_t *host, uint32_t spi)
 {
 	unsigned long hash;
-	u_int32_t addr;
+	uint32_t addr;
 
 	addr = host2int(host);
 	hash = jhash(this->version, ntohl(addr), ntohl(spi));

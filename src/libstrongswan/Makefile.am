@@ -6,17 +6,21 @@ asn1/asn1.c asn1/asn1_parser.c asn1/oid.c bio/bio_reader.c bio/bio_writer.c \
 collections/blocking_queue.c collections/enumerator.c collections/hashtable.c \
 collections/array.c \
 collections/linked_list.c crypto/crypters/crypter.c crypto/hashers/hasher.c \
+crypto/hashers/hash_algorithm_set.c \
 crypto/proposal/proposal_keywords.c crypto/proposal/proposal_keywords_static.c \
 crypto/prfs/prf.c crypto/prfs/mac_prf.c crypto/pkcs5.c \
 crypto/rngs/rng.c crypto/prf_plus.c crypto/signers/signer.c \
 crypto/signers/mac_signer.c crypto/crypto_factory.c crypto/crypto_tester.c \
 crypto/diffie_hellman.c crypto/aead.c crypto/transform.c \
-crypto/iv/iv_gen_rand.c crypto/iv/iv_gen_seq.c \
+crypto/iv/iv_gen.c crypto/iv/iv_gen_rand.c crypto/iv/iv_gen_seq.c \
+crypto/iv/iv_gen_null.c \
+crypto/xofs/xof.c crypto/xofs/xof_bitspender.c \
 credentials/credential_factory.c credentials/builder.c \
 credentials/cred_encoding.c credentials/keys/private_key.c \
 credentials/keys/public_key.c credentials/keys/shared_key.c \
 credentials/certificates/certificate.c credentials/certificates/crl.c \
-credentials/certificates/ocsp_response.c \
+credentials/certificates/ocsp_response.c credentials/certificates/x509.c \
+credentials/certificates/certificate_printer.c \
 credentials/containers/container.c credentials/containers/pkcs12.c \
 credentials/credential_manager.c \
 credentials/sets/auth_cfg_wrapper.c credentials/sets/ocsp_response_wrapper.c \
@@ -32,10 +36,13 @@ pen/pen.c plugins/plugin_loader.c plugins/plugin_feature.c processing/jobs/job.c
 processing/jobs/callback_job.c processing/processor.c processing/scheduler.c \
 processing/watcher.c resolver/resolver_manager.c resolver/rr_set.c \
 selectors/traffic_selector.c settings/settings.c settings/settings_types.c \
-settings/settings_parser.y settings/settings_lexer.l \
+settings/settings_parser.y settings/settings_lexer.l utils/cpu_feature.c \
 utils/utils.c utils/chunk.c utils/debug.c utils/enum.c utils/identification.c \
 utils/lexparser.c utils/optionsfrom.c utils/capabilities.c utils/backtrace.c \
-utils/parser_helper.c utils/test.c utils/process.c utils/utils/strerror.c
+utils/parser_helper.c utils/test.c utils/process.c utils/utils/strerror.c \
+utils/utils/atomics.c utils/utils/string.c utils/utils/memory.c \
+utils/utils/tty.c utils/utils/path.c utils/utils/status.c utils/utils/time.c \
+utils/utils/align.c
 
 if !USE_WINDOWS
   libstrongswan_la_SOURCES += \
@@ -60,13 +67,15 @@ library.h \
 asn1/asn1.h asn1/asn1_parser.h asn1/oid.h bio/bio_reader.h bio/bio_writer.h \
 collections/blocking_queue.h collections/enumerator.h collections/hashtable.h \
 collections/linked_list.h collections/array.h collections/dictionary.h \
-crypto/crypters/crypter.h crypto/hashers/hasher.h crypto/mac.h \
+crypto/crypters/crypter.h crypto/hashers/hasher.h \
+crypto/hashers/hash_algorithm_set.h crypto/mac.h \
 crypto/proposal/proposal_keywords.h crypto/proposal/proposal_keywords_static.h \
 crypto/prfs/prf.h crypto/prfs/mac_prf.h crypto/rngs/rng.h crypto/nonce_gen.h \
 crypto/prf_plus.h crypto/signers/signer.h crypto/signers/mac_signer.h \
 crypto/crypto_factory.h crypto/crypto_tester.h crypto/diffie_hellman.h \
 crypto/aead.h crypto/transform.h crypto/pkcs5.h crypto/iv/iv_gen.h \
-crypto/iv/iv_gen_rand.h crypto/iv/iv_gen_seq.h \
+crypto/iv/iv_gen_rand.h crypto/iv/iv_gen_seq.h crypto/iv/iv_gen_null.h \
+crypto/xofs/xof.h crypto/xofs/xof_bitspender.h crypto/xofs/mgf1.h \
 credentials/credential_factory.h credentials/builder.h \
 credentials/cred_encoding.h credentials/keys/private_key.h \
 credentials/keys/public_key.h credentials/keys/shared_key.h \
@@ -75,6 +84,7 @@ credentials/certificates/ac.h credentials/certificates/crl.h \
 credentials/certificates/pkcs10.h credentials/certificates/ocsp_request.h \
 credentials/certificates/ocsp_response.h \
 credentials/certificates/pgp_certificate.h \
+credentials/certificates/certificate_printer.h \
 credentials/containers/container.h credentials/containers/pkcs7.h \
 credentials/containers/pkcs12.h \
 credentials/credential_manager.h credentials/sets/auth_cfg_wrapper.h \
@@ -93,21 +103,26 @@ resolver/rr.h resolver/resolver_manager.h \
 plugins/plugin_loader.h plugins/plugin.h plugins/plugin_feature.h \
 processing/jobs/job.h processing/jobs/callback_job.h processing/processor.h \
 processing/scheduler.h processing/watcher.h selectors/traffic_selector.h \
-settings/settings.h threading/thread_value.h \
+settings/settings.h settings/settings_parser.h threading/thread_value.h \
 threading/thread.h threading/windows/thread.h \
 threading/mutex.h threading/condvar.h threading/spinlock.h threading/semaphore.h \
 threading/rwlock.h threading/rwlock_condvar.h threading/lock_profiler.h \
 utils/utils.h utils/chunk.h utils/debug.h utils/enum.h utils/identification.h \
 utils/lexparser.h utils/optionsfrom.h utils/capabilities.h utils/backtrace.h \
-utils/leak_detective.h utils/printf_hook/printf_hook.h \
+utils/cpu_feature.h utils/leak_detective.h utils/printf_hook/printf_hook.h \
 utils/printf_hook/printf_hook_vstr.h utils/printf_hook/printf_hook_builtin.h \
-utils/parser_helper.h utils/test.h utils/integrity_checker.h utils/windows.h \
-utils/process.h utils/utils/strerror.h
+utils/parser_helper.h utils/test.h utils/integrity_checker.h utils/process.h \
+utils/utils/strerror.h utils/compat/windows.h utils/compat/apple.h utils/compat/android.h \
+utils/utils/atomics.h utils/utils/types.h utils/utils/byteorder.h \
+utils/utils/string.h utils/utils/memory.h utils/utils/tty.h utils/utils/path.h \
+utils/utils/status.h utils/utils/object.h utils/utils/time.h utils/utils/align.h
 endif
 
 library.lo :	$(top_builddir)/config.status
 
-libstrongswan_la_LIBADD = $(DLLIB) $(BTLIB) $(SOCKLIB) $(RTLIB) $(BFDLIB) $(UNWINDLIB)
+libstrongswan_la_LIBADD = \
+	$(DLLIB) $(ATOMICLIB)  $(BTLIB) $(SOCKLIB) \
+	$(RTLIB) $(BFDLIB) $(UNWINDLIB)
 
 AM_CPPFLAGS = \
 	-I$(top_srcdir)/src/libstrongswan \
@@ -133,7 +148,7 @@ if USE_WINDOWS
     threading/windows/rwlock.c \
     threading/windows/spinlock.c \
     threading/windows/semaphore.c \
-    utils/windows.c
+    utils/compat/windows.c
 else
   libstrongswan_la_LIBADD += $(PTHREADLIB)
 endif
@@ -180,7 +195,7 @@ endif
 EXTRA_DIST = \
 asn1/oid.txt asn1/oid.pl \
 crypto/proposal/proposal_keywords_static.txt \
-Android.mk AndroidConfigLocal.h
+Android.mk
 
 BUILT_SOURCES = \
 $(srcdir)/asn1/oid.c $(srcdir)/asn1/oid.h \
@@ -205,15 +220,21 @@ $(srcdir)/crypto/proposal/proposal_keywords_static.c:	$(srcdir)/crypto/proposal/
 		$(GPERF) -N proposal_get_token_static -m 10 -C -G -c -t -D < \
 												$(srcdir)/crypto/proposal/proposal_keywords_static.txt > $@
 
-
-# build plugins with their own Makefile
-#######################################
-
 if MONOLITHIC
 SUBDIRS =
 else
 SUBDIRS = .
 endif
+
+# build libnttfft used by some plugins
+######################################
+
+if USE_LIBNTTFFT
+  SUBDIRS += math/libnttfft
+endif
+
+# build plugins with their own Makefile
+#######################################
 
 if USE_AF_ALG
   SUBDIRS += plugins/af_alg
@@ -278,6 +299,13 @@ if MONOLITHIC
 endif
 endif
 
+if USE_SHA3
+  SUBDIRS += plugins/sha3
+if MONOLITHIC
+  libstrongswan_la_LIBADD += plugins/sha3/libstrongswan-sha3.la
+endif
+endif
+
 if USE_GMP
   SUBDIRS += plugins/gmp
 if MONOLITHIC
@@ -289,6 +317,13 @@ if USE_RDRAND
   SUBDIRS += plugins/rdrand
 if MONOLITHIC
   libstrongswan_la_LIBADD += plugins/rdrand/libstrongswan-rdrand.la
+endif
+endif
+
+if USE_AESNI
+  SUBDIRS += plugins/aesni
+if MONOLITHIC
+  libstrongswan_la_LIBADD += plugins/aesni/libstrongswan-aesni.la
 endif
 endif
 
@@ -425,6 +460,13 @@ if MONOLITHIC
 endif
 endif
 
+if USE_FILES
+  SUBDIRS += plugins/files
+if MONOLITHIC
+  libstrongswan_la_LIBADD += plugins/files/libstrongswan-files.la
+endif
+endif
+
 if USE_WINHTTP
   SUBDIRS += plugins/winhttp
 if MONOLITHIC
@@ -516,6 +558,13 @@ if MONOLITHIC
 endif
 endif
 
+if USE_CHAPOLY
+  SUBDIRS += plugins/chapoly
+if MONOLITHIC
+  libstrongswan_la_LIBADD += plugins/chapoly/libstrongswan-chapoly.la
+endif
+endif
+
 if USE_CTR
   SUBDIRS += plugins/ctr
 if MONOLITHIC
@@ -537,10 +586,31 @@ if MONOLITHIC
 endif
 endif
 
+if USE_MGF1
+  SUBDIRS += plugins/mgf1
+if MONOLITHIC
+  libstrongswan_la_LIBADD += plugins/mgf1/libstrongswan-mgf1.la
+endif
+endif
+
 if USE_NTRU
   SUBDIRS += plugins/ntru
 if MONOLITHIC
   libstrongswan_la_LIBADD += plugins/ntru/libstrongswan-ntru.la
+endif
+endif
+
+if USE_BLISS
+  SUBDIRS += plugins/bliss
+if MONOLITHIC
+  libstrongswan_la_LIBADD += plugins/bliss/libstrongswan-bliss.la
+endif
+endif
+
+if USE_NEWHOPE
+  SUBDIRS += plugins/newhope
+if MONOLITHIC
+  libstrongswan_la_LIBADD += plugins/newhope/libstrongswan-newhope.la
 endif
 endif
 
@@ -554,4 +624,20 @@ endif
 if MONOLITHIC
   SUBDIRS += .
 endif
+
+# build unit tests
+##################
+
 SUBDIRS += tests
+
+if USE_LIBNTTFFT
+  SUBDIRS += math/libnttfft/tests
+endif
+
+if USE_BLISS
+  SUBDIRS += plugins/bliss/tests
+endif
+
+if USE_NEWHOPE
+  SUBDIRS += plugins/newhope/tests
+endif

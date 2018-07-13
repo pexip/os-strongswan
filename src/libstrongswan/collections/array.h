@@ -68,7 +68,7 @@ typedef void (*array_callback_t)(void *data, int idx, void *user);
  * @param reserve		number of items to allocate space for
  * @return				array instance
  */
-array_t *array_create(u_int esize, u_int8_t reserve);
+array_t *array_create(u_int esize, uint8_t reserve);
 
 /**
  * Get the number of elements currently in the array.
@@ -137,6 +137,21 @@ void array_insert(array_t *array, int idx, void *data);
  * @param ptr			pointer to append
  */
 void array_insert_create(array_t **array, int idx, void *ptr);
+
+/**
+ * Create a value based array if it does not exist, insert value.
+ *
+ * This is a convenience function to insert a value and implicitly
+ * create a value based array if array is NULL. Array is set the the newly
+ * created array, if any.
+ *
+ * @param array			pointer to array reference, potentially NULL
+ * @param esize			element size of this array
+ * @param idx			index to insert item at
+ * @param val			pointer to value to insert
+ */
+void array_insert_create_value(array_t **array, u_int esize,
+							   int idx, void *val);
 
 /**
  * Insert all items from an enumerator to an array.

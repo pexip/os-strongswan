@@ -37,9 +37,10 @@
 typedef struct private_settings_t private_settings_t;
 
 /**
- * Parse function provided by the generated parser.
+ * Parse functions provided by the generated parser.
  */
 bool settings_parser_parse_file(section_t *root, char *name);
+bool settings_parser_parse_string(section_t *root, char *settings);
 
 /**
  * Private data of settings
@@ -539,6 +540,31 @@ METHOD(settings_t, get_int, int,
 /**
  * Described in header
  */
+inline uint64_t settings_value_as_uint64(char *value, uint64_t def)
+{
+	uint64_t intval;
+	char *end;
+	int base = 10;
+
+	if (value)
+	{
+		errno = 0;
+		if (value[0] == '0' && value[1] == 'x')
+		{	/* manually detect 0x prefix as we want to avoid octal encoding */
+			base = 16;
+		}
+		intval = strtoull(value, &end, base);
+		if (errno == 0 && *end == 0 && end != value)
+		{
+			return intval;
+		}
+	}
+	return def;
+}
+
+/**
+ * Described in header
+ */
 inline double settings_value_as_double(char *value, double def)
 {
 	double dval;
@@ -571,10 +597,10 @@ METHOD(settings_t, get_double, double,
 /**
  * Described in header
  */
-inline u_int32_t settings_value_as_time(char *value, u_int32_t def)
+inline uint32_t settings_value_as_time(char *value, uint32_t def)
 {
 	char *endptr;
-	u_int32_t timeval;
+	uint32_t timeval;
 	if (value)
 	{
 		errno = 0;
@@ -612,8 +638,8 @@ inline u_int32_t settings_value_as_time(char *value, u_int32_t def)
 	return def;
 }
 
-METHOD(settings_t, get_time, u_int32_t,
-	private_settings_t *this, char *key, u_int32_t def, ...)
+METHOD(settings_t, get_time, uint32_t,
+	private_settings_t *this, char *key, uint32_t def, ...)
 {
 	char *value;
 	va_list args;
@@ -669,7 +695,7 @@ METHOD(settings_t, set_double, void,
 }
 
 METHOD(settings_t, set_time, void,
-	private_settings_t *this, char *key, u_int32_t value, ...)
+	private_settings_t *this, char *key, uint32_t value, ...)
 {
 	char val[16];
 	va_list args;
@@ -843,16 +869,17 @@ METHOD(settings_t, add_fallback, void,
 }
 
 /**
- * Load settings from files matching the given file pattern.
+ * Load settings from files matching the given file pattern or from a string.
  * All sections and values are added relative to "parent".
  * All files (even included ones) have to be loaded successfully.
  * If merge is FALSE the contents of parent are replaced with the parsed
  * contents, otherwise they are merged together.
  */
-static bool load_files_internal(private_settings_t *this, section_t *parent,
-								char *pattern, bool merge)
+static bool load_internal(private_settings_t *this, section_t *parent,
+						  char *pattern, bool merge, bool string)
 {
 	section_t *section;
+	bool loaded;
 
 	if (pattern == NULL || !pattern[0])
 	{	/* TODO: Clear parent if merge is FALSE? */
@@ -860,7 +887,9 @@ static bool load_files_internal(private_settings_t *this, section_t *parent,
 	}
 
 	section = settings_section_create(NULL);
-	if (!settings_parser_parse_file(section, pattern))
+	loaded = string ? settings_parser_parse_string(section, pattern) :
+					  settings_parser_parse_file(section, pattern);
+	if (!loaded)
 	{
 		settings_section_destroy(section, NULL);
 		return FALSE;
@@ -877,7 +906,7 @@ static bool load_files_internal(private_settings_t *this, section_t *parent,
 METHOD(settings_t, load_files, bool,
 	private_settings_t *this, char *pattern, bool merge)
 {
-	return load_files_internal(this, this->top, pattern, merge);
+	return load_internal(this, this->top, pattern, merge, FALSE);
 }
 
 METHOD(settings_t, load_files_section, bool,
@@ -894,7 +923,30 @@ METHOD(settings_t, load_files_section, bool,
 	{
 		return FALSE;
 	}
-	return load_files_internal(this, section, pattern, merge);
+	return load_internal(this, section, pattern, merge, FALSE);
+}
+
+METHOD(settings_t, load_string, bool,
+	private_settings_t *this, char *settings, bool merge)
+{
+	return load_internal(this, this->top, settings, merge, TRUE);
+}
+
+METHOD(settings_t, load_string_section, bool,
+	private_settings_t *this, char *settings, bool merge, char *key, ...)
+{
+	section_t *section;
+	va_list args;
+
+	va_start(args, key);
+	section = ensure_section(this, this->top, key, args);
+	va_end(args);
+
+	if (!section)
+	{
+		return FALSE;
+	}
+	return load_internal(this, section, settings, merge, TRUE);
 }
 
 METHOD(settings_t, destroy, void,
@@ -906,10 +958,7 @@ METHOD(settings_t, destroy, void,
 	free(this);
 }
 
-/*
- * see header file
- */
-settings_t *settings_create(char *file)
+static private_settings_t *settings_create_base()
 {
 	private_settings_t *this;
 
@@ -931,14 +980,37 @@ settings_t *settings_create(char *file)
 			.add_fallback = _add_fallback,
 			.load_files = _load_files,
 			.load_files_section = _load_files_section,
+			.load_string = _load_string,
+			.load_string_section = _load_string_section,
 			.destroy = _destroy,
 		},
 		.top = settings_section_create(NULL),
 		.contents = array_create(0, 0),
 		.lock = rwlock_create(RWLOCK_TYPE_DEFAULT),
 	);
+	return this;
+}
+
+/*
+ * see header file
+ */
+settings_t *settings_create(char *file)
+{
+	private_settings_t *this = settings_create_base();
 
 	load_files(this, file, FALSE);
+
+	return &this->public;
+}
+
+/*
+ * see header file
+ */
+settings_t *settings_create_string(char *settings)
+{
+	private_settings_t *this = settings_create_base();
+
+	load_string(this, settings, FALSE);
 
 	return &this->public;
 }

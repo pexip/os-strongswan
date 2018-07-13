@@ -19,8 +19,10 @@
 #include <stdlib.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <string.h>
 #include <errno.h>
 #include <arpa/inet.h>
+#include <netinet/in.h>
 
 #include "duplicheck_msg.h"
 
@@ -69,7 +71,7 @@ int main(int argc, char *argv[])
 {
 	char buf[128];
 	int fd, len;
-	u_int16_t msglen;
+	uint16_t msglen;
 
 	fd = make_connection();
 	if (fd < 0)

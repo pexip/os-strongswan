@@ -186,6 +186,11 @@ enum radius_attribute_type_t {
 	RAT_DELEGATED_IPV6_PREFIX = 123,
 	RAT_MIP6_FEATURE_VECTOR = 124,
 	RAT_MIP6_HOME_LINK_PREFIX = 125,
+	RAT_FRAMED_IPV6_ADDRESS = 168,
+	RAT_FRAMED_IPV6_DNS_SERVER = 169,
+	RAT_ROUTE_IPV6_INFORMATION = 170,
+	RAT_DELEGATED_IPV6_PREFIX_POOL = 171,
+	RAT_STATEFUL_IPV6_ADDRESS_POOL = 172,
 };
 
 /**
@@ -236,21 +241,21 @@ struct radius_message_t {
 	 *
 	 * @return				message identifier
 	 */
-	u_int8_t (*get_identifier)(radius_message_t *this);
+	uint8_t (*get_identifier)(radius_message_t *this);
 
 	/**
 	 * Set the message identifier.
 	 *
 	 * @param identifier	message identifier
 	 */
-	void (*set_identifier)(radius_message_t *this, u_int8_t identifier);
+	void (*set_identifier)(radius_message_t *this, uint8_t identifier);
 
 	/**
 	 * Get the 16 byte authenticator.
 	 *
 	 * @return				pointer to the Authenticator field
 	 */
-	u_int8_t* (*get_authenticator)(radius_message_t *this);
+	uint8_t* (*get_authenticator)(radius_message_t *this);
 
 	/**
 	 * Get the RADIUS message in its encoded form.
@@ -270,7 +275,7 @@ struct radius_message_t {
 	 * @param msg_auth		calculate and add Message-Authenticator
 	 * @return				TRUE if signed successfully
 	 */
-	bool (*sign)(radius_message_t *this, u_int8_t *req_auth, chunk_t secret,
+	bool (*sign)(radius_message_t *this, uint8_t *req_auth, chunk_t secret,
 				 hasher_t *hasher, signer_t *signer, rng_t *rng, bool msg_auth);
 
 	/**
@@ -281,7 +286,7 @@ struct radius_message_t {
 	 * @param signer		HMAC-MD5 signer with secret set
 	 * @param hasher		MD5 hasher
 	 */
-	bool (*verify)(radius_message_t *this, u_int8_t *req_auth, chunk_t secret,
+	bool (*verify)(radius_message_t *this, uint8_t *req_auth, chunk_t secret,
 				   hasher_t *hasher, signer_t *signer);
 
 	/**

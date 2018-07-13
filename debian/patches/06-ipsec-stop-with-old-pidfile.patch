@@ -1,5 +1,5 @@
 diff --git a/src/ipsec/_ipsec.in b/src/ipsec/_ipsec.in
-index 3c1f998..00f6a4b 100644
+index a002614f..8aab2ec9 100644
 --- a/src/ipsec/_ipsec.in
 +++ b/src/ipsec/_ipsec.in
 @@ -34,6 +34,7 @@ IPSEC_CONFDIR="@IPSEC_CONFDIR@"
@@ -10,7 +10,7 @@ index 3c1f998..00f6a4b 100644
  IPSEC_STARTER_PID="${IPSEC_PIDDIR}/starter.${DAEMON_NAME}.pid"
  IPSEC_CHARON_PID="${IPSEC_PIDDIR}/${DAEMON_NAME}.pid"
  
-@@ -261,10 +262,16 @@ status|statusall)
+@@ -249,10 +250,16 @@ status|statusall)
  	;;
  stop)
  	# stopping a not-running service is considered as success
@@ -29,8 +29,8 @@ index 3c1f998..00f6a4b 100644
  		if [ -n "$spid" ]
  		then
  			kill $spid 2>/dev/null
-@@ -277,7 +284,7 @@ stop)
- 			if [ $loop -eq 0 ]
+@@ -270,7 +277,7 @@ stop)
+ 			if [ $loop -le 0 ]
  			then
  				kill -KILL $spid 2>/dev/null
 -				rm -f $IPSEC_STARTER_PID

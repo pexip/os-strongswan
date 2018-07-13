@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2015 Tobias Brunner
  * Copyright (C) 2008 Martin Willi
  * Hochschule fuer Technik Rapperswil
  *
@@ -17,6 +18,7 @@
 
 #include <daemon.h>
 #include <crypto/prf_plus.h>
+#include <crypto/hashers/hash_algorithm_set.h>
 
 typedef struct private_keymat_v2_t private_keymat_v2_t;
 
@@ -69,6 +71,11 @@ struct private_keymat_v2_t {
 	 * Key to verify incoming authentication data (SKp)
 	 */
 	chunk_t skp_verify;
+
+	/**
+	 * Set of hash algorithms supported by peer for signature authentication
+	 */
+	hash_algorithm_set_t *hash_algorithms;
 };
 
 METHOD(keymat_t, get_version, ike_version_t,
@@ -92,11 +99,11 @@ METHOD(keymat_t, create_nonce_gen, nonce_gen_t*,
 /**
  * Derive IKE keys for a combined AEAD algorithm
  */
-static bool derive_ike_aead(private_keymat_v2_t *this, u_int16_t alg,
-							u_int16_t key_size, prf_plus_t *prf_plus)
+static bool derive_ike_aead(private_keymat_v2_t *this, uint16_t alg,
+							uint16_t key_size, prf_plus_t *prf_plus)
 {
 	aead_t *aead_i, *aead_r;
-	chunk_t key = chunk_empty;
+	chunk_t sk_ei = chunk_empty, sk_er = chunk_empty;
 	u_int salt_size;
 
 	switch (alg)
@@ -105,6 +112,7 @@ static bool derive_ike_aead(private_keymat_v2_t *this, u_int16_t alg,
 		case ENCR_AES_GCM_ICV12:
 		case ENCR_AES_GCM_ICV16:
 			/* RFC 4106 */
+		case ENCR_CHACHA20_POLY1305:
 			salt_size = 4;
 			break;
 		case ENCR_AES_CCM_ICV8:
@@ -138,23 +146,22 @@ static bool derive_ike_aead(private_keymat_v2_t *this, u_int16_t alg,
 	{
 		goto failure;
 	}
-	if (!prf_plus->allocate_bytes(prf_plus, key_size, &key))
+	if (!prf_plus->allocate_bytes(prf_plus, key_size, &sk_ei))
 	{
 		goto failure;
 	}
-	DBG4(DBG_IKE, "Sk_ei secret %B", &key);
-	if (!aead_i->set_key(aead_i, key))
+	DBG4(DBG_IKE, "Sk_ei secret %B", &sk_ei);
+	if (!aead_i->set_key(aead_i, sk_ei))
 	{
 		goto failure;
 	}
-	chunk_clear(&key);
 
-	if (!prf_plus->allocate_bytes(prf_plus, key_size, &key))
+	if (!prf_plus->allocate_bytes(prf_plus, key_size, &sk_er))
 	{
 		goto failure;
 	}
-	DBG4(DBG_IKE, "Sk_er secret %B", &key);
-	if (!aead_r->set_key(aead_r, key))
+	DBG4(DBG_IKE, "Sk_er secret %B", &sk_er);
+	if (!aead_r->set_key(aead_r, sk_er))
 	{
 		goto failure;
 	}
@@ -170,24 +177,29 @@ static bool derive_ike_aead(private_keymat_v2_t *this, u_int16_t alg,
 		this->aead_out = aead_r;
 	}
 	aead_i = aead_r = NULL;
+	charon->bus->ike_derived_keys(charon->bus, sk_ei, sk_er, chunk_empty,
+								  chunk_empty);
 
 failure:
 	DESTROY_IF(aead_i);
 	DESTROY_IF(aead_r);
-	chunk_clear(&key);
+	chunk_clear(&sk_ei);
+	chunk_clear(&sk_er);
 	return this->aead_in && this->aead_out;
 }
 
 /**
  * Derive IKE keys for traditional encryption and MAC algorithms
  */
-static bool derive_ike_traditional(private_keymat_v2_t *this, u_int16_t enc_alg,
-					u_int16_t enc_size, u_int16_t int_alg, prf_plus_t *prf_plus)
+static bool derive_ike_traditional(private_keymat_v2_t *this, uint16_t enc_alg,
+					uint16_t enc_size, uint16_t int_alg, prf_plus_t *prf_plus)
 {
 	crypter_t *crypter_i = NULL, *crypter_r = NULL;
 	signer_t *signer_i, *signer_r;
+	iv_gen_t *ivg_i, *ivg_r;
 	size_t key_size;
-	chunk_t key = chunk_empty;
+	chunk_t sk_ei = chunk_empty, sk_er = chunk_empty,
+			sk_ai = chunk_empty, sk_ar = chunk_empty;
 
 	signer_i = lib->crypto->create_signer(lib->crypto, int_alg);
 	signer_r = lib->crypto->create_signer(lib->crypto, int_alg);
@@ -211,67 +223,74 @@ static bool derive_ike_traditional(private_keymat_v2_t *this, u_int16_t enc_alg,
 	/* SK_ai/SK_ar used for integrity protection */
 	key_size = signer_i->get_key_size(signer_i);
 
-	if (!prf_plus->allocate_bytes(prf_plus, key_size, &key))
+	if (!prf_plus->allocate_bytes(prf_plus, key_size, &sk_ai))
 	{
 		goto failure;
 	}
-	DBG4(DBG_IKE, "Sk_ai secret %B", &key);
-	if (!signer_i->set_key(signer_i, key))
+	DBG4(DBG_IKE, "Sk_ai secret %B", &sk_ai);
+	if (!signer_i->set_key(signer_i, sk_ai))
 	{
 		goto failure;
 	}
-	chunk_clear(&key);
 
-	if (!prf_plus->allocate_bytes(prf_plus, key_size, &key))
+	if (!prf_plus->allocate_bytes(prf_plus, key_size, &sk_ar))
 	{
 		goto failure;
 	}
-	DBG4(DBG_IKE, "Sk_ar secret %B", &key);
-	if (!signer_r->set_key(signer_r, key))
+	DBG4(DBG_IKE, "Sk_ar secret %B", &sk_ar);
+	if (!signer_r->set_key(signer_r, sk_ar))
 	{
 		goto failure;
 	}
-	chunk_clear(&key);
 
 	/* SK_ei/SK_er used for encryption */
 	key_size = crypter_i->get_key_size(crypter_i);
 
-	if (!prf_plus->allocate_bytes(prf_plus, key_size, &key))
+	if (!prf_plus->allocate_bytes(prf_plus, key_size, &sk_ei))
 	{
 		goto failure;
 	}
-	DBG4(DBG_IKE, "Sk_ei secret %B", &key);
-	if (!crypter_i->set_key(crypter_i, key))
-	{
-		goto failure;
-	}
-	chunk_clear(&key);
-
-	if (!prf_plus->allocate_bytes(prf_plus, key_size, &key))
-	{
-		goto failure;
-	}
-	DBG4(DBG_IKE, "Sk_er secret %B", &key);
-	if (!crypter_r->set_key(crypter_r, key))
+	DBG4(DBG_IKE, "Sk_ei secret %B", &sk_ei);
+	if (!crypter_i->set_key(crypter_i, sk_ei))
 	{
 		goto failure;
 	}
 
+	if (!prf_plus->allocate_bytes(prf_plus, key_size, &sk_er))
+	{
+		goto failure;
+	}
+	DBG4(DBG_IKE, "Sk_er secret %B", &sk_er);
+	if (!crypter_r->set_key(crypter_r, sk_er))
+	{
+		goto failure;
+	}
+
+	ivg_i = iv_gen_create_for_alg(enc_alg);
+	ivg_r = iv_gen_create_for_alg(enc_alg);
+	if (!ivg_i || !ivg_r)
+	{
+		goto failure;
+	}
 	if (this->initiator)
 	{
-		this->aead_in = aead_create(crypter_r, signer_r);
-		this->aead_out = aead_create(crypter_i, signer_i);
+		this->aead_in = aead_create(crypter_r, signer_r, ivg_r);
+		this->aead_out = aead_create(crypter_i, signer_i, ivg_i);
 	}
 	else
 	{
-		this->aead_in = aead_create(crypter_i, signer_i);
-		this->aead_out = aead_create(crypter_r, signer_r);
+		this->aead_in = aead_create(crypter_i, signer_i, ivg_i);
+		this->aead_out = aead_create(crypter_r, signer_r, ivg_r);
 	}
 	signer_i = signer_r = NULL;
 	crypter_i = crypter_r = NULL;
+	charon->bus->ike_derived_keys(charon->bus, sk_ei, sk_er, sk_ai, sk_ar);
 
 failure:
-	chunk_clear(&key);
+	chunk_clear(&sk_ai);
+	chunk_clear(&sk_ar);
+	chunk_clear(&sk_ei);
+	chunk_clear(&sk_er);
 	DESTROY_IF(signer_i);
 	DESTROY_IF(signer_r);
 	DESTROY_IF(crypter_i);
@@ -287,13 +306,13 @@ METHOD(keymat_v2_t, derive_ike_keys, bool,
 	chunk_t skeyseed, key, secret, full_nonce, fixed_nonce, prf_plus_seed;
 	chunk_t spi_i, spi_r;
 	prf_plus_t *prf_plus = NULL;
-	u_int16_t alg, key_size, int_alg;
+	uint16_t alg, key_size, int_alg;
 	prf_t *rekey_prf = NULL;
 
-	spi_i = chunk_alloca(sizeof(u_int64_t));
-	spi_r = chunk_alloca(sizeof(u_int64_t));
+	spi_i = chunk_alloca(sizeof(uint64_t));
+	spi_r = chunk_alloca(sizeof(uint64_t));
 
-	if (dh->get_shared_secret(dh, &secret) != SUCCESS)
+	if (!dh->get_shared_secret(dh, &secret))
 	{
 		return FALSE;
 	}
@@ -339,8 +358,8 @@ METHOD(keymat_v2_t, derive_ike_keys, bool,
 			break;
 	}
 	fixed_nonce = chunk_cat("cc", nonce_i, nonce_r);
-	*((u_int64_t*)spi_i.ptr) = id->get_initiator_spi(id);
-	*((u_int64_t*)spi_r.ptr) = id->get_responder_spi(id);
+	*((uint64_t*)spi_i.ptr) = id->get_initiator_spi(id);
+	*((uint64_t*)spi_r.ptr) = id->get_responder_spi(id);
 	prf_plus_seed = chunk_cat("ccc", full_nonce, spi_i, spi_r);
 
 	/* KEYMAT = prf+ (SKEYSEED, Ni | Nr | SPIi | SPIr)
@@ -474,7 +493,7 @@ METHOD(keymat_v2_t, derive_child_keys, bool,
 	chunk_t nonce_i, chunk_t nonce_r, chunk_t *encr_i, chunk_t *integ_i,
 	chunk_t *encr_r, chunk_t *integ_r)
 {
-	u_int16_t enc_alg, int_alg, enc_size = 0, int_size = 0;
+	uint16_t enc_alg, int_alg, enc_size = 0, int_size = 0;
 	chunk_t seed, secret = chunk_empty;
 	prf_plus_t *prf_plus;
 
@@ -512,7 +531,9 @@ METHOD(keymat_v2_t, derive_child_keys, bool,
 			case ENCR_AES_GCM_ICV12:
 			case ENCR_AES_GCM_ICV16:
 			case ENCR_AES_CTR:
+			case ENCR_CAMELLIA_CTR:
 			case ENCR_NULL_AUTH_AES_GMAC:
+			case ENCR_CHACHA20_POLY1305:
 				enc_size += 4;
 				break;
 			default:
@@ -547,7 +568,7 @@ METHOD(keymat_v2_t, derive_child_keys, bool,
 
 	if (dh)
 	{
-		if (dh->get_shared_secret(dh, &secret) != SUCCESS)
+		if (!dh->get_shared_secret(dh, &secret))
 		{
 			return FALSE;
 		}
@@ -676,6 +697,26 @@ METHOD(keymat_v2_t, get_psk_sig, bool,
 	return TRUE;
 }
 
+METHOD(keymat_v2_t, hash_algorithm_supported, bool,
+	private_keymat_v2_t *this, hash_algorithm_t hash)
+{
+	if (!this->hash_algorithms)
+	{
+		return FALSE;
+	}
+	return this->hash_algorithms->contains(this->hash_algorithms, hash);
+}
+
+METHOD(keymat_v2_t, add_hash_algorithm, void,
+	private_keymat_v2_t *this, hash_algorithm_t hash)
+{
+	if (!this->hash_algorithms)
+	{
+		this->hash_algorithms = hash_algorithm_set_create();
+	}
+	this->hash_algorithms->add(this->hash_algorithms, hash);
+}
+
 METHOD(keymat_t, destroy, void,
 	private_keymat_v2_t *this)
 {
@@ -685,6 +726,7 @@ METHOD(keymat_t, destroy, void,
 	chunk_clear(&this->skd);
 	chunk_clear(&this->skp_verify);
 	chunk_clear(&this->skp_build);
+	DESTROY_IF(this->hash_algorithms);
 	free(this);
 }
 
@@ -709,6 +751,9 @@ keymat_v2_t *keymat_v2_create(bool initiator)
 			.get_skd = _get_skd,
 			.get_auth_octets = _get_auth_octets,
 			.get_psk_sig = _get_psk_sig,
+			.add_hash_algorithm = _add_hash_algorithm,
+			.hash_algorithm_supported = _hash_algorithm_supported,
+
 		},
 		.initiator = initiator,
 		.prf_alg = PRF_UNDEFINED,

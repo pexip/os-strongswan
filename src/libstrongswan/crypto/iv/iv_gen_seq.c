@@ -15,6 +15,12 @@
 
 #include "iv_gen_seq.h"
 
+/**
+ * Magic value for the initial IV state
+ */
+#define SEQ_IV_INIT_STATE (~(uint64_t)0)
+#define SEQ_IV_HIGH_MASK (1ULL << 63)
+
 typedef struct private_iv_gen_t private_iv_gen_t;
 
 /**
@@ -28,34 +34,68 @@ struct private_iv_gen_t {
 	iv_gen_t public;
 
 	/**
+	 * Previously passed sequence number in lower space to enforce uniqueness
+	 */
+	uint64_t prevl;
+
+	/**
+	 * Previously passed sequence number in upper space to enforce uniqueness
+	 */
+	uint64_t prevh;
+
+	/**
 	 * Salt to mask counter
 	 */
-	u_int8_t *salt;
+	uint8_t *salt;
 };
 
 METHOD(iv_gen_t, get_iv, bool,
-	private_iv_gen_t *this, u_int64_t seq, size_t size, u_int8_t *buffer)
+	private_iv_gen_t *this, uint64_t seq, size_t size, uint8_t *buffer)
 {
-	u_int8_t iv[sizeof(u_int64_t)];
+	uint8_t iv[sizeof(uint64_t)];
 	size_t len = size;
 
 	if (!this->salt)
 	{
 		return FALSE;
 	}
-	if (len > sizeof(u_int64_t))
+	if (size < sizeof(uint64_t))
 	{
-		len = sizeof(u_int64_t);
+		return FALSE;
+	}
+	if (this->prevl != SEQ_IV_INIT_STATE && seq <= this->prevl)
+	{
+		seq |= SEQ_IV_HIGH_MASK;
+		if (this->prevh != SEQ_IV_INIT_STATE && seq <= this->prevh)
+		{
+			return FALSE;
+		}
+	}
+	if ((seq | SEQ_IV_HIGH_MASK) == SEQ_IV_INIT_STATE)
+	{
+		return FALSE;
+	}
+	if (seq & SEQ_IV_HIGH_MASK)
+	{
+		this->prevh = seq;
+	}
+	else
+	{
+		this->prevl = seq;
+	}
+	if (len > sizeof(uint64_t))
+	{
+		len = sizeof(uint64_t);
 		memset(buffer, 0, size - len);
 	}
 	htoun64(iv, seq);
-	memxor(iv, this->salt, sizeof(u_int64_t));
-	memcpy(buffer + size - len, iv + sizeof(u_int64_t) - len, len);
+	memxor(iv, this->salt, sizeof(uint64_t));
+	memcpy(buffer + size - len, iv + sizeof(uint64_t) - len, len);
 	return TRUE;
 }
 
 METHOD(iv_gen_t, allocate_iv, bool,
-	private_iv_gen_t *this, u_int64_t seq, size_t size, chunk_t *chunk)
+	private_iv_gen_t *this, uint64_t seq, size_t size, chunk_t *chunk)
 {
 	*chunk = chunk_alloc(size);
 	if (!get_iv(this, seq, chunk->len, chunk->ptr))
@@ -84,13 +124,15 @@ iv_gen_t *iv_gen_seq_create()
 			.allocate_iv = _allocate_iv,
 			.destroy = _destroy,
 		},
+		.prevl = SEQ_IV_INIT_STATE,
+		.prevh = SEQ_IV_INIT_STATE,
 	);
 
 	rng = lib->crypto->create_rng(lib->crypto, RNG_STRONG);
 	if (rng)
 	{
-		this->salt = malloc(sizeof(u_int64_t));
-		if (!rng->get_bytes(rng, sizeof(u_int64_t), this->salt))
+		this->salt = malloc(sizeof(uint64_t));
+		if (!rng->get_bytes(rng, sizeof(uint64_t), this->salt))
 		{
 			free(this->salt);
 			this->salt = NULL;

@@ -65,7 +65,7 @@ ENUM_NEXT(notify_type_names, ME_CONNECT_FAILED, ME_CONNECT_FAILED, CHILD_SA_NOT_
 	"ME_CONNECT_FAILED");
 ENUM_NEXT(notify_type_names, MS_NOTIFY_STATUS, MS_NOTIFY_STATUS, ME_CONNECT_FAILED,
 	"MS_NOTIFY_STATUS");
-ENUM_NEXT(notify_type_names, INITIAL_CONTACT, FRAGMENTATION_SUPPORTED, MS_NOTIFY_STATUS,
+ENUM_NEXT(notify_type_names, INITIAL_CONTACT, SIGNATURE_HASH_ALGORITHMS, MS_NOTIFY_STATUS,
 	"INITIAL_CONTACT",
 	"SET_WINDOW_SIZE",
 	"ADDITIONAL_TS_POSSIBLE",
@@ -112,8 +112,9 @@ ENUM_NEXT(notify_type_names, INITIAL_CONTACT, FRAGMENTATION_SUPPORTED, MS_NOTIFY
 	"ERX_SUPPORTED",
 	"IFOM_CAPABILITY",
 	"SENDER_REQUEST_ID",
-	"FRAGMENTATION_SUPPORTED");
-ENUM_NEXT(notify_type_names, INITIAL_CONTACT_IKEV1, INITIAL_CONTACT_IKEV1, FRAGMENTATION_SUPPORTED,
+	"FRAGMENTATION_SUPPORTED",
+	"SIGNATURE_HASH_ALGORITHMS");
+ENUM_NEXT(notify_type_names, INITIAL_CONTACT_IKEV1, INITIAL_CONTACT_IKEV1, SIGNATURE_HASH_ALGORITHMS,
 	"INITIAL_CONTACT");
 ENUM_NEXT(notify_type_names, DPD_R_U_THERE, DPD_R_U_THERE_ACK, INITIAL_CONTACT_IKEV1,
 	"DPD_R_U_THERE",
@@ -174,7 +175,7 @@ ENUM_NEXT(notify_type_short_names, ME_CONNECT_FAILED, ME_CONNECT_FAILED, CHILD_S
 	"ME_CONN_FAIL");
 ENUM_NEXT(notify_type_short_names, MS_NOTIFY_STATUS, MS_NOTIFY_STATUS, ME_CONNECT_FAILED,
 	"MS_STATUS");
-ENUM_NEXT(notify_type_short_names, INITIAL_CONTACT, FRAGMENTATION_SUPPORTED, MS_NOTIFY_STATUS,
+ENUM_NEXT(notify_type_short_names, INITIAL_CONTACT, SIGNATURE_HASH_ALGORITHMS, MS_NOTIFY_STATUS,
 	"INIT_CONTACT",
 	"SET_WINSIZE",
 	"ADD_TS_POSS",
@@ -221,8 +222,9 @@ ENUM_NEXT(notify_type_short_names, INITIAL_CONTACT, FRAGMENTATION_SUPPORTED, MS_
 	"ERX_SUP",
 	"IFOM_CAP",
 	"SENDER_REQ_ID",
-	"FRAG_SUP");
-ENUM_NEXT(notify_type_short_names, INITIAL_CONTACT_IKEV1, INITIAL_CONTACT_IKEV1, FRAGMENTATION_SUPPORTED,
+	"FRAG_SUP",
+	"HASH_ALG");
+ENUM_NEXT(notify_type_short_names, INITIAL_CONTACT_IKEV1, INITIAL_CONTACT_IKEV1, SIGNATURE_HASH_ALGORITHMS,
 	"INITIAL_CONTACT");
 ENUM_NEXT(notify_type_short_names, DPD_R_U_THERE, DPD_R_U_THERE_ACK, INITIAL_CONTACT_IKEV1,
 	"DPD",
@@ -258,7 +260,7 @@ struct private_notify_payload_t {
 	/**
 	 * Next payload type.
 	 */
-	u_int8_t  next_payload;
+	uint8_t  next_payload;
 
 	/**
 	 * Critical flag.
@@ -273,27 +275,27 @@ struct private_notify_payload_t {
 	/**
 	 * Length of this payload.
 	 */
-	u_int16_t payload_length;
+	uint16_t payload_length;
 
 	/**
 	 * Domain of interpretation, IKEv1 only.
 	 */
-	u_int32_t doi;
+	uint32_t doi;
 
 	/**
 	 * Protocol id.
 	 */
-	u_int8_t protocol_id;
+	uint8_t protocol_id;
 
 	/**
 	 * Spi size.
 	 */
-	u_int8_t spi_size;
+	uint8_t spi_size;
 
 	/**
 	 * Notify message type.
 	 */
-	u_int16_t notify_type;
+	uint16_t notify_type;
 
 	/**
 	 * Security parameter index (spi).
@@ -473,6 +475,14 @@ METHOD(payload_t, verify, status_t,
 			}
 			break;
 		}
+		case SIGNATURE_HASH_ALGORITHMS:
+		{
+			if (this->notify_data.len % 2)
+			{
+				bad_length = TRUE;
+			}
+			break;
+		}
 		case AUTH_LIFETIME:
 		{
 			if (this->notify_data.len != 4)
@@ -586,14 +596,14 @@ METHOD(payload_t, get_length, size_t,
 	return this->payload_length;
 }
 
-METHOD(notify_payload_t, get_protocol_id, u_int8_t,
+METHOD(notify_payload_t, get_protocol_id, uint8_t,
 	private_notify_payload_t *this)
 {
 	return this->protocol_id;
 }
 
 METHOD(notify_payload_t, set_protocol_id, void,
-	private_notify_payload_t *this, u_int8_t protocol_id)
+	private_notify_payload_t *this, uint8_t protocol_id)
 {
 	this->protocol_id = protocol_id;
 }
@@ -610,7 +620,7 @@ METHOD(notify_payload_t, set_notify_type, void,
 	this->notify_type = notify_type;
 }
 
-METHOD(notify_payload_t, get_spi, u_int32_t,
+METHOD(notify_payload_t, get_spi, uint32_t,
 	private_notify_payload_t *this)
 {
 	switch (this->protocol_id)
@@ -619,7 +629,7 @@ METHOD(notify_payload_t, get_spi, u_int32_t,
 		case PROTO_ESP:
 			if (this->spi.len == 4)
 			{
-				return *((u_int32_t*)this->spi.ptr);
+				return *((uint32_t*)this->spi.ptr);
 			}
 		default:
 			break;
@@ -628,7 +638,7 @@ METHOD(notify_payload_t, get_spi, u_int32_t,
 }
 
 METHOD(notify_payload_t, set_spi, void,
-	private_notify_payload_t *this, u_int32_t spi)
+	private_notify_payload_t *this, uint32_t spi)
 {
 	chunk_free(&this->spi);
 	switch (this->protocol_id)
@@ -636,7 +646,7 @@ METHOD(notify_payload_t, set_spi, void,
 		case PROTO_AH:
 		case PROTO_ESP:
 			this->spi = chunk_alloc(4);
-			*((u_int32_t*)this->spi.ptr) = spi;
+			*((uint32_t*)this->spi.ptr) = spi;
 			break;
 		default:
 			break;
