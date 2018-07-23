@@ -1,3 +1,9 @@
+strongswan (5.5.1-4+deb9u2pexip2) pexip; urgency=medium
+
+  * Build-Depend on libssl 1.0.x
+
+ -- John-Mark Bell <jmb@pexip.com>  Mon, 23 Jul 2018 16:04:25 +0100
+
 strongswan (5.5.1-4+deb9u2pexip1) pexip; urgency=medium
 
   * Migrate to Stretch
