@@ -1,0 +1,4 @@
+rm_conffile /etc/logcheck/ignore.d.paranoid/strongswan 5.5.1-4+deb9u2pexip2~ libstrongswan
+rm_conffile /etc/logcheck/ignore.d.server/strongswan 5.5.1-4+deb9u2pexip2~ libstrongswan
+rm_conffile /etc/logcheck/ignore.d.workstation/strongswan 5.5.1-4+deb9u2pexip2~ libstrongswan
+rm_conffile /etc/logcheck/violations.ignore.d/strongswan 5.5.1-4+deb9u2pexip2~ libstrongswan
