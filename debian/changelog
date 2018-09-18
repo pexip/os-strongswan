@@ -1,3 +1,11 @@
+strongswan (5.5.1-4+deb9u3) stretch-security; urgency=medium
+
+  * d/p/CVE-2018-16151+CVE-2018-16152_gmp-pkcs1-verify added
+    fix potential Bleichenbacher's low-exponent attack (CVE-2018-16151,
+    CVE-2018-16152)
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Tue, 18 Sep 2018 21:32:10 +0200
+
 strongswan (5.5.1-4+deb9u2) stretch-security; urgency=medium
 
   * debian/patches:
