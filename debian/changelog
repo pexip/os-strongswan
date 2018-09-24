@@ -1,3 +1,17 @@
+strongswan (5.5.1-4+deb9u3pexip1) pexip; urgency=medium
+
+  * New upstream release
+
+ -- John-Mark Bell <jmb@pexip.com>  Mon, 24 Sep 2018 16:00:43 +0100
+
+strongswan (5.5.1-4+deb9u3) stretch-security; urgency=medium
+
+  * d/p/CVE-2018-16151+CVE-2018-16152_gmp-pkcs1-verify added
+    fix potential Bleichenbacher's low-exponent attack (CVE-2018-16151,
+    CVE-2018-16152)
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Tue, 18 Sep 2018 21:32:10 +0200
+
 strongswan (5.5.1-4+deb9u2pexip2) pexip; urgency=medium
 
   * Build-Depend on libssl 1.0.x
