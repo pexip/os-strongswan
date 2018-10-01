@@ -7,3 +7,4 @@ CVE-2017-11185.patch
 CVE-2018-10811.patch
 CVE-2018-5388.patch
 CVE-2018-16151+CVE-2018-16152_gmp-pkcs1-verify.patch
+CVE-2018-17540_gmp-pkcs1-overflow.patch
