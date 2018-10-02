@@ -1,3 +1,18 @@
+strongswan (5.5.1-4+deb9u4pexip1) pexip; urgency=medium
+
+  * New upstream release
+
+ -- John-Mark Bell <jmb@pexip.com>  Tue, 02 Oct 2018 10:25:57 +0100
+
+strongswan (5.5.1-4+deb9u4) stretch-security; urgency=medium
+
+  * d/p/CVE-2018-17540_gmp-pkcs1-overflow added, fix an integer underflow and
+    subsequent heap buffer overflow vulnerability in the gmp plugin triggered
+    by crafted certificates with RSA keys with very small moduli
+    (CVE-2018-17540)
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Mon, 01 Oct 2018 22:51:38 +0200
+
 strongswan (5.5.1-4+deb9u3pexip1) pexip; urgency=medium
 
   * New upstream release
