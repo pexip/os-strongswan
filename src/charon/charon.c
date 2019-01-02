@@ -1,9 +1,9 @@
 /*
- * Copyright (C) 2006-2012 Tobias Brunner
+ * Copyright (C) 2006-2017 Tobias Brunner
  * Copyright (C) 2005-2009 Martin Willi
  * Copyright (C) 2006 Daniel Roethlisberger
  * Copyright (C) 2005 Jan Hutter
- * Hochschule fuer Technik Rapperswil
+ * HSR Hochschule fuer Technik Rapperswil
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -57,16 +57,6 @@
  * Global reference to PID file (required to truncate, if undeletable)
  */
 static FILE *pidfile = NULL;
-
-/**
- * Log levels as defined via command line arguments
- */
-static level_t levels[DBG_MAX];
-
-/**
- * Whether to only use syslog when logging
- */
-static bool use_syslog = FALSE;
 
 /**
  * hook in library for debugging messages
@@ -126,7 +116,7 @@ static void run()
 					 "configuration");
 				if (lib->settings->load_files(lib->settings, lib->conf, FALSE))
 				{
-					charon->load_loggers(charon, levels, !use_syslog);
+					charon->load_loggers(charon);
 					lib->plugins->reload(lib->plugins, NULL);
 				}
 				else
@@ -213,8 +203,10 @@ static bool check_pidfile()
 				pid = atoi(buf);
 			}
 			fclose(pidfile);
-			if (pid && kill(pid, 0) == 0)
-			{	/* such a process is running */
+			pidfile = NULL;
+			if (pid && pid != getpid() && kill(pid, 0) == 0)
+			{
+				DBG1(DBG_DMN, "charon already running ('"PID_FILE"' exists)");
 				return TRUE;
 			}
 		}
@@ -229,18 +221,43 @@ static bool check_pidfile()
 		int fd;
 
 		fd = fileno(pidfile);
-		if (fd == -1 || fcntl(fd, F_SETFD, FD_CLOEXEC) == -1)
+		if (fd == -1)
+		{
+			DBG1(DBG_DMN, "unable to determine fd for '"PID_FILE"'");
+			return TRUE;
+		}
+		if (fcntl(fd, F_SETFD, FD_CLOEXEC) == -1)
 		{
 			DBG1(DBG_LIB, "setting FD_CLOEXEC for '"PID_FILE"' failed: %s",
 				 strerror(errno));
 		}
-		ignore_result(fchown(fileno(pidfile),
-							 lib->caps->get_uid(lib->caps),
-							 lib->caps->get_gid(lib->caps)));
+		/* Only change owner of the pidfile if we have CAP_CHOWN. Otherwise,
+		 * attempt to change group of pidfile to group under which charon
+		 * runs after dropping caps. This requires the user that charon
+		 * starts as to:
+		 * a) Have write access to the socket dir.
+		 * b) Belong to the group that charon will run under after dropping
+		 *    caps. */
+		if (lib->caps->check(lib->caps, CAP_CHOWN))
+		{
+			ignore_result(fchown(fd,
+								 lib->caps->get_uid(lib->caps),
+								 lib->caps->get_gid(lib->caps)));
+		}
+		else
+		{
+			ignore_result(fchown(fd, -1,
+								 lib->caps->get_gid(lib->caps)));
+		}
 		fprintf(pidfile, "%d\n", getpid());
 		fflush(pidfile);
+		return FALSE;
 	}
-	return FALSE;
+	else
+	{
+		DBG1(DBG_DMN, "unable to create pidfile '"PID_FILE"'");
+		return TRUE;
+	}
 }
 
 /**
@@ -256,8 +273,8 @@ static void unlink_pidfile()
 	{
 		ignore_result(ftruncate(fileno(pidfile), 0));
 		fclose(pidfile);
+		unlink(PID_FILE);
 	}
-	unlink(PID_FILE);
 }
 
 /**
@@ -289,6 +306,8 @@ int main(int argc, char *argv[])
 	struct sigaction action;
 	int group, status = SS_RC_INITIALIZATION_FAILED;
 	struct utsname utsname;
+	level_t levels[DBG_MAX];
+	bool use_syslog = FALSE;
 
 	/* logging for library during initialization, as we have no bus yet */
 	dbg = dbg_stderr;
@@ -382,7 +401,8 @@ int main(int argc, char *argv[])
 		goto deinit;
 	}
 
-	charon->load_loggers(charon, levels, !use_syslog);
+	charon->set_default_loggers(charon, levels, !use_syslog);
+	charon->load_loggers(charon);
 
 	if (uname(&utsname) != 0)
 	{
@@ -409,7 +429,6 @@ int main(int argc, char *argv[])
 
 	if (check_pidfile())
 	{
-		DBG1(DBG_DMN, "charon already running (\""PID_FILE"\" exists)");
 		goto deinit;
 	}
 
@@ -441,12 +460,11 @@ int main(int argc, char *argv[])
 	/* main thread goes to run loop */
 	run();
 
-	/* normal termination, cleanup and exit */
-	unlink_pidfile();
 	status = 0;
 
 deinit:
 	libcharon_deinit();
+	unlink_pidfile();
 	library_deinit();
 	return status;
 }

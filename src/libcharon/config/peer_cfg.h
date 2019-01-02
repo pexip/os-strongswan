@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007-2016 Tobias Brunner
+ * Copyright (C) 2007-2018 Tobias Brunner
  * Copyright (C) 2005-2009 Martin Willi
  * Copyright (C) 2005 Jan Hutter
  * HSR Hochschule fuer Technik Rapperswil
@@ -32,7 +32,7 @@ typedef struct peer_cfg_create_t peer_cfg_create_t;
 #include <utils/identification.h>
 #include <collections/enumerator.h>
 #include <selectors/traffic_selector.h>
-#include <config/proposal.h>
+#include <crypto/proposal/proposal.h>
 #include <config/ike_cfg.h>
 #include <config/child_cfg.h>
 #include <credentials/auth_cfg.h>
@@ -157,11 +157,9 @@ struct peer_cfg_t {
 	/**
 	 * Replace the CHILD configs with those in the given PEER config.
 	 *
-	 * Configs that are equal are not replaced.
-	 *
 	 * The enumerator enumerates the removed and added CHILD configs
 	 * (child_cfg_t*, bool), where the flag is FALSE for removed configs and
-	 * TRUE for added configs.
+	 * TRUE for added configs. Configs that are equal are not enumerated.
 	 *
 	 * @param other			other config to get CHILD configs from
 	 * @return				an enumerator over removed/added CHILD configs
@@ -313,20 +311,34 @@ struct peer_cfg_t {
 	 */
 	enumerator_t* (*create_pool_enumerator)(peer_cfg_t *this);
 
+	/**
+	 * Get the PPK ID to use with this peer.
+	 *
+	 * @return				PPK id
+	 */
+	identification_t *(*get_ppk_id)(peer_cfg_t *this);
+
+	/**
+	 * Whether a PPK is required with this peer.
+	 *
+	 * @return				TRUE, if a PPK is required
+	 */
+	bool (*ppk_required)(peer_cfg_t *this);
+
 #ifdef ME
 	/**
 	 * Is this a mediation connection?
 	 *
 	 * @return				TRUE, if this is a mediation connection
 	 */
-	bool (*is_mediation) (peer_cfg_t *this);
+	bool (*is_mediation)(peer_cfg_t *this);
 
 	/**
-	 * Get peer_cfg of the connection this one is mediated through.
+	 * Get name of the connection this one is mediated through.
 	 *
-	 * @return				the peer_cfg of the mediation connection
+	 * @return				the name of the mediation connection
 	 */
-	peer_cfg_t* (*get_mediated_by) (peer_cfg_t *this);
+	char* (*get_mediated_by)(peer_cfg_t *this);
 
 	/**
 	 * Get the id of the other peer at the mediation server.
@@ -338,7 +350,7 @@ struct peer_cfg_t {
 	 *
 	 * @return				the id of the other peer
 	 */
-	identification_t* (*get_peer_id) (peer_cfg_t *this);
+	identification_t* (*get_peer_id)(peer_cfg_t *this);
 #endif /* ME */
 
 	/**
@@ -395,11 +407,15 @@ struct peer_cfg_create_t {
 	uint32_t dpd;
 	/** DPD timeout interval (IKEv1 only), if 0 default applies */
 	uint32_t dpd_timeout;
+	/** Postquantum Preshared Key ID (adopted) */
+	identification_t *ppk_id;
+	/** TRUE if a PPK is required, FALSE if it's optional */
+	bool ppk_required;
 #ifdef ME
 	/** TRUE if this is a mediation connection */
 	bool mediation;
-	/** peer_cfg_t of the mediation connection to mediate through (adopted) */
-	peer_cfg_t *mediated_by;
+	/** peer_cfg_t of the mediation connection to mediate through (cloned) */
+	char *mediated_by;
 	/** ID that identifies our peer at the mediation server (adopted) */
 	identification_t *peer_id;
 #endif /* ME */

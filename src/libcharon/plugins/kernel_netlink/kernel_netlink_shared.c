@@ -2,7 +2,7 @@
  * Copyright (C) 2014 Martin Willi
  * Copyright (C) 2014 revosec AG
  * Copyright (C) 2008 Tobias Brunner
- * Hochschule fuer Technik Rapperswil
+ * HSR Hochschule fuer Technik Rapperswil
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -13,6 +13,29 @@
  * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
  * or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * for more details.
+ */
+
+/*
+ * Copyright (C) 2016 secunet Security Networks AG
+ * Copyright (C) 2016 Thomas Egerer
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
  */
 
 #include <sys/socket.h>
@@ -242,9 +265,10 @@ static bool read_and_queue(private_netlink_socket_t *this, bool block)
 {
 	struct nlmsghdr *hdr;
 	char buf[this->buflen];
-	ssize_t len;
+	ssize_t len, read_len;
+	bool wipe = FALSE;
 
-	len = read_msg(this, buf, sizeof(buf), block);
+	len = read_len = read_msg(this, buf, sizeof(buf), block);
 	if (len == -1)
 	{
 		return TRUE;
@@ -254,12 +278,21 @@ static bool read_and_queue(private_netlink_socket_t *this, bool block)
 		hdr = (struct nlmsghdr*)buf;
 		while (NLMSG_OK(hdr, len))
 		{
+			if (this->protocol == NETLINK_XFRM &&
+				hdr->nlmsg_type == XFRM_MSG_NEWSA)
+			{	/* wipe potential IPsec SA keys */
+				wipe = TRUE;
+			}
 			if (!queue(this, hdr))
 			{
 				break;
 			}
 			hdr = NLMSG_NEXT(hdr, len);
 		}
+	}
+	if (wipe)
+	{
+		memwipe(buf, read_len);
 	}
 	return FALSE;
 }
@@ -281,8 +314,9 @@ static status_t send_once(private_netlink_socket_t *this, struct nlmsghdr *in,
 						  uintptr_t seq, struct nlmsghdr **out, size_t *out_len)
 {
 	struct nlmsghdr *hdr;
-	chunk_t result = {};
 	entry_t *entry;
+	u_char *ptr;
+	int i;
 
 	in->nlmsg_seq = seq;
 	in->nlmsg_pid = getpid();
@@ -309,7 +343,8 @@ static status_t send_once(private_netlink_socket_t *this, struct nlmsghdr *in,
 	while (!entry->complete)
 	{
 		if (this->parallel &&
-			lib->watcher->get_state(lib->watcher) != WATCHER_STOPPED)
+			lib->watcher->get_state(lib->watcher) != WATCHER_STOPPED &&
+			lib->processor->get_total_threads(lib->processor))
 		{
 			if (this->timeout)
 			{
@@ -343,6 +378,14 @@ static status_t send_once(private_netlink_socket_t *this, struct nlmsghdr *in,
 		return OUT_OF_RES;
 	}
 
+	for (i = 0, *out_len = 0; i < array_count(entry->hdrs); i++)
+	{
+		array_get(entry->hdrs, i, &hdr);
+		*out_len += NLMSG_ALIGN(hdr->nlmsg_len);
+	}
+	ptr = malloc(*out_len);
+	*out = (struct nlmsghdr*)ptr;
+
 	while (array_remove(entry->hdrs, ARRAY_HEAD, &hdr))
 	{
 		if (this->names)
@@ -350,14 +393,11 @@ static status_t send_once(private_netlink_socket_t *this, struct nlmsghdr *in,
 			DBG3(DBG_KNL, "received %N %u: %b", this->names, hdr->nlmsg_type,
 				 hdr->nlmsg_seq, hdr, hdr->nlmsg_len);
 		}
-		result = chunk_cat("mm", result,
-						   chunk_create((char*)hdr, hdr->nlmsg_len));
+		memcpy(ptr, hdr, hdr->nlmsg_len);
+		ptr += NLMSG_ALIGN(hdr->nlmsg_len);
+		free(hdr);
 	}
 	destroy_entry(entry);
-
-	*out_len = result.len;
-	*out = (struct nlmsghdr*)result.ptr;
-
 	return SUCCESS;
 }
 
@@ -547,8 +587,31 @@ METHOD(netlink_socket_t, destroy, void,
 	free(this);
 }
 
-/**
- * Described in header.
+/*
+ * Described in header
+ */
+u_int netlink_get_buflen()
+{
+	u_int buflen;
+
+	buflen = lib->settings->get_int(lib->settings,
+								"%s.plugins.kernel-netlink.buflen", 0, lib->ns);
+	if (!buflen)
+	{
+		long pagesize = sysconf(_SC_PAGESIZE);
+
+		if (pagesize == -1)
+		{
+			pagesize = 4096;
+		}
+		/* base this on NLMSG_GOODSIZE */
+		buflen = min(pagesize, 8192);
+	}
+	return buflen;
+}
+
+/*
+ * Described in header
  */
 netlink_socket_t *netlink_socket_create(int protocol, enum_name_t *names,
 										bool parallel)
@@ -557,6 +620,8 @@ netlink_socket_t *netlink_socket_create(int protocol, enum_name_t *names,
 	struct sockaddr_nl addr = {
 		.nl_family = AF_NETLINK,
 	};
+	bool force_buf = FALSE;
+	int rcvbuf_size = 0;
 
 	INIT(this,
 		.public = {
@@ -570,8 +635,7 @@ netlink_socket_t *netlink_socket_create(int protocol, enum_name_t *names,
 		.entries = hashtable_create(hashtable_hash_ptr, hashtable_equals_ptr, 4),
 		.protocol = protocol,
 		.names = names,
-		.buflen = lib->settings->get_int(lib->settings,
-							"%s.plugins.kernel-netlink.buflen", 0, lib->ns),
+		.buflen = netlink_get_buflen(),
 		.timeout = lib->settings->get_int(lib->settings,
 							"%s.plugins.kernel-netlink.timeout", 0, lib->ns),
 		.retries = lib->settings->get_int(lib->settings,
@@ -582,16 +646,6 @@ netlink_socket_t *netlink_socket_create(int protocol, enum_name_t *names,
 		.parallel = parallel,
 	);
 
-	if (!this->buflen)
-	{
-		long pagesize = sysconf(_SC_PAGESIZE);
-		if (pagesize == -1)
-		{
-			pagesize = 4096;
-		}
-		/* base this on NLMSG_GOODSIZE */
-		this->buflen = min(pagesize, 8192);
-	}
 	if (this->socket == -1)
 	{
 		DBG1(DBG_KNL, "unable to create netlink socket: %s (%d)",
@@ -605,6 +659,25 @@ netlink_socket_t *netlink_socket_create(int protocol, enum_name_t *names,
 			 strerror(errno), errno);
 		destroy(this);
 		return NULL;
+	}
+	rcvbuf_size = lib->settings->get_int(lib->settings,
+						"%s.plugins.kernel-netlink.receive_buffer_size",
+						rcvbuf_size, lib->ns);
+	if (rcvbuf_size)
+	{
+		int optname;
+
+		force_buf = lib->settings->get_bool(lib->settings,
+						"%s.plugins.kernel-netlink.force_receive_buffer_size",
+						force_buf, lib->ns);
+		optname = force_buf ? SO_RCVBUFFORCE : SO_RCVBUF;
+
+		if (setsockopt(this->socket, SOL_SOCKET, optname, &rcvbuf_size,
+					   sizeof(rcvbuf_size)) == -1)
+		{
+			DBG1(DBG_KNL, "failed to %supdate receive buffer size to %d: %s",
+					force_buf ? "forcibly " : "", rcvbuf_size, strerror(errno));
+		}
 	}
 	if (this->parallel)
 	{

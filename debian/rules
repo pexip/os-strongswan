@@ -6,8 +6,10 @@ export DEB_BUILD_MAINT_OPTIONS=hardening=+all
 CONFIGUREARGS := --libdir=/usr/lib --libexecdir=/usr/lib \
 		--enable-addrblock \
 		--enable-agent \
+		--enable-bypass-lan \
 		--enable-ccm \
 		--enable-certexpire \
+		--enable-chapoly \
 		--enable-cmd \
 		--enable-ctr \
 		--enable-curl \
@@ -31,6 +33,7 @@ CONFIGUREARGS := --libdir=/usr/lib --libexecdir=/usr/lib \
 		--enable-openssl \
 		--enable-pkcs11 \
 		--enable-test-vectors \
+		--enable-tpm \
 		--enable-unity \
 		--enable-xauth-eap \
 		--enable-xauth-pam \
@@ -41,7 +44,7 @@ CONFIGUREARGS := --libdir=/usr/lib --libexecdir=/usr/lib \
 	# And for --enable-eap-sim we would need the library, which we don't
 	# have right now.
 	# Don't --enable-cisco-quirks, because some other IPsec implementations
-	# (most notably the Phion one) have problems connecting when pluto 
+	# (most notably the Phion one) have problems connecting when pluto
 	# sends these Cisco options.
 	# don't enable medsrv/medcli right now (20160523) since clearsilver FTBFS
 	#--enable-medsrv --enable-medcli \
@@ -51,15 +54,15 @@ include /usr/share/dpkg/architecture.mk
 
 # the padlock plugin only makes sense on i386
 # AESNI and RdRand only make sense on i386 and amd64
-ifeq ($(DEB_BUILD_ARCH_CPU),i386)
+ifeq ($(DEB_HOST_ARCH_CPU),i386)
   CONFIGUREARGS += --enable-padlock --enable-rdrand --enable-aesni
 endif
 
-ifeq ($(DEB_BUILD_ARCH_CPU),amd64)
+ifeq ($(DEB_HOST_ARCH_CPU),amd64)
   CONFIGUREARGS += --enable-rdrand --enable-aesni
 endif
 
-ifeq ($(DEB_BUILD_ARCH_OS),linux)
+ifeq ($(DEB_HOST_ARCH_OS),linux)
 	# only enable network-manager and capabilities dropping on linux hosts
 	# some plugins are linux-only too
 	CONFIGUREARGS += --enable-nm \
@@ -72,7 +75,7 @@ ifeq ($(DEB_BUILD_ARCH_OS),linux)
 		--enable-systemd --enable-swanctl
 endif
 
-ifeq ($(DEB_BUILD_ARCH_OS),kfreebsd)
+ifeq ($(DEB_HOST_ARCH_OS),kfreebsd)
 	# recommended configure line for FreeBSD
 	# http://wiki.strongswan.org/projects/strongswan/wiki/FreeBSD
 	CONFIGUREARGS += --disable-kernel-netlink \
@@ -101,9 +104,11 @@ override_dh_auto_clean:
 
 
 override_dh_install-arch:
+	# remove all .la files
+	find debian/tmp/usr/lib -name '*.la' -delete
 
 	# first special cases
-ifeq ($(DEB_BUILD_ARCH_OS),linux)
+ifeq ($(DEB_HOST_ARCH_OS),linux)
 	# handle Linux-only plugins
 	dh_install -p libstrongswan-standard-plugins usr/lib/ipsec/plugins/libstrongswan-connmark.so
 	dh_install -p libstrongswan-standard-plugins usr/share/strongswan/templates/config/plugins/connmark.conf
@@ -127,7 +132,7 @@ ifeq ($(DEB_BUILD_ARCH_OS),linux)
 	dh_install -p strongswan-starter lib/systemd/system/strongswan.service
 endif
 
-ifeq ($(DEB_BUILD_ARCH_OS),kfreebsd)
+ifeq ($(DEB_HOST_ARCH_OS),kfreebsd)
 	# handle FreeBSD-only plugins
 	dh_install -p libstrongswan usr/lib/ipsec/plugins/libstrongswan-kernel-pfkey.so
 	dh_install -p libstrongswan usr/share/strongswan/templates/config/plugins/kernel-pfkey.conf
@@ -138,7 +143,7 @@ ifeq ($(DEB_BUILD_ARCH_OS),kfreebsd)
 	dh_install -p libstrongswan etc/strongswan.d/charon/kernel-pfroute.conf
 endif
 
-ifeq ($(DEB_BUILD_ARCH_CPU),i386)
+ifeq ($(DEB_HOST_ARCH_CPU),i386)
 	# special handling for padlock, as it is only built on i386
 	dh_install -p libstrongswan-extra-plugins usr/lib/ipsec/plugins/libstrongswan-padlock.so
 	dh_install -p libstrongswan-extra-plugins usr/share/strongswan/templates/config/plugins/padlock.conf
@@ -153,7 +158,7 @@ ifeq ($(DEB_BUILD_ARCH_CPU),i386)
 	dh_install -p libstrongswan-standard-plugins etc/strongswan.d/charon/aesni.conf
 endif
 
-ifeq ($(DEB_BUILD_ARCH_CPU), amd64)
+ifeq ($(DEB_HOST_ARCH_CPU), amd64)
 	dh_install -p libstrongswan-extra-plugins usr/lib/ipsec/plugins/libstrongswan-rdrand.so
 	dh_install -p libstrongswan-extra-plugins usr/share/strongswan/templates/config/plugins/rdrand.conf
 	dh_install -p libstrongswan-extra-plugins etc/strongswan.d/charon/rdrand.conf
@@ -164,7 +169,7 @@ ifeq ($(DEB_BUILD_ARCH_CPU), amd64)
 endif
 
 	# then install the rest, ignoring the above
-	dh_install --fail-missing \
+	dh_install \
 		-X\.la -X\.a \
 		-Xmedsrv -Xman3 \
 		-Xlibstrongswan-connmark.so -X connmark.conf \
@@ -181,6 +186,8 @@ endif
 	dh_apparmor --profile-name=usr.lib.ipsec.charon -p strongswan-charon
 	dh_apparmor --profile-name=usr.lib.ipsec.lookip -p libcharon-extra-plugins
 	dh_apparmor --profile-name=usr.lib.ipsec.stroke -p strongswan-starter
+	dh_apparmor --profile-name=usr.sbin.swanctl -p strongswan-swanctl
+	dh_apparmor --profile-name=usr.sbin.charon-systemd -p charon-systemd
 
 	# add additional files not covered by upstream makefile...
 	install --mode=0600 $(CURDIR)/debian/ipsec.secrets.proto $(CURDIR)/debian/strongswan-starter/etc/ipsec.secrets
@@ -191,10 +198,15 @@ endif
 	sed -r 's/^[ \t]+# *charonstart=(yes|no) */\tcharonstart=yes/' < $(CURDIR)/debian/strongswan-starter/etc/ipsec.conf > $(CURDIR)/debian/strongswan-starter/etc/ipsec.conf.tmp
 	mv $(CURDIR)/debian/strongswan-starter/etc/ipsec.conf.tmp $(CURDIR)/debian/strongswan-starter/etc/ipsec.conf
 
-	# set permissions on ipsec.secrets
+	# set permissions on ipsec.secrets and private key directories
 	chmod 600 $(CURDIR)/debian/strongswan-starter/etc/ipsec.secrets
 	chmod 700 -R $(CURDIR)/debian/strongswan-starter/etc/ipsec.d/private/
 	chmod 700 -R $(CURDIR)/debian/strongswan-starter/var/lib/strongswan/
+	chmod 700 -R $(CURDIR)/debian/strongswan-swanctl/etc/swanctl/bliss/
+	chmod 700 -R $(CURDIR)/debian/strongswan-swanctl/etc/swanctl/ecdsa/
+	chmod 700 -R $(CURDIR)/debian/strongswan-swanctl/etc/swanctl/pkcs8/
+	chmod 700 -R $(CURDIR)/debian/strongswan-swanctl/etc/swanctl/private/
+	chmod 700 -R $(CURDIR)/debian/strongswan-swanctl/etc/swanctl/rsa/
 
 	# this is handled by update-rc.d
 	rm -rf $(CURDIR)/debian/strongswan-starter/etc/rc?.d
@@ -217,7 +229,15 @@ override_dh_strip:
 	dh_strip --dbgsym-migration='strongswan-dbg (<< 5.3.5-2~)'
 
 override_dh_fixperms:
-	dh_fixperms -X etc/ipsec.secrets -X etc/ipsec.d -X var/lib/strongswan
+	dh_fixperms \
+		-X etc/ipsec.d \
+		-X etc/ipsec.secrets \
+		-X etc/swanctl/bliss \
+		-X etc/swanctl/ecdsa \
+		-X etc/swanctl/pkcs8 \
+		-X etc/swanctl/private \
+		-X etc/swanctl/rsa \
+		-X var/lib/strongswan
 
 override_dh_makeshlibs:
 	dh_makeshlibs -n -X usr/lib/ipsec/plugins
@@ -230,5 +250,11 @@ ifeq ($(DEB_BUILD_ARCH),amd64)
 	dh_auto_test
 endif
 
+override_dh_missing-arch:
+	dh_missing --fail-missing
+
+override_dh_missing-indep:
+	dh_missing --list-missing
+
 %:
-	dh $@ --parallel --with autoreconf,systemd
+	dh $@ --with systemd

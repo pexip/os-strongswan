@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2009 Andreas Steffen
- * Hochschule fuer Technik Rapperswil, Switzerland
+ * HSR Hochschule fuer Technik Rapperswil
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -19,7 +19,7 @@
 #include "proposal_keywords.h"
 
 const proposal_token_t* proposal_get_token_static(register const char *str,
-												  register unsigned int len);
+												  register size_t len);
 
 #endif /* PROPOSAL_KEYWORDS_STATIC_H_ */
 

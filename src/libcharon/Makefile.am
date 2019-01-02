@@ -14,7 +14,6 @@ config/backend_manager.c config/backend_manager.h config/backend.h \
 config/child_cfg.c config/child_cfg.h \
 config/ike_cfg.c config/ike_cfg.h \
 config/peer_cfg.c config/peer_cfg.h \
-config/proposal.c config/proposal.h \
 control/controller.c control/controller.h \
 daemon.c daemon.h \
 encoding/generator.c encoding/generator.h \
@@ -105,6 +104,7 @@ sa/ikev2/tasks/ike_delete.c sa/ikev2/tasks/ike_delete.h \
 sa/ikev2/tasks/ike_dpd.c sa/ikev2/tasks/ike_dpd.h \
 sa/ikev2/tasks/ike_init.c sa/ikev2/tasks/ike_init.h \
 sa/ikev2/tasks/ike_natd.c sa/ikev2/tasks/ike_natd.h \
+sa/ikev2/tasks/ike_mid_sync.c sa/ikev2/tasks/ike_mid_sync.h \
 sa/ikev2/tasks/ike_mobike.c sa/ikev2/tasks/ike_mobike.h \
 sa/ikev2/tasks/ike_rekey.c sa/ikev2/tasks/ike_rekey.h \
 sa/ikev2/tasks/ike_reauth.c sa/ikev2/tasks/ike_reauth.h \
@@ -118,6 +118,7 @@ endif
 if USE_IKEV1
 libcharon_la_SOURCES += \
 sa/ikev1/keymat_v1.c sa/ikev1/keymat_v1.h \
+sa/ikev1/iv_manager.c sa/ikev1/iv_manager.h \
 sa/ikev1/task_manager_v1.c sa/ikev1/task_manager_v1.h \
 sa/ikev1/authenticators/psk_v1_authenticator.c sa/ikev1/authenticators/psk_v1_authenticator.h \
 sa/ikev1/authenticators/pubkey_v1_authenticator.c sa/ikev1/authenticators/pubkey_v1_authenticator.h \
@@ -182,6 +183,15 @@ if USE_ME
     sa/ikev2/tasks/ike_me.c sa/ikev2/tasks/ike_me.h
 endif
 
+if STATIC_PLUGIN_CONSTRUCTORS
+BUILT_SOURCES = $(srcdir)/plugin_constructors.c
+CLEANFILES = $(srcdir)/plugin_constructors.c
+
+$(srcdir)/plugin_constructors.c: $(top_srcdir)/src/libstrongswan/plugins/plugin_constructors.py
+		$(AM_V_GEN) \
+		$(PYTHON) $(top_srcdir)/src/libstrongswan/plugins/plugin_constructors.py ${c_plugins} > $@
+endif
+
 # build optional plugins
 ########################
 
@@ -195,6 +205,13 @@ if USE_LOAD_TESTER
   SUBDIRS += plugins/load_tester
 if MONOLITHIC
   libcharon_la_LIBADD += plugins/load_tester/libstrongswan-load-tester.la
+endif
+endif
+
+if USE_SAVE_KEYS
+ SUBDIRS += plugins/save_keys
+if MONOLITHIC
+ libcharon_la_LIBADD += plugins/save_keys/libstrongswan-save-keys.la
 endif
 endif
 
@@ -226,6 +243,13 @@ if MONOLITHIC
 endif
 endif
 
+if USE_BYPASS_LAN
+  SUBDIRS += plugins/bypass_lan
+if MONOLITHIC
+  libcharon_la_LIBADD += plugins/bypass_lan/libstrongswan-bypass-lan.la
+endif
+endif
+
 if USE_FORECAST
   SUBDIRS += plugins/forecast
 if MONOLITHIC
@@ -237,6 +261,13 @@ if USE_FARP
   SUBDIRS += plugins/farp
 if MONOLITHIC
   libcharon_la_LIBADD += plugins/farp/libstrongswan-farp.la
+endif
+endif
+
+if USE_COUNTERS
+  SUBDIRS += plugins/counters
+if MONOLITHIC
+  libcharon_la_LIBADD += plugins/counters/libstrongswan-counters.la
 endif
 endif
 
@@ -349,6 +380,13 @@ if USE_EAP_AKA
   SUBDIRS += plugins/eap_aka
 if MONOLITHIC
   libcharon_la_LIBADD += plugins/eap_aka/libstrongswan-eap-aka.la
+endif
+endif
+
+if USE_EAP_AKA_3GPP
+  SUBDIRS += plugins/eap_aka_3gpp
+if MONOLITHIC
+  libcharon_la_LIBADD += plugins/eap_aka_3gpp/libstrongswan-eap-aka-3gpp.la
 endif
 endif
 
@@ -698,4 +736,12 @@ endif
 if MONOLITHIC
   SUBDIRS += .
 endif
+
+# build unit tests
+##################
+
 SUBDIRS += tests
+
+if USE_EAP_AKA_3GPP
+  SUBDIRS += plugins/eap_aka_3gpp/tests
+endif

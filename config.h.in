@@ -136,7 +136,7 @@
 /* Define to 1 if you have the `mmap' function. */
 #undef HAVE_MMAP
 
-/* have mpz_mown_sec() */
+/* have mpz_powm_sec() */
 #undef HAVE_MPZ_POWM_SEC
 
 /* Define to 1 if you have the <netinet6/ipsec.h> header file. */
@@ -190,14 +190,14 @@
 /* have GNU-style qsort_r() */
 #undef HAVE_QSORT_R_GNU
 
-/* Define to 1 if you have the `rb_errinfo' function. */
-#undef HAVE_RB_ERRINFO
-
 /* have netlink RTA_TABLE defined */
 #undef HAVE_RTA_TABLE
 
 /* have PF_ROUTE RTM_IFANNOUNCE defined */
 #undef HAVE_RTM_IFANNOUNCE
+
+/* Define to 1 if you have the `sd_listen_fds_with_names' function. */
+#undef HAVE_SD_LISTEN_FDS_WITH_NAMES
 
 /* Define to 1 if you have the `sem_timedwait' function. */
 #undef HAVE_SEM_TIMEDWAIT
@@ -313,26 +313,50 @@
 	STACK_DIRECTION = 0 => direction of growth unknown */
 #undef STACK_DIRECTION
 
+/* static plugin constructors */
+#undef STATIC_PLUGIN_CONSTRUCTORS
+
 /* Define to 1 if you have the ANSI C header files. */
 #undef STDC_HEADERS
 
 /* Define to 1 if strerror_r returns char *. */
 #undef STRERROR_R_CHAR_P
 
+/* use TSS2 v2 Extended System API */
+#undef TSS2_ESYS
+
+/* use TSS2 v2 System API */
+#undef TSS2_SYS
+
+/* use TCTI Sockets */
+#undef TSS2_TCTI_SOCKET
+
+/* use TCTI Access Broker and Resource Mamager */
+#undef TSS2_TCTI_TABRMD
+
 /* use TrouSerS library libtspi */
 #undef TSS_TROUSERS
 
-/* use TSS 2.0 libraries */
-#undef TSS_TSS2
+/* use TSS 2.0 v1 libraries */
+#undef TSS_TSS2_V1
+
+/* use TSS 2.0 v2 libraries */
+#undef TSS_TSS2_V2
 
 /* using builtin printf for printf hooks */
 #undef USE_BUILTIN_PRINTF
+
+/* build code for fuzzing */
+#undef USE_FUZZING
 
 /* support for IKEv1 protocol */
 #undef USE_IKEV1
 
 /* support for IKEv2 protocol */
 #undef USE_IKEV2
+
+/* build code for JSON */
+#undef USE_JSON
 
 /* use thread ID for thread identification, if available */
 #undef USE_THREAD_IDS
