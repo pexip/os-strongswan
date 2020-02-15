@@ -40,7 +40,7 @@ Build-Depends: bison,
                tzdata
 Homepage: http://www.strongswan.org
 XS-Testsuite: autopkgtest
-XS-Pexip-Upstream: http://ftp.debian.org/debian/ stretch
+XS-Pexip-Upstream: http://ftp.debian.org/debian/ buster
 
 Package: strongswan
 Architecture: all
