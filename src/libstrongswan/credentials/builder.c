@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2008 Martin Willi
- * Hochschule fuer Technik Rapperswil
+ * Copyright (C) 2016 Andreas Steffen
+ * HSR Hochschule fuer Technik Rapperswil
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -36,6 +37,7 @@ ENUM(builder_part_names, BUILD_FROM_FILE, BUILD_END,
 	"BUILD_NOT_BEFORE_TIME",
 	"BUILD_NOT_AFTER_TIME",
 	"BUILD_SERIAL",
+	"BUILD_SIGNATURE_SCHEME",
 	"BUILD_DIGEST_ALG",
 	"BUILD_ENCRYPTION_ALG",
 	"BUILD_AC_GROUP_STRINGS",
@@ -44,6 +46,7 @@ ENUM(builder_part_names, BUILD_FROM_FILE, BUILD_END,
 	"BUILD_CRL_DISTRIBUTION_POINTS",
 	"BUILD_OCSP_ACCESS_LOCATIONS",
 	"BUILD_PATHLEN",
+	"BUILD_ADDRBLOCKS",
 	"BUILD_PERMITTED_NAME_CONSTRAINTS",
 	"BUILD_EXCLUDED_NAME_CONSTRAINTS",
 	"BUILD_CERTIFICATE_POLICIES",
@@ -70,5 +73,7 @@ ENUM(builder_part_names, BUILD_FROM_FILE, BUILD_END,
 	"BUILD_SAFE_PRIMES",
 	"BUILD_SHARES",
 	"BUILD_THRESHOLD",
+	"BUILD_EDDSA_PUB",
+	"BUILD_EDDSA_PRIV_ASN1_DER",
 	"BUILD_END",
 );

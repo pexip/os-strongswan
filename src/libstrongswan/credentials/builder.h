@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2008 Martin Willi
- * Hochschule fuer Technik Rapperswil
+ * Copyright (C) 2016 Andreas Steffen
+ * HSR Hochschule fuer Technik Rapperswil
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -55,7 +56,7 @@ enum builder_part_t {
 	BUILD_BLOB_PEM,
 	/** OpenPGP key blob, chunk_t */
 	BUILD_BLOB_PGP,
-	/** DNS public key blob (RFC 4034, RSA specifc RFC 3110), chunk_t */
+	/** DNS public key blob (RFC 4034, RSA specific RFC 3110), chunk_t */
 	BUILD_BLOB_DNSKEY,
 	/** SSH public key blob (RFC 4253), chunk_t */
 	BUILD_BLOB_SSHKEY,
@@ -83,6 +84,8 @@ enum builder_part_t {
 	BUILD_NOT_AFTER_TIME,
 	/** a serial number in binary form, chunk_t */
 	BUILD_SERIAL,
+	/** signature scheme and parameters for signature, signature_params_t* */
+	BUILD_SIGNATURE_SCHEME,
 	/** digest algorithm to be used for signature, hash_algorithm_t */
 	BUILD_DIGEST_ALG,
 	/** encryption algorithm to use, encryption_algorithm_t */
@@ -99,6 +102,8 @@ enum builder_part_t {
 	BUILD_OCSP_ACCESS_LOCATIONS,
 	/** certificate path length constraint */
 	BUILD_PATHLEN,
+	/** RFC3779 addressBlock, linked_list_t* of traffic_selector_t* */
+	BUILD_ADDRBLOCKS,
 	/** permitted X509 name constraints, linked_list_t* of identification_t* */
 	BUILD_PERMITTED_NAME_CONSTRAINTS,
 	/** excluded X509 name constraints, linked_list_t* of identification_t* */
@@ -151,6 +156,10 @@ enum builder_part_t {
 	BUILD_SHARES,
 	/** minimum number of participating private key shares */
 	BUILD_THRESHOLD,
+	/** EdDSA public key blob */
+	BUILD_EDDSA_PUB,
+	/** DER encoded ASN.1 EdDSA private key */
+	BUILD_EDDSA_PRIV_ASN1_DER,
 	/** end of variable argument builder list */
 	BUILD_END,
 };

@@ -3,7 +3,7 @@
  * Copyright (C) 2005-2013 Martin Willi
  * Copyright (C) 2006 Daniel Roethlisberger
  * Copyright (C) 2005 Jan Hutter
- * Hochschule fuer Technik Rapperswil
+ * HSR Hochschule fuer Technik Rapperswil
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -38,11 +38,6 @@
  * Default loglevel
  */
 static level_t default_loglevel = LEVEL_CTRL;
-
-/**
- * Loglevel configuration
- */
-static level_t levels[DBG_MAX];
 
 /**
  * Connection to initiate
@@ -129,7 +124,7 @@ static int run()
 					 "configuration");
 				if (lib->settings->load_files(lib->settings, lib->conf, FALSE))
 				{
-					charon->load_loggers(charon, levels, TRUE);
+					charon->load_loggers(charon);
 					lib->plugins->reload(lib->plugins, NULL);
 				}
 				else
@@ -311,6 +306,7 @@ int main(int argc, char *argv[])
 {
 	struct sigaction action;
 	struct utsname utsname;
+	level_t levels[DBG_MAX];
 	int group;
 
 	/* handle simple arguments */
@@ -338,7 +334,8 @@ int main(int argc, char *argv[])
 	{
 		levels[group] = default_loglevel;
 	}
-	charon->load_loggers(charon, levels, TRUE);
+	charon->set_default_loggers(charon, levels, TRUE);
+	charon->load_loggers(charon);
 
 	if (!lookup_uid_gid())
 	{
@@ -351,6 +348,9 @@ int main(int argc, char *argv[])
 	{
 		exit(SS_RC_INITIALIZATION_FAILED);
 	}
+	/* register this again after loading plugins to avoid issues with libraries
+	 * that register atexit() handlers */
+	atexit(libcharon_deinit);
 	if (!lib->caps->drop(lib->caps))
 	{
 		exit(SS_RC_INITIALIZATION_FAILED);
@@ -361,9 +361,6 @@ int main(int argc, char *argv[])
 	creds = cmd_creds_create();
 	atexit(cleanup_creds);
 
-	/* handle all arguments */
-	handle_arguments(argc, argv, FALSE);
-
 	if (uname(&utsname) != 0)
 	{
 		memset(&utsname, 0, sizeof(utsname));
@@ -371,6 +368,9 @@ int main(int argc, char *argv[])
 	DBG1(DBG_DMN, "Starting charon-cmd IKE client (strongSwan %s, %s %s, %s)",
 		 VERSION, utsname.sysname, utsname.release, utsname.machine);
 	lib->plugins->status(lib->plugins, LEVEL_CTRL);
+
+	/* handle all arguments */
+	handle_arguments(argc, argv, FALSE);
 
 	/* add handler for SEGV and ILL,
 	 * INT, TERM and HUP are handled by sigwaitinfo() in run() */

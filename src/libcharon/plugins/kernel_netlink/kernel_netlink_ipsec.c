@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006-2016 Tobias Brunner
+ * Copyright (C) 2006-2018 Tobias Brunner
  * Copyright (C) 2005-2009 Martin Willi
  * Copyright (C) 2008-2016 Andreas Steffen
  * Copyright (C) 2006-2007 Fabian Hartmann, Noah Heusser
@@ -17,16 +17,40 @@
  * or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * for more details.
  */
+/*
+ * Copyright (C) 2018 Mellanox Technologies.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
 
 #define _GNU_SOURCE
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/ioctl.h>
 #include <stdint.h>
 #include <linux/ipsec.h>
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
 #include <linux/xfrm.h>
 #include <linux/udp.h>
+#include <linux/ethtool.h>
+#include <linux/sockios.h>
 #include <net/if.h>
 #include <unistd.h>
 #include <time.h>
@@ -76,10 +100,7 @@
 #endif
 
 /** Base priority for installed policies */
-#define PRIO_BASE 100000
-
-/** Default lifetime of an acquire XFRM state (in seconds) */
-#define DEFAULT_ACQUIRE_LIFETIME 165
+#define PRIO_BASE 200000
 
 /**
  * Map the limit for bytes and packets to XFRM_INF by default
@@ -117,7 +138,7 @@ struct kernel_algorithm_t {
 	/**
 	 * Name of the algorithm in linux crypto API
 	 */
-	char *name;
+	const char *name;
 };
 
 ENUM(xfrm_msg_names, XFRM_MSG_NEWSA, XFRM_MSG_MAPPING,
@@ -146,7 +167,7 @@ ENUM(xfrm_msg_names, XFRM_MSG_NEWSA, XFRM_MSG_MAPPING,
 	"XFRM_MSG_MAPPING"
 );
 
-ENUM(xfrm_attr_type_names, XFRMA_UNSPEC, XFRMA_REPLAY_ESN_VAL,
+ENUM(xfrm_attr_type_names, XFRMA_UNSPEC, XFRMA_OFFLOAD_DEV,
 	"XFRMA_UNSPEC",
 	"XFRMA_ALG_AUTH",
 	"XFRMA_ALG_CRYPT",
@@ -171,6 +192,11 @@ ENUM(xfrm_attr_type_names, XFRMA_UNSPEC, XFRMA_REPLAY_ESN_VAL,
 	"XFRMA_MARK",
 	"XFRMA_TFCPAD",
 	"XFRMA_REPLAY_ESN_VAL",
+	"XFRMA_SA_EXTRA_FLAGS",
+	"XFRMA_PROTO",
+	"XFRMA_ADDRESS_FILTER",
+	"XFRMA_PAD",
+	"XFRMA_OFFLOAD_DEV",
 );
 
 /**
@@ -221,6 +247,7 @@ static kernel_algorithm_t integrity_algs[] = {
 /*	{AUTH_DES_MAC,				"***"				}, */
 /*	{AUTH_KPDK_MD5,				"***"				}, */
 	{AUTH_AES_XCBC_96,			"xcbc(aes)"			},
+	{AUTH_AES_CMAC_96,			"cmac(aes)"			},
 };
 
 /**
@@ -234,9 +261,30 @@ static kernel_algorithm_t compression_algs[] = {
 };
 
 /**
+ * IPsec HW offload state in kernel
+ */
+typedef enum {
+	NL_OFFLOAD_UNKNOWN,
+	NL_OFFLOAD_UNSUPPORTED,
+	NL_OFFLOAD_SUPPORTED
+} nl_offload_state_t;
+
+/**
+ * Global metadata used for IPsec HW offload
+ */
+static struct {
+	/** bit in feature set */
+	u_int bit;
+	/** total number of device feature blocks */
+	u_int total_blocks;
+	/** determined HW offload state */
+	nl_offload_state_t state;
+} netlink_hw_offload;
+
+/**
  * Look up a kernel algorithm name and its key size
  */
-static char* lookup_algorithm(transform_type_t type, int ikev2)
+static const char* lookup_algorithm(transform_type_t type, int ikev2)
 {
 	kernel_algorithm_t *list;
 	int i, count;
@@ -544,10 +592,10 @@ static policy_sa_t *policy_sa_create(private_kernel_netlink_ipsec_t *this,
 /**
  * Destroy a policy_sa(_in)_t object
  */
-static void policy_sa_destroy(policy_sa_t *policy, policy_dir_t *dir,
+static void policy_sa_destroy(policy_sa_t *policy, policy_dir_t dir,
 							  private_kernel_netlink_ipsec_t *this)
 {
-	if (*dir == POLICY_OUT)
+	if (dir == POLICY_OUT)
 	{
 		policy_sa_out_t *out = (policy_sa_out_t*)policy;
 		out->src_ts->destroy(out->src_ts);
@@ -555,6 +603,16 @@ static void policy_sa_destroy(policy_sa_t *policy, policy_dir_t *dir,
 	}
 	ipsec_sa_destroy(this, policy->sa);
 	free(policy);
+}
+
+CALLBACK(policy_sa_destroy_cb, void,
+	policy_sa_t *policy, va_list args)
+{
+	private_kernel_netlink_ipsec_t *this;
+	policy_dir_t dir;
+
+	VA_ARGS_VGET(args, dir, this);
+	policy_sa_destroy(policy, dir, this);
 }
 
 typedef struct policy_entry_t policy_entry_t;
@@ -601,9 +659,8 @@ static void policy_entry_destroy(private_kernel_netlink_ipsec_t *this,
 	}
 	if (policy->used_by)
 	{
-		policy->used_by->invoke_function(policy->used_by,
-										(linked_list_invoke_t)policy_sa_destroy,
-										 &policy->direction, this);
+		policy->used_by->invoke_function(policy->used_by, policy_sa_destroy_cb,
+										 policy->direction, this);
 		policy->used_by->destroy(policy->used_by);
 	}
 	free(policy);
@@ -652,14 +709,15 @@ static inline uint32_t port_mask_bits(uint16_t port_mask)
 /**
  * Calculate the priority of a policy
  *
- * bits 0-0:  restriction to network interface (0..1)   1 bit
- * bits 1-6:  src + dst port mask bits (2 * 0..16)      6 bits
- * bits 7-7:  restriction to protocol (0..1)            1 bit
- * bits 8-16: src + dst network mask bits (2 * 0..128)  9 bits
- *                                                     17 bits
+ * bits 0-0:  separate trap and regular policies (0..1) 1 bit
+ * bits 1-1:  restriction to network interface (0..1)   1 bit
+ * bits 2-7:  src + dst port mask bits (2 * 0..16)      6 bits
+ * bits 8-8:  restriction to protocol (0..1)            1 bit
+ * bits 9-17: src + dst network mask bits (2 * 0..128)  9 bits
+ *                                                     18 bits
  *
- * smallest value: 000000000 0 000000 0:      0, lowest priority = 100'000
- * largest value : 100000000 1 100000 1: 65'729, highst priority =  34'271
+ * smallest value: 000000000 0 000000 0 0:       0, lowest priority = 200'000
+ * largest value : 100000000 1 100000 1 1: 131'459, highst priority =  68'541
  */
 static uint32_t get_priority(policy_entry_t *policy, policy_priority_t prio,
 							 char *interface)
@@ -672,8 +730,6 @@ static uint32_t get_priority(policy_entry_t *policy, policy_priority_t prio,
 			priority += PRIO_BASE;
 			/* fall-through to next case */
 		case POLICY_PRIORITY_ROUTED:
-			priority += PRIO_BASE;
-			/* fall-through to next case */
 		case POLICY_PRIORITY_DEFAULT:
 			priority += PRIO_BASE;
 			/* fall-through to next case */
@@ -684,10 +740,11 @@ static uint32_t get_priority(policy_entry_t *policy, policy_priority_t prio,
 	dport_mask_bits = port_mask_bits(policy->sel.dport_mask);
 
 	/* calculate priority */
-	priority -= (policy->sel.prefixlen_s + policy->sel.prefixlen_d) * 256;
-	priority -=  policy->sel.proto ? 128 : 0;
-	priority -= (sport_mask_bits + dport_mask_bits) * 2;
-	priority -= (interface != NULL);
+	priority -= (policy->sel.prefixlen_s + policy->sel.prefixlen_d) * 512;
+	priority -=  policy->sel.proto ? 256 : 0;
+	priority -= (sport_mask_bits + dport_mask_bits) * 4;
+	priority -= (interface != NULL) * 2;
+	priority -= (prio != POLICY_PRIORITY_ROUTED);
 
 	return priority;
 }
@@ -1074,7 +1131,7 @@ static void process_mapping(private_kernel_netlink_ipsec_t *this,
 static bool receive_events(private_kernel_netlink_ipsec_t *this, int fd,
 						   watcher_event_t event)
 {
-	char response[1024];
+	char response[netlink_get_buflen()];
 	struct nlmsghdr *hdr = (struct nlmsghdr*)response;
 	struct sockaddr_nl addr;
 	socklen_t addr_len = sizeof(addr);
@@ -1134,7 +1191,7 @@ static bool receive_events(private_kernel_netlink_ipsec_t *this, int fd,
 METHOD(kernel_ipsec_t, get_features, kernel_feature_t,
 	private_kernel_netlink_ipsec_t *this)
 {
-	return KERNEL_ESP_V3_TFC;
+	return KERNEL_ESP_V3_TFC | KERNEL_POLICY_SPI;
 }
 
 /**
@@ -1210,8 +1267,15 @@ METHOD(kernel_ipsec_t, get_spi, status_t,
 	private_kernel_netlink_ipsec_t *this, host_t *src, host_t *dst,
 	uint8_t protocol, uint32_t *spi)
 {
-	if (get_spi_internal(this, src, dst, protocol,
-						 0xc0000000, 0xcFFFFFFF, spi) != SUCCESS)
+	uint32_t spi_min, spi_max;
+
+	spi_min = lib->settings->get_int(lib->settings, "%s.spi_min",
+									 KERNEL_SPI_MIN, lib->ns);
+	spi_max = lib->settings->get_int(lib->settings, "%s.spi_max",
+									 KERNEL_SPI_MAX, lib->ns);
+
+	if (get_spi_internal(this, src, dst, protocol, min(spi_min, spi_max),
+						 max(spi_min, spi_max), spi) != SUCCESS)
 	{
 		DBG1(DBG_KNL, "unable to get SPI");
 		return FAILED;
@@ -1271,12 +1335,217 @@ static bool add_mark(struct nlmsghdr *hdr, int buflen, mark_t mark)
 	return TRUE;
 }
 
+/**
+ * Add a uint32 attribute to message
+ */
+static bool add_uint32(struct nlmsghdr *hdr, int buflen,
+					   enum xfrm_attr_type_t type, uint32_t value)
+{
+	uint32_t *xvalue;
+
+	xvalue = netlink_reserve(hdr, buflen, type, sizeof(*xvalue));
+	if (!xvalue)
+	{
+		return FALSE;
+	}
+	*xvalue = value;
+	return TRUE;
+}
+
+/**
+ * Check if kernel supports HW offload
+ */
+static void netlink_find_offload_feature(const char *ifname, int query_socket)
+{
+	struct ethtool_sset_info *sset_info;
+	struct ethtool_gstrings *cmd = NULL;
+	struct ifreq ifr;
+	uint32_t sset_len, i;
+	char *str;
+	int err;
+
+	netlink_hw_offload.state = NL_OFFLOAD_UNSUPPORTED;
+
+	/* determine number of device features */
+	INIT_EXTRA(sset_info, sizeof(uint32_t),
+		.cmd = ETHTOOL_GSSET_INFO,
+		.sset_mask = 1ULL << ETH_SS_FEATURES,
+	);
+	strncpy(ifr.ifr_name, ifname, IFNAMSIZ);
+	ifr.ifr_name[IFNAMSIZ-1] = '\0';
+	ifr.ifr_data = (void*)sset_info;
+
+	err = ioctl(query_socket, SIOCETHTOOL, &ifr);
+	if (err || sset_info->sset_mask != 1ULL << ETH_SS_FEATURES)
+	{
+		goto out;
+	}
+	sset_len = sset_info->data[0];
+
+	/* retrieve names of device features */
+	INIT_EXTRA(cmd, ETH_GSTRING_LEN * sset_len,
+		.cmd = ETHTOOL_GSTRINGS,
+		.string_set = ETH_SS_FEATURES,
+	);
+	strncpy(ifr.ifr_name, ifname, IFNAMSIZ);
+	ifr.ifr_name[IFNAMSIZ-1] = '\0';
+	ifr.ifr_data = (void*)cmd;
+
+	err = ioctl(query_socket, SIOCETHTOOL, &ifr);
+	if (err)
+	{
+		goto out;
+	}
+
+	/* look for the ESP_HW feature bit */
+	str = (char*)cmd->data;
+	for (i = 0; i < cmd->len; i++)
+	{
+		if (strneq(str, "esp-hw-offload", ETH_GSTRING_LEN))
+		{
+			netlink_hw_offload.bit = i;
+			netlink_hw_offload.total_blocks = (sset_len + 31) / 32;
+			netlink_hw_offload.state = NL_OFFLOAD_SUPPORTED;
+			break;
+		}
+		str += ETH_GSTRING_LEN;
+	}
+
+out:
+	free(sset_info);
+	free(cmd);
+}
+
+/**
+ * Check if interface supported HW offload
+ */
+static bool netlink_detect_offload(const char *ifname)
+{
+	struct ethtool_gfeatures *cmd;
+	uint32_t feature_bit;
+	struct ifreq ifr;
+	int query_socket;
+	int block;
+	bool ret = FALSE;
+
+	query_socket = socket(AF_NETLINK, SOCK_DGRAM, NETLINK_XFRM);
+	if (query_socket < 0)
+	{
+		return FALSE;
+	}
+
+	/* kernel requires a real interface in order to query the kernel-wide
+	 * capability, so we do it here on first invocation.
+	 */
+	if (netlink_hw_offload.state == NL_OFFLOAD_UNKNOWN)
+	{
+		netlink_find_offload_feature(ifname, query_socket);
+	}
+	if (netlink_hw_offload.state == NL_OFFLOAD_UNSUPPORTED)
+	{
+		DBG1(DBG_KNL, "HW offload is not supported by kernel");
+		goto out;
+	}
+
+	/* feature is supported by kernel, query device features */
+	INIT_EXTRA(cmd, sizeof(cmd->features[0]) * netlink_hw_offload.total_blocks,
+		.cmd = ETHTOOL_GFEATURES,
+		.size = netlink_hw_offload.total_blocks,
+	);
+	strncpy(ifr.ifr_name, ifname, IFNAMSIZ);
+	ifr.ifr_name[IFNAMSIZ-1] = '\0';
+	ifr.ifr_data = (void*)cmd;
+
+	if (ioctl(query_socket, SIOCETHTOOL, &ifr))
+	{
+		goto out_free;
+	}
+
+	block = netlink_hw_offload.bit / 32;
+	feature_bit = 1U << (netlink_hw_offload.bit % 32);
+	if (cmd->features[block].active & feature_bit)
+	{
+		ret = TRUE;
+	}
+
+out_free:
+	free(cmd);
+	if (!ret)
+	{
+		DBG1(DBG_KNL, "HW offload is not supported by device");
+	}
+out:
+	close(query_socket);
+	return ret;
+}
+
+/**
+ * There are 3 HW offload configuration values:
+ * 1. HW_OFFLOAD_NO   : Do not configure HW offload.
+ * 2. HW_OFFLOAD_YES  : Configure HW offload.
+ *                      Fail SA addition if offload is not supported.
+ * 3. HW_OFFLOAD_AUTO : Configure HW offload if supported by the kernel
+ *                      and device.
+ *                      Do not fail SA addition otherwise.
+ */
+static bool config_hw_offload(kernel_ipsec_sa_id_t *id,
+							  kernel_ipsec_add_sa_t *data, struct nlmsghdr *hdr,
+							  int buflen)
+{
+	host_t *local = data->inbound ? id->dst : id->src;
+	struct xfrm_user_offload *offload;
+	bool hw_offload_yes, ret = FALSE;
+	char *ifname;
+
+	/* do Ipsec configuration without offload */
+	if (data->hw_offload == HW_OFFLOAD_NO)
+	{
+		return TRUE;
+	}
+
+	hw_offload_yes = (data->hw_offload == HW_OFFLOAD_YES);
+
+	if (!charon->kernel->get_interface(charon->kernel, local, &ifname))
+	{
+		return !hw_offload_yes;
+	}
+
+	/* check if interface supports hw_offload */
+	if (!netlink_detect_offload(ifname))
+	{
+		ret = !hw_offload_yes;
+		goto out;
+	}
+
+	/* activate HW offload */
+	offload = netlink_reserve(hdr, buflen,
+							  XFRMA_OFFLOAD_DEV, sizeof(*offload));
+	if (!offload)
+	{
+		ret = !hw_offload_yes;
+		goto out;
+	}
+	offload->ifindex = if_nametoindex(ifname);
+	if (local->get_family(local) == AF_INET6)
+	{
+		offload->flags |= XFRM_OFFLOAD_IPV6;
+	}
+	offload->flags |= data->inbound ? XFRM_OFFLOAD_INBOUND : 0;
+
+	ret = TRUE;
+
+out:
+	free(ifname);
+	return ret;
+}
+
 METHOD(kernel_ipsec_t, add_sa, status_t,
 	private_kernel_netlink_ipsec_t *this, kernel_ipsec_sa_id_t *id,
 	kernel_ipsec_add_sa_t *data)
 {
 	netlink_buf_t request;
-	char *alg_name, markstr[32] = "";
+	const char *alg_name;
+	char markstr[32] = "";
 	struct nlmsghdr *hdr;
 	struct xfrm_usersa_info *sa;
 	uint16_t icv_size = 64, ipcomp = data->ipcomp;
@@ -1334,6 +1603,49 @@ METHOD(kernel_ipsec_t, add_sa, status_t,
 	sa->id.proto = id->proto;
 	sa->family = id->src->get_family(id->src);
 	sa->mode = mode2kernel(mode);
+
+	if (!data->copy_df)
+	{
+		sa->flags |= XFRM_STATE_NOPMTUDISC;
+	}
+
+	if (!data->copy_ecn)
+	{
+		sa->flags |= XFRM_STATE_NOECN;
+	}
+
+	if (data->inbound)
+	{
+		switch (data->copy_dscp)
+		{
+			case DSCP_COPY_YES:
+			case DSCP_COPY_IN_ONLY:
+				sa->flags |= XFRM_STATE_DECAP_DSCP;
+				break;
+			default:
+				break;
+		}
+	}
+	else
+	{
+		switch (data->copy_dscp)
+		{
+			case DSCP_COPY_IN_ONLY:
+			case DSCP_COPY_NO:
+			{
+				/* currently the only extra flag */
+				if (!add_uint32(hdr, sizeof(request), XFRMA_SA_EXTRA_FLAGS,
+								XFRM_SA_XFLAG_DONT_ENCAP_DSCP))
+				{
+					goto failed;
+				}
+				break;
+			}
+			default:
+				break;
+		}
+	}
+
 	switch (mode)
 	{
 		case MODE_TUNNEL:
@@ -1366,6 +1678,11 @@ METHOD(kernel_ipsec_t, add_sa, status_t,
 			break;
 		default:
 			break;
+	}
+	if (id->proto == IPPROTO_AH && sa->family == AF_INET)
+	{	/* use alignment to 4 bytes for IPv4 instead of the incorrect 8 byte
+		 * alignment that's used by default but is only valid for IPv6 */
+		sa->flags |= XFRM_STATE_ALIGN4;
 	}
 
 	sa->reqid = data->reqid;
@@ -1572,17 +1889,23 @@ METHOD(kernel_ipsec_t, add_sa, status_t,
 		goto failed;
 	}
 
-	if (data->tfc && id->proto == IPPROTO_ESP && mode == MODE_TUNNEL)
-	{	/* the kernel supports TFC padding only for tunnel mode ESP SAs */
-		uint32_t *tfcpad;
-
-		tfcpad = netlink_reserve(hdr, sizeof(request), XFRMA_TFCPAD,
-								 sizeof(*tfcpad));
-		if (!tfcpad)
+	if (ipcomp == IPCOMP_NONE && (data->mark.value | data->mark.mask))
+	{
+		if (!add_uint32(hdr, sizeof(request), XFRMA_SET_MARK,
+						data->mark.value) ||
+			!add_uint32(hdr, sizeof(request), XFRMA_SET_MARK_MASK,
+						data->mark.mask))
 		{
 			goto failed;
 		}
-		*tfcpad = data->tfc;
+	}
+
+	if (data->tfc && id->proto == IPPROTO_ESP && mode == MODE_TUNNEL)
+	{	/* the kernel supports TFC padding only for tunnel mode ESP SAs */
+		if (!add_uint32(hdr, sizeof(request), XFRMA_TFCPAD, data->tfc))
+		{
+			goto failed;
+		}
 	}
 
 	if (id->proto != IPPROTO_COMP)
@@ -1625,12 +1948,28 @@ METHOD(kernel_ipsec_t, add_sa, status_t,
 				 data->replay_window);
 			sa->replay_window = data->replay_window;
 		}
+
+		DBG2(DBG_KNL, "  HW offload: %N", hw_offload_names, data->hw_offload);
+		if (!config_hw_offload(id, data, hdr, sizeof(request)))
+		{
+			DBG1(DBG_KNL, "failed to configure HW offload");
+			goto failed;
+		}
 	}
 
-	if (this->socket_xfrm->send_ack(this->socket_xfrm, hdr) != SUCCESS)
+	status = this->socket_xfrm->send_ack(this->socket_xfrm, hdr);
+	if (status == NOT_FOUND && data->update)
 	{
-		DBG1(DBG_KNL, "unable to add SAD entry with SPI %.8x%s", ntohl(id->spi),
-			 markstr);
+		DBG1(DBG_KNL, "allocated SPI not found anymore, try to add SAD entry");
+		hdr->nlmsg_type = XFRM_MSG_NEWSA;
+		status = this->socket_xfrm->send_ack(this->socket_xfrm, hdr);
+	}
+
+	if (status != SUCCESS)
+	{
+		DBG1(DBG_KNL, "unable to add SAD entry with SPI %.8x%s (%N)", ntohl(id->spi),
+			 markstr, status_names, status);
+		status = FAILED;
 		goto failed;
 	}
 
@@ -1905,19 +2244,20 @@ METHOD(kernel_ipsec_t, update_sa, status_t,
 	kernel_ipsec_update_sa_t *data)
 {
 	netlink_buf_t request;
-	struct nlmsghdr *hdr, *out = NULL;
+	struct nlmsghdr *hdr, *out_hdr = NULL, *out = NULL;
 	struct xfrm_usersa_id *sa_id;
-	struct xfrm_usersa_info *out_sa = NULL, *sa;
+	struct xfrm_usersa_info *sa;
 	size_t len;
 	struct rtattr *rta;
 	size_t rtasize;
-	struct xfrm_encap_tmpl* tmpl = NULL;
+	struct xfrm_encap_tmpl* encap = NULL;
 	struct xfrm_replay_state *replay = NULL;
 	struct xfrm_replay_state_esn *replay_esn = NULL;
 	struct xfrm_lifetime_cur *lifetime = NULL;
 	uint32_t replay_esn_len = 0;
 	kernel_ipsec_del_sa_t del = { 0 };
 	status_t status = FAILED;
+	traffic_selector_t *ts;
 	char markstr[32] = "";
 
 	/* if IPComp is used, we first update the IPComp SA */
@@ -1969,7 +2309,7 @@ METHOD(kernel_ipsec_t, update_sa, status_t,
 			{
 				case XFRM_MSG_NEWSA:
 				{
-					out_sa = NLMSG_DATA(hdr);
+					out_hdr = hdr;
 					break;
 				}
 				case NLMSG_ERROR:
@@ -1988,7 +2328,7 @@ METHOD(kernel_ipsec_t, update_sa, status_t,
 			break;
 		}
 	}
-	if (out_sa == NULL)
+	if (!out_hdr)
 	{
 		DBG1(DBG_KNL, "unable to update SAD entry with SPI %.8x%s",
 			 ntohl(id->spi), markstr);
@@ -2015,20 +2355,36 @@ METHOD(kernel_ipsec_t, update_sa, status_t,
 	hdr->nlmsg_type = XFRM_MSG_NEWSA;
 	hdr->nlmsg_len = NLMSG_LENGTH(sizeof(struct xfrm_usersa_info));
 	sa = NLMSG_DATA(hdr);
-	memcpy(sa, NLMSG_DATA(out), sizeof(struct xfrm_usersa_info));
+	memcpy(sa, NLMSG_DATA(out_hdr), sizeof(struct xfrm_usersa_info));
 	sa->family = data->new_dst->get_family(data->new_dst);
 
 	if (!id->src->ip_equals(id->src, data->new_src))
 	{
 		host2xfrm(data->new_src, &sa->saddr);
+
+		ts = selector2ts(&sa->sel, TRUE);
+		if (ts && ts->is_host(ts, id->src))
+		{
+			ts->set_address(ts, data->new_src);
+			ts2subnet(ts, &sa->sel.saddr, &sa->sel.prefixlen_s);
+		}
+		DESTROY_IF(ts);
 	}
 	if (!id->dst->ip_equals(id->dst, data->new_dst))
 	{
 		host2xfrm(data->new_dst, &sa->id.daddr);
+
+		ts = selector2ts(&sa->sel, FALSE);
+		if (ts && ts->is_host(ts, id->dst))
+		{
+			ts->set_address(ts, data->new_dst);
+			ts2subnet(ts, &sa->sel.daddr, &sa->sel.prefixlen_d);
+		}
+		DESTROY_IF(ts);
 	}
 
-	rta = XFRM_RTA(out, struct xfrm_usersa_info);
-	rtasize = XFRM_PAYLOAD(out, struct xfrm_usersa_info);
+	rta = XFRM_RTA(out_hdr, struct xfrm_usersa_info);
+	rtasize = XFRM_PAYLOAD(out_hdr, struct xfrm_usersa_info);
 	while (RTA_OK(rta, rtasize))
 	{
 		/* copy all attributes, but not XFRMA_ENCAP if we are disabling it */
@@ -2036,9 +2392,34 @@ METHOD(kernel_ipsec_t, update_sa, status_t,
 		{
 			if (rta->rta_type == XFRMA_ENCAP)
 			{	/* update encap tmpl */
-				tmpl = RTA_DATA(rta);
-				tmpl->encap_sport = ntohs(data->new_src->get_port(data->new_src));
-				tmpl->encap_dport = ntohs(data->new_dst->get_port(data->new_dst));
+				encap = RTA_DATA(rta);
+				encap->encap_sport = ntohs(data->new_src->get_port(data->new_src));
+				encap->encap_dport = ntohs(data->new_dst->get_port(data->new_dst));
+			}
+			if (rta->rta_type == XFRMA_OFFLOAD_DEV)
+			{	/* update offload device */
+				struct xfrm_user_offload *offload;
+				host_t *local;
+				char *ifname;
+
+				offload = RTA_DATA(rta);
+				local = offload->flags & XFRM_OFFLOAD_INBOUND ? data->new_dst
+															  : data->new_src;
+
+				if (charon->kernel->get_interface(charon->kernel, local,
+												  &ifname))
+				{
+					offload->ifindex = if_nametoindex(ifname);
+					if (local->get_family(local) == AF_INET6)
+					{
+						offload->flags |= XFRM_OFFLOAD_IPV6;
+					}
+					else
+					{
+						offload->flags &= ~XFRM_OFFLOAD_IPV6;
+					}
+					free(ifname);
+				}
 			}
 			netlink_add_attribute(hdr, rta->rta_type,
 								  chunk_create(RTA_DATA(rta), RTA_PAYLOAD(rta)),
@@ -2047,17 +2428,18 @@ METHOD(kernel_ipsec_t, update_sa, status_t,
 		rta = RTA_NEXT(rta, rtasize);
 	}
 
-	if (tmpl == NULL && data->new_encap)
+	if (encap == NULL && data->new_encap)
 	{	/* add tmpl if we are enabling it */
-		tmpl = netlink_reserve(hdr, sizeof(request), XFRMA_ENCAP, sizeof(*tmpl));
-		if (!tmpl)
+		encap = netlink_reserve(hdr, sizeof(request), XFRMA_ENCAP,
+								sizeof(*encap));
+		if (!encap)
 		{
 			goto failed;
 		}
-		tmpl->encap_type = UDP_ENCAP_ESPINUDP;
-		tmpl->encap_sport = ntohs(data->new_src->get_port(data->new_src));
-		tmpl->encap_dport = ntohs(data->new_dst->get_port(data->new_dst));
-		memset(&tmpl->encap_oa, 0, sizeof (xfrm_address_t));
+		encap->encap_type = UDP_ENCAP_ESPINUDP;
+		encap->encap_sport = ntohs(data->new_src->get_port(data->new_src));
+		encap->encap_dport = ntohs(data->new_dst->get_port(data->new_dst));
+		memset(&encap->encap_oa, 0, sizeof (xfrm_address_t));
 	}
 
 	if (replay_esn)
@@ -2329,11 +2711,13 @@ static status_t add_policy_internal(private_kernel_netlink_ipsec_t *this,
 		struct xfrm_user_tmpl *tmpl;
 		struct {
 			uint8_t proto;
+			uint32_t spi;
 			bool use;
 		} protos[] = {
-			{ IPPROTO_COMP, ipsec->cfg.ipcomp.transform != IPCOMP_NONE },
-			{ IPPROTO_ESP, ipsec->cfg.esp.use },
-			{ IPPROTO_AH, ipsec->cfg.ah.use },
+			{ IPPROTO_COMP, htonl(ntohs(ipsec->cfg.ipcomp.cpi)),
+			  ipsec->cfg.ipcomp.transform != IPCOMP_NONE },
+			{ IPPROTO_ESP, ipsec->cfg.esp.spi, ipsec->cfg.esp.use },
+			{ IPPROTO_AH, ipsec->cfg.ah.spi, ipsec->cfg.ah.use },
 		};
 		ipsec_mode_t proto_mode = ipsec->cfg.mode;
 		int count = 0;
@@ -2361,6 +2745,10 @@ static status_t add_policy_internal(private_kernel_netlink_ipsec_t *this,
 			}
 			tmpl->reqid = ipsec->cfg.reqid;
 			tmpl->id.proto = protos[i].proto;
+			if (policy->direction == POLICY_OUT)
+			{
+				tmpl->id.spi = protos[i].spi;
+			}
 			tmpl->aalgos = tmpl->ealgos = tmpl->calgos = ~0;
 			tmpl->mode = mode2kernel(proto_mode);
 			tmpl->optional = protos[i].proto == IPPROTO_COMP &&
@@ -2523,7 +2911,7 @@ METHOD(kernel_ipsec_t, add_policy, status_t,
 	{	/* we don't update the policy if the priority is lower than that of
 		 * the currently installed one */
 		policy_change_done(this, policy);
-		DBG2(DBG_KNL, "not updating policy %R === %R %N%s [priority %u,"
+		DBG2(DBG_KNL, "not updating policy %R === %R %N%s [priority %u, "
 			 "refcount %d]", id->src_ts, id->dst_ts, policy_dir_names,
 			 id->dir, markstr, cur_priority, use_count);
 		return SUCCESS;
@@ -2697,7 +3085,7 @@ METHOD(kernel_ipsec_t, del_policy, status_t,
 			ipsec_sa_equals(mapping->sa, &assigned_sa))
 		{
 			current->used_by->remove_at(current->used_by, enumerator);
-			policy_sa_destroy(mapping, &id->dir, this);
+			policy_sa_destroy(mapping, id->dir, this);
 			break;
 		}
 		if (is_installed)
@@ -3157,7 +3545,6 @@ kernel_netlink_ipsec_t *kernel_netlink_ipsec_create()
 {
 	private_kernel_netlink_ipsec_t *this;
 	bool register_for_events = TRUE;
-	FILE *f;
 
 	INIT(this,
 		.public = {
@@ -3200,15 +3587,6 @@ kernel_netlink_ipsec_t *kernel_netlink_ipsec_create()
 	if (streq(lib->ns, "starter"))
 	{	/* starter has no threads, so we do not register for kernel events */
 		register_for_events = FALSE;
-	}
-
-	f = fopen("/proc/sys/net/core/xfrm_acq_expires", "w");
-	if (f)
-	{
-		fprintf(f, "%u", lib->settings->get_int(lib->settings,
-								"%s.plugins.kernel-netlink.xfrm_acq_expires",
-								DEFAULT_ACQUIRE_LIFETIME, lib->ns));
-		fclose(f);
 	}
 
 	this->socket_xfrm = netlink_socket_create(NETLINK_XFRM, xfrm_msg_names,

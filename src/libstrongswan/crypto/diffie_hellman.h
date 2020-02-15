@@ -2,7 +2,7 @@
  * Copyright (C) 2010 Tobias Brunner
  * Copyright (C) 2005-2007 Martin Willi
  * Copyright (C) 2005 Jan Hutter
- * Hochschule fuer Technik Rapperswil
+ * HSR Hochschule fuer Technik Rapperswil
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -37,6 +37,7 @@ typedef struct diffie_hellman_params_t diffie_hellman_params_t;
  *
  * ECP groups are defined in RFC 4753 and RFC 5114.
  * ECC Brainpool groups are defined in RFC 6954.
+ * Curve25519 and Curve448 groups are defined in RFC 8031.
  */
 enum diffie_hellman_group_t {
 	MODP_NONE     =  0,
@@ -60,6 +61,8 @@ enum diffie_hellman_group_t {
 	ECP_256_BP    = 28,
 	ECP_384_BP    = 29,
 	ECP_512_BP    = 30,
+	CURVE_25519   = 31,
+	CURVE_448     = 32,
 	/** insecure NULL diffie hellman group for testing, in PRIVATE USE */
 	MODP_NULL = 1024,
 	/** MODP group with custom generator/prime */
