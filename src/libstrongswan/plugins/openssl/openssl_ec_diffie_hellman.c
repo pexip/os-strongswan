@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008-2013 Tobias Brunner
- * Hochschule fuer Technik Rapperswil
+ * HSR Hochschule fuer Technik Rapperswil
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -327,9 +327,12 @@ METHOD(diffie_hellman_t, destroy, void,
 /**
  * ECC Brainpool curves are not available in OpenSSL releases < 1.0.2, but we
  * don't check the version in case somebody backported them.
+ *
+ * BoringSSL defines the constants but not the curves.
  */
 #if (!defined(NID_brainpoolP224r1) || !defined(NID_brainpoolP256r1) || \
-	 !defined(NID_brainpoolP384r1) || !defined(NID_brainpoolP512r1))
+	 !defined(NID_brainpoolP384r1) || !defined(NID_brainpoolP512r1) || \
+	 defined(OPENSSL_IS_BORINGSSL))
 
 /**
  * Parameters for ECC Brainpool curves

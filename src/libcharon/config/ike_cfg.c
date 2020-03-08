@@ -1,8 +1,8 @@
 /*
- * Copyright (C) 2012-2016 Tobias Brunner
+ * Copyright (C) 2012-2018 Tobias Brunner
  * Copyright (C) 2005-2007 Martin Willi
  * Copyright (C) 2005 Jan Hutter
- * Hochschule fuer Technik Rapperswil
+ * HSR Hochschule fuer Technik Rapperswil
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -224,12 +224,12 @@ static u_int match(linked_list_t *hosts, linked_list_t *ranges, host_t *cand)
 			if (ts->to_subnet(ts, &host, &mask))
 			{
 				quality = max(quality, mask + 1);
-				host->destroy(host);
 			}
 			else
 			{
 				quality = max(quality, 1);
 			}
+			host->destroy(host);
 		}
 	}
 	enumerator->destroy(enumerator);
@@ -309,6 +309,25 @@ METHOD(ike_cfg_t, get_proposals, linked_list_t*,
 	return proposals;
 }
 
+METHOD(ike_cfg_t, has_proposal, bool,
+	private_ike_cfg_t *this, proposal_t *match, bool private)
+{
+	enumerator_t *enumerator;
+	proposal_t *proposal;
+
+	enumerator = this->proposals->create_enumerator(this->proposals);
+	while (enumerator->enumerate(enumerator, &proposal))
+	{
+		if (proposal->matches(proposal, match, private))
+		{
+			enumerator->destroy(enumerator);
+			return TRUE;
+		}
+	}
+	enumerator->destroy(enumerator);
+	return FALSE;
+}
+
 METHOD(ike_cfg_t, select_proposal, proposal_t*,
 	private_ike_cfg_t *this, linked_list_t *proposals, bool private,
 	bool prefer_self)
@@ -339,12 +358,12 @@ METHOD(ike_cfg_t, select_proposal, proposal_t*,
 		}
 		while (match_enum->enumerate(match_enum, (void**)&match))
 		{
-			selected = proposal->select(proposal, match, private);
+			selected = proposal->select(proposal, match, prefer_self, private);
 			if (selected)
 			{
 				DBG2(DBG_CFG, "received proposals: %#P", proposals);
 				DBG2(DBG_CFG, "configured proposals: %#P", this->proposals);
-				DBG2(DBG_CFG, "selected proposal: %P", selected);
+				DBG1(DBG_CFG, "selected proposal: %P", selected);
 				break;
 			}
 		}
@@ -559,6 +578,40 @@ int ike_cfg_get_family(ike_cfg_t *cfg, bool local)
 /**
  * Described in header.
  */
+bool ike_cfg_has_address(ike_cfg_t *cfg, host_t *addr, bool local)
+{
+	private_ike_cfg_t *this = (private_ike_cfg_t*)cfg;
+	enumerator_t *enumerator;
+	host_t *host;
+	char *str;
+	bool found = FALSE;
+
+	if (local)
+	{
+		enumerator = this->my_hosts->create_enumerator(this->my_hosts);
+	}
+	else
+	{
+		enumerator = this->other_hosts->create_enumerator(this->other_hosts);
+	}
+	while (enumerator->enumerate(enumerator, &str))
+	{
+		host = host_create_from_string(str, 0);
+		if (host && addr->ip_equals(addr, host))
+		{
+			host->destroy(host);
+			found = TRUE;
+			break;
+		}
+		DESTROY_IF(host);
+	}
+	enumerator->destroy(enumerator);
+	return found;
+}
+
+/**
+ * Described in header.
+ */
 ike_cfg_t *ike_cfg_create(ike_version_t version, bool certreq, bool force_encap,
 						  char *me, uint16_t my_port,
 						  char *other, uint16_t other_port,
@@ -584,6 +637,7 @@ ike_cfg_t *ike_cfg_create(ike_version_t version, bool certreq, bool force_encap,
 			.add_proposal = _add_proposal,
 			.get_proposals = _get_proposals,
 			.select_proposal = _select_proposal,
+			.has_proposal = _has_proposal,
 			.get_dh_group = _get_dh_group,
 			.equals = _equals,
 			.get_ref = _get_ref,

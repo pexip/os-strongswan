@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2011-2015 Tobias Brunner
- * Hochschule fuer Technik Rapperswil
+ * HSR Hochschule fuer Technik Rapperswil
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -22,6 +22,7 @@
 #define KEYMAT_V2_H_
 
 #include <sa/keymat.h>
+#include <collections/array.h>
 
 typedef struct keymat_v2_t keymat_v2_t;
 
@@ -55,6 +56,16 @@ struct keymat_v2_t {
 							chunk_t nonce_r, ike_sa_id_t *id,
 							pseudo_random_function_t rekey_function,
 							chunk_t rekey_skd);
+
+	/**
+	 * Derive SK_d, SK_pi and SK_pr after authentication using the given
+	 * Postquantum Preshared Key and the previous values of these keys that
+	 * were derived by derive_ike_keys().
+	 *
+	 * @param ppk		the postquantum preshared key
+	 * @return			TRUE on success
+	 */
+	bool (*derive_ike_keys_ppk)(keymat_v2_t *this, chunk_t ppk);
 
 	/**
 	 * Derive keys for a CHILD_SA.
@@ -94,17 +105,22 @@ struct keymat_v2_t {
 	 * key. PSK and EAP authentication include a secret into the data, use
 	 * the get_psk_sig() method instead.
 	 *
-	 * @param verify		TRUE to create for verfification, FALSE to sign
+	 * @param verify		TRUE to create for verification, FALSE to sign
 	 * @param ike_sa_init	encoded ike_sa_init message
 	 * @param nonce			nonce value
+	 * @param ppk			optional postquantum preshared key
 	 * @param id			identity
 	 * @param reserved		reserved bytes of id_payload
 	 * @param octests		chunk receiving allocated auth octets
+	 * @param schemes		array containing signature schemes
+	 * 						(signature_params_t*) in case they need to be
+	 *						modified by the keymat implementation
 	 * @return				TRUE if octets created successfully
 	 */
 	bool (*get_auth_octets)(keymat_v2_t *this, bool verify, chunk_t ike_sa_init,
-							chunk_t nonce, identification_t *id,
-							char reserved[3], chunk_t *octets);
+							chunk_t nonce, chunk_t ppk, identification_t *id,
+							char reserved[3], chunk_t *octets,
+							array_t *schemes);
 	/**
 	 * Build the shared secret signature used for PSK and EAP authentication.
 	 *
@@ -112,17 +128,18 @@ struct keymat_v2_t {
 	 * includes the secret into the signature. If no secret is given, SK_p is
 	 * used as secret (used for EAP methods without MSK).
 	 *
-	 * @param verify		TRUE to create for verfification, FALSE to sign
+	 * @param verify		TRUE to create for verification, FALSE to sign
 	 * @param ike_sa_init	encoded ike_sa_init message
 	 * @param nonce			nonce value
 	 * @param secret		optional secret to include into signature
+	 * @param ppk			optional postquantum preshared key
 	 * @param id			identity
 	 * @param reserved		reserved bytes of id_payload
 	 * @param sign			chunk receiving allocated signature octets
 	 * @return				TRUE if signature created successfully
 	 */
 	bool (*get_psk_sig)(keymat_v2_t *this, bool verify, chunk_t ike_sa_init,
-						chunk_t nonce, chunk_t secret,
+						chunk_t nonce, chunk_t secret, chunk_t ppk,
 						identification_t *id, char reserved[3], chunk_t *sig);
 
 	/**

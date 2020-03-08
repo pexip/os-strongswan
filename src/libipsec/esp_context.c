@@ -2,7 +2,7 @@
  * Copyright (C) 2012-2013 Tobias Brunner
  * Copyright (C) 2012 Giuliano Grassi
  * Copyright (C) 2012 Ralf Sager
- * Hochschule fuer Technik Rapperswil
+ * HSR Hochschule fuer Technik Rapperswil
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -210,18 +210,31 @@ METHOD(esp_context_t, destroy, void,
 static bool create_aead(private_esp_context_t *this, int alg,
 						chunk_t key)
 {
+	size_t salt = 0;
+
 	switch (alg)
 	{
 		case ENCR_AES_GCM_ICV8:
 		case ENCR_AES_GCM_ICV12:
 		case ENCR_AES_GCM_ICV16:
 		case ENCR_CHACHA20_POLY1305:
-			/* the key includes a 4 byte salt */
-			this->aead = lib->crypto->create_aead(lib->crypto, alg,
-												  key.len - 4, 4);
+			salt = 4;
+			break;
+		case ENCR_AES_CCM_ICV8:
+		case ENCR_AES_CCM_ICV12:
+		case ENCR_AES_CCM_ICV16:
+		case ENCR_CAMELLIA_CCM_ICV8:
+		case ENCR_CAMELLIA_CCM_ICV12:
+		case ENCR_CAMELLIA_CCM_ICV16:
+			salt = 3;
 			break;
 		default:
 			break;
+	}
+	if (salt)
+	{
+		this->aead = lib->crypto->create_aead(lib->crypto, alg,
+											  key.len - salt, salt);
 	}
 	if (!this->aead)
 	{

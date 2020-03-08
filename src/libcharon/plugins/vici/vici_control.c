@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2015 Tobias Brunner
- * Hochschule fuer Technik Rapperswil
+ * Copyright (C) 2015-2017 Tobias Brunner
+ * HSR Hochschule fuer Technik Rapperswil
  *
  * Copyright (C) 2014 Martin Willi
  * Copyright (C) 2014 revosec AG
@@ -23,6 +23,8 @@
 
 #include <daemon.h>
 #include <collections/array.h>
+#include <processing/jobs/rekey_ike_sa_job.h>
+#include <processing/jobs/rekey_child_sa_job.h>
 #include <processing/jobs/redirect_job.h>
 
 typedef struct private_vici_control_t private_vici_control_t;
@@ -223,6 +225,7 @@ CALLBACK(terminate, vici_message_t*,
 	enumerator_t *enumerator, *isas, *csas;
 	char *child, *ike, *errmsg = NULL;
 	u_int child_id, ike_id, current, *del, done = 0;
+	bool force;
 	int timeout;
 	ike_sa_t *ike_sa;
 	child_sa_t *child_sa;
@@ -238,6 +241,7 @@ CALLBACK(terminate, vici_message_t*,
 	ike = request->get_str(request, NULL, "ike");
 	child_id = request->get_int(request, 0, "child-id");
 	ike_id = request->get_int(request, 0, "ike-id");
+	force = request->get_bool(request, FALSE, "force");
 	timeout = request->get_int(request, 0, "timeout");
 	log.level = request->get_int(request, 1, "loglevel");
 
@@ -324,7 +328,7 @@ CALLBACK(terminate, vici_message_t*,
 		}
 		else
 		{
-			if (charon->controller->terminate_ike(charon->controller, *del,
+			if (charon->controller->terminate_ike(charon->controller, *del, force,
 											log_cb, &log, timeout) == SUCCESS)
 			{
 				done++;
@@ -357,6 +361,102 @@ CALLBACK(terminate, vici_message_t*,
 		builder->add_kv(builder, "errmsg", "%s", errmsg);
 	}
 	array_destroy(ids);
+	return builder->finalize(builder);
+}
+
+CALLBACK(rekey, vici_message_t*,
+	private_vici_control_t *this, char *name, u_int id, vici_message_t *request)
+{
+	enumerator_t *isas, *csas;
+	char *child, *ike, *errmsg = NULL;
+	u_int child_id, ike_id, found = 0;
+	ike_sa_t *ike_sa;
+	child_sa_t *child_sa;
+	vici_builder_t *builder;
+	bool reauth;
+
+	child = request->get_str(request, NULL, "child");
+	ike = request->get_str(request, NULL, "ike");
+	child_id = request->get_int(request, 0, "child-id");
+	ike_id = request->get_int(request, 0, "ike-id");
+	reauth = request->get_bool(request, FALSE, "reauth");
+
+	if (!child && !ike && !ike_id && !child_id)
+	{
+		return send_reply(this, "missing rekey selector");
+	}
+
+	if (ike_id)
+	{
+		DBG1(DBG_CFG, "vici rekey IKE_SA #%d", ike_id);
+	}
+	if (child_id)
+	{
+		DBG1(DBG_CFG, "vici rekey CHILD_SA #%d", child_id);
+	}
+	if (ike)
+	{
+		DBG1(DBG_CFG, "vici rekey IKE_SA '%s'", ike);
+	}
+	if (child)
+	{
+		DBG1(DBG_CFG, "vici rekey CHILD_SA '%s'", child);
+	}
+
+	isas = charon->controller->create_ike_sa_enumerator(charon->controller, TRUE);
+	while (isas->enumerate(isas, &ike_sa))
+	{
+		if (child || child_id)
+		{
+			if (ike && !streq(ike, ike_sa->get_name(ike_sa)))
+			{
+				continue;
+			}
+			if (ike_id && ike_id != ike_sa->get_unique_id(ike_sa))
+			{
+				continue;
+			}
+			csas = ike_sa->create_child_sa_enumerator(ike_sa);
+			while (csas->enumerate(csas, &child_sa))
+			{
+				if (child && !streq(child, child_sa->get_name(child_sa)))
+				{
+					continue;
+				}
+				if (child_id && child_sa->get_unique_id(child_sa) != child_id)
+				{
+					continue;
+				}
+				lib->processor->queue_job(lib->processor,
+						(job_t*)rekey_child_sa_job_create(
+											child_sa->get_protocol(child_sa),
+											child_sa->get_spi(child_sa, TRUE),
+											ike_sa->get_my_host(ike_sa)));
+				found++;
+			}
+			csas->destroy(csas);
+		}
+		else if ((ike && streq(ike, ike_sa->get_name(ike_sa))) ||
+				 (ike_id && ike_id == ike_sa->get_unique_id(ike_sa)))
+		{
+			lib->processor->queue_job(lib->processor,
+				(job_t*)rekey_ike_sa_job_create(ike_sa->get_id(ike_sa), reauth));
+			found++;
+		}
+	}
+	isas->destroy(isas);
+
+	builder = vici_builder_create();
+	if (!found)
+	{
+		errmsg = "no matching SAs to rekey found";
+	}
+	builder->add_kv(builder, "success", errmsg ? "no" : "yes");
+	builder->add_kv(builder, "matches", "%u", found);
+	if (errmsg)
+	{
+		builder->add_kv(builder, "errmsg", "%s", errmsg);
+	}
 	return builder->finalize(builder);
 }
 
@@ -494,6 +594,7 @@ CALLBACK(redirect, vici_message_t*,
 		errmsg = "no matching SAs to redirect found";
 	}
 	builder->add_kv(builder, "success", errmsg ? "no" : "yes");
+	builder->add_kv(builder, "matches", "%u", found);
 	if (errmsg)
 	{
 		builder->add_kv(builder, "errmsg", "%s", errmsg);
@@ -502,41 +603,6 @@ CALLBACK(redirect, vici_message_t*,
 	DESTROY_IF(identity);
 	DESTROY_IF(ts);
 	return builder->finalize(builder);
-}
-
-/**
- * Find reqid of an existing CHILD_SA
- */
-static uint32_t find_reqid(child_cfg_t *cfg)
-{
-	enumerator_t *enumerator, *children;
-	child_sa_t *child_sa;
-	ike_sa_t *ike_sa;
-	uint32_t reqid;
-
-	reqid = charon->traps->find_reqid(charon->traps, cfg);
-	if (reqid)
-	{	/* already trapped */
-		return reqid;
-	}
-
-	enumerator = charon->controller->create_ike_sa_enumerator(
-													charon->controller, TRUE);
-	while (!reqid && enumerator->enumerate(enumerator, &ike_sa))
-	{
-		children = ike_sa->create_child_sa_enumerator(ike_sa);
-		while (children->enumerate(children, &child_sa))
-		{
-			if (streq(cfg->get_name(cfg), child_sa->get_name(child_sa)))
-			{
-				reqid = child_sa->get_reqid(child_sa);
-				break;
-			}
-		}
-		children->destroy(children);
-	}
-	enumerator->destroy(enumerator);
-	return reqid;
 }
 
 CALLBACK(install, vici_message_t*,
@@ -565,11 +631,11 @@ CALLBACK(install, vici_message_t*,
 	{
 		case MODE_PASS:
 		case MODE_DROP:
-			ok = charon->shunts->install(charon->shunts, child_cfg);
+			ok = charon->shunts->install(charon->shunts,
+									peer_cfg->get_name(peer_cfg), child_cfg);
 			break;
 		default:
-			ok = charon->traps->install(charon->traps, peer_cfg, child_cfg,
-										find_reqid(child_cfg));
+			ok = charon->traps->install(charon->traps, peer_cfg, child_cfg);
 			break;
 	}
 	peer_cfg->destroy(peer_cfg);
@@ -581,12 +647,10 @@ CALLBACK(install, vici_message_t*,
 CALLBACK(uninstall, vici_message_t*,
 	private_vici_control_t *this, char *name, u_int id, vici_message_t *request)
 {
-	child_sa_t *child_sa;
-	enumerator_t *enumerator;
-	uint32_t reqid = 0;
-	char *child;
+	char *child, *ike;
 
 	child = request->get_str(request, NULL, "child");
+	ike = request->get_str(request, NULL, "ike");
 	if (!child)
 	{
 		return send_reply(this, "missing configuration name");
@@ -594,29 +658,13 @@ CALLBACK(uninstall, vici_message_t*,
 
 	DBG1(DBG_CFG, "vici uninstall '%s'", child);
 
-	if (charon->shunts->uninstall(charon->shunts, child))
+	if (charon->shunts->uninstall(charon->shunts, ike, child))
 	{
 		return send_reply(this, NULL);
 	}
-
-	enumerator = charon->traps->create_enumerator(charon->traps);
-	while (enumerator->enumerate(enumerator, NULL, &child_sa))
+	else if (charon->traps->uninstall(charon->traps, ike, child))
 	{
-		if (streq(child, child_sa->get_name(child_sa)))
-		{
-			reqid = child_sa->get_reqid(child_sa);
-			break;
-		}
-	}
-	enumerator->destroy(enumerator);
-
-	if (reqid)
-	{
-		if (charon->traps->uninstall(charon->traps, reqid))
-		{
-			return send_reply(this, NULL);
-		}
-		return send_reply(this, "uninstalling policy '%s' failed", child);
+		return send_reply(this, NULL);
 	}
 	return send_reply(this, "policy '%s' not found", child);
 }
@@ -626,6 +674,7 @@ CALLBACK(reload_settings, vici_message_t*,
 {
 	if (lib->settings->load_files(lib->settings, lib->conf, FALSE))
 	{
+		charon->load_loggers(charon);
 		lib->plugins->reload(lib->plugins, NULL);
 		return send_reply(this, NULL);
 	}
@@ -646,6 +695,7 @@ static void manage_commands(private_vici_control_t *this, bool reg)
 {
 	manage_command(this, "initiate", initiate, reg);
 	manage_command(this, "terminate", terminate, reg);
+	manage_command(this, "rekey", rekey, reg);
 	manage_command(this, "redirect", redirect, reg);
 	manage_command(this, "install", install, reg);
 	manage_command(this, "uninstall", uninstall, reg);

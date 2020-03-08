@@ -16,7 +16,6 @@ config/backend_manager.c config/backend_manager.h config/backend.h \
 config/child_cfg.c config/child_cfg.h \
 config/ike_cfg.c config/ike_cfg.h \
 config/peer_cfg.c config/peer_cfg.h \
-config/proposal.c config/proposal.h \
 control/controller.c control/controller.h \
 daemon.c daemon.h \
 encoding/generator.c encoding/generator.h \
@@ -106,6 +105,7 @@ sa/ikev2/tasks/ike_delete.c sa/ikev2/tasks/ike_delete.h \
 sa/ikev2/tasks/ike_dpd.c sa/ikev2/tasks/ike_dpd.h \
 sa/ikev2/tasks/ike_init.c sa/ikev2/tasks/ike_init.h \
 sa/ikev2/tasks/ike_natd.c sa/ikev2/tasks/ike_natd.h \
+sa/ikev2/tasks/ike_mid_sync.c sa/ikev2/tasks/ike_mid_sync.h \
 sa/ikev2/tasks/ike_mobike.c sa/ikev2/tasks/ike_mobike.h \
 sa/ikev2/tasks/ike_rekey.c sa/ikev2/tasks/ike_rekey.h \
 sa/ikev2/tasks/ike_reauth.c sa/ikev2/tasks/ike_reauth.h \
@@ -117,6 +117,7 @@ sa/ikev2/tasks/ike_verify_peer_cert.c sa/ikev2/tasks/ike_verify_peer_cert.h
 
 libcharon_la_SOURCES += \
 sa/ikev1/keymat_v1.c sa/ikev1/keymat_v1.h \
+sa/ikev1/iv_manager.c sa/ikev1/iv_manager.h \
 sa/ikev1/task_manager_v1.c sa/ikev1/task_manager_v1.h \
 sa/ikev1/authenticators/psk_v1_authenticator.c sa/ikev1/authenticators/psk_v1_authenticator.h \
 sa/ikev1/authenticators/pubkey_v1_authenticator.c sa/ikev1/authenticators/pubkey_v1_authenticator.h \
@@ -160,6 +161,8 @@ LOCAL_SRC_FILES += $(call add_plugin, attr)
 LOCAL_SRC_FILES += $(call add_plugin, p-cscf)
 
 LOCAL_SRC_FILES += $(call add_plugin, eap-aka)
+
+LOCAL_SRC_FILES += $(call add_plugin, eap-aka-3gpp)
 
 LOCAL_SRC_FILES += $(call add_plugin, eap-aka-3gpp2)
 ifneq ($(call plugin_enabled, eap-aka-3gpp2),)

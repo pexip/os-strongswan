@@ -1,4 +1,4 @@
-/* C code produced by gperf version 3.0.4 */
+/* ANSI-C code produced by gperf version 3.1 */
 /* Command-line: /usr/bin/gperf -m 10 -C -G -D -t  */
 /* Computed positions: -k'2-3,6,$' */
 
@@ -26,13 +26,13 @@
       && ('w' == 119) && ('x' == 120) && ('y' == 121) && ('z' == 122) \
       && ('{' == 123) && ('|' == 124) && ('}' == 125) && ('~' == 126))
 /* The character set is not based on ISO-646.  */
-error "gperf generated tables don't work with this execution character set. Please report a bug to <bug-gnu-gperf@gnu.org>."
+#error "gperf generated tables don't work with this execution character set. Please report a bug to <bug-gperf@gnu.org>."
 #endif
 
 
 /*
  * Copyright (C) 2005 Andreas Steffen
- * Hochschule fuer Technik Rapperswil, Switzerland
+ * HSR Hochschule fuer Technik Rapperswil
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -47,6 +47,7 @@ error "gperf generated tables don't work with this execution character set. Plea
 
 #include <string.h>
 
+#define IN_GPERF_GENERATED_FILE
 #include "keywords.h"
 
 struct kw_entry {
@@ -54,7 +55,7 @@ struct kw_entry {
     kw_token_t token;
 };
 
-#define TOTAL_KEYWORDS 139
+#define TOTAL_KEYWORDS 140
 #define MIN_WORD_LENGTH 2
 #define MAX_WORD_LENGTH 17
 #define MIN_HASH_VALUE 9
@@ -69,9 +70,7 @@ inline
 #endif
 #endif
 static unsigned int
-hash (str, len)
-     register const char *str;
-     register unsigned int len;
+hash (register const char *str, register size_t len)
 {
   static const unsigned short asso_values[] =
     {
@@ -80,7 +79,7 @@ hash (str, len)
       258, 258, 258, 258, 258, 258, 258, 258, 258, 258,
       258, 258, 258, 258, 258, 258, 258, 258, 258, 258,
       258, 258, 258, 258, 258, 258, 258, 258, 258,  14,
-      129, 258, 258, 258, 258, 258, 258, 258, 258, 258,
+      129, 258, 258, 258,   4, 258, 258, 258, 258, 258,
       258, 258, 258, 258, 258, 258, 258, 258, 258, 258,
       258, 258, 258, 258, 258, 258, 258, 258, 258, 258,
       258, 258, 258, 258, 258, 258, 258, 258, 258, 258,
@@ -102,7 +101,7 @@ hash (str, len)
       258, 258, 258, 258, 258, 258, 258, 258, 258, 258,
       258, 258, 258, 258, 258, 258
     };
-  register int hval = len;
+  register unsigned int hval = len;
 
   switch (hval)
     {
@@ -202,6 +201,7 @@ static const struct kw_entry wordlist[] =
     {"klipsdebug",        KW_SETUP_DEPRECATED},
     {"ldapbase",          KW_CA_DEPRECATED},
     {"overridemtu",       KW_SETUP_DEPRECATED},
+    {"sha256_96",         KW_SHA256_96},
     {"ocspuri1",          KW_OCSPURI},
     {"dpdtimeout",        KW_DPDTIMEOUT},
     {"aaa_identity",      KW_AAA_IDENTITY},
@@ -278,38 +278,30 @@ static const short lookup[] =
      48,  49,  50,  51,  52,  53,  54,  55,  56,  57,
      58,  59,  -1,  -1,  60,  61,  62,  -1,  63,  -1,
      64,  -1,  65,  66,  67,  68,  69,  70,  71,  72,
-     -1,  73,  74,  75,  76,  77,  78,  -1,  79,  -1,
-     -1,  80,  81,  -1,  82,  -1,  -1,  83,  84,  85,
-     86,  87,  88,  -1,  89,  -1,  90,  91,  -1,  92,
-     93,  -1,  94,  95,  -1,  96,  -1,  -1,  97,  98,
-     99, 100,  -1, 101,  -1, 102, 103, 104,  -1, 105,
-    106, 107, 108, 109, 110, 111, 112, 113, 114, 115,
-     -1, 116,  -1, 117,  -1, 118,  -1,  -1, 119, 120,
-     -1,  -1,  -1,  -1,  -1, 121,  -1, 122,  -1, 123,
-    124, 125,  -1,  -1,  -1,  -1,  -1, 126,  -1,  -1,
-     -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1, 127,  -1,
-     -1, 128, 129,  -1, 130,  -1, 131,  -1,  -1,  -1,
-     -1,  -1,  -1, 132,  -1, 133,  -1, 134, 135,  -1,
-     -1,  -1,  -1, 136,  -1,  -1,  -1,  -1,  -1,  -1,
-    137,  -1,  -1,  -1,  -1,  -1,  -1, 138
+     -1,  73,  74,  75,  76,  77,  78,  79,  80,  -1,
+     -1,  81,  82,  -1,  83,  -1,  -1,  84,  85,  86,
+     87,  88,  89,  -1,  90,  -1,  91,  92,  -1,  93,
+     94,  -1,  95,  96,  -1,  97,  -1,  -1,  98,  99,
+    100, 101,  -1, 102,  -1, 103, 104, 105,  -1, 106,
+    107, 108, 109, 110, 111, 112, 113, 114, 115, 116,
+     -1, 117,  -1, 118,  -1, 119,  -1,  -1, 120, 121,
+     -1,  -1,  -1,  -1,  -1, 122,  -1, 123,  -1, 124,
+    125, 126,  -1,  -1,  -1,  -1,  -1, 127,  -1,  -1,
+     -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1, 128,  -1,
+     -1, 129, 130,  -1, 131,  -1, 132,  -1,  -1,  -1,
+     -1,  -1,  -1, 133,  -1, 134,  -1, 135, 136,  -1,
+     -1,  -1,  -1, 137,  -1,  -1,  -1,  -1,  -1,  -1,
+    138,  -1,  -1,  -1,  -1,  -1,  -1, 139
   };
 
-#ifdef __GNUC__
-__inline
-#if defined __GNUC_STDC_INLINE__ || defined __GNUC_GNU_INLINE__
-__attribute__ ((__gnu_inline__))
-#endif
-#endif
 const struct kw_entry *
-in_word_set (str, len)
-     register const char *str;
-     register unsigned int len;
+in_word_set (register const char *str, register size_t len)
 {
   if (len <= MAX_WORD_LENGTH && len >= MIN_WORD_LENGTH)
     {
-      register int key = hash (str, len);
+      register unsigned int key = hash (str, len);
 
-      if (key <= MAX_HASH_VALUE && key >= 0)
+      if (key <= MAX_HASH_VALUE)
         {
           register int index = lookup[key];
 
