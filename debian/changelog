@@ -1,3 +1,9 @@
+strongswan (5.7.2-1pexip1) pexip; urgency=medium
+
+  * Migrate to Buster
+
+ -- Vincent Sanders <vince@pexip.com>  Mon, 18 May 2020 10:34:44 +0000
+
 strongswan (5.7.2-1) unstable; urgency=medium
 
   * d/control: remove Rene from Uploaders, thanks!
