@@ -1,0 +1,18 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+    configure)
+        if [ -e /etc/apparmor.d/local/usr.lib.ipsec.charon ] && [ "$( md5sum /etc/apparmor.d/local/usr.lib.ipsec.charon | awk '{print $1}')" = "8300beaa00face659fc5d2a587e405b2" ]; then
+            install --mode 644 /dev/null "/etc/apparmor.d/local/usr.lib.ipsec.charon"
+        fi
+    ;;
+    abort-upgrade|abort-remove|abort-deconfigure)
+    ;;
+    *)
+        echo "postinst called with unknown argument '$1'" >&2
+        exit 0
+    ;;
+esac
+
+#DEBHELPER#

@@ -1,3 +1,9 @@
+strongswan (5.7.2-1pexip3) pexip; urgency=medium
+
+  * Force removal of old config files
+
+ -- Huw Jones <huw@pexip.com>  Wed, 04 Aug 2021 14:23:17 +0100
+
 strongswan (5.7.2-1pexip2) pexip; urgency=medium
 
   * Rebuild in buster environment

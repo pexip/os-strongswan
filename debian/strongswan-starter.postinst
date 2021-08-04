@@ -296,6 +296,10 @@ EOF
 
         db_stop
 
+        if [ -e /etc/apparmor.d/local/usr.lib.ipsec.stroke ] && [ "$(md5sum /etc/apparmor.d/local/usr.lib.ipsec.stroke | awk '{print $1}'))" = "c11d091bd51092fa4e848406bc5de3ed" ]; then
+            install --mode 644 /dev/null "/etc/apparmor.d/local/usr.lib.ipsec.stroke"
+        fi
+
     ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)
