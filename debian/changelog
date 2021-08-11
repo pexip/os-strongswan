@@ -1,3 +1,10 @@
+strongswan (5.7.2-1pexip4) pexip; urgency=medium
+
+  * Update strongswan.service definitions, reduce noise from systemd
+    complaining about obsolete settings.
+
+ -- Steve McIntyre <steve.mcintyre@pexip.com>  Wed, 11 Aug 2021 10:51:45 +0100
+
 strongswan (5.7.2-1pexip3) pexip; urgency=medium
 
   * Force removal of old config files
