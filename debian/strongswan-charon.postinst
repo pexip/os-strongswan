@@ -3,8 +3,11 @@ set -e
 
 case "$1" in
     configure)
-        if [ -e /etc/apparmor.d/local/usr.lib.ipsec.charon ] && [ "$( md5sum /etc/apparmor.d/local/usr.lib.ipsec.charon | awk '{print $1}')" = "8300beaa00face659fc5d2a587e405b2" ]; then
-            install --mode 644 /dev/null "/etc/apparmor.d/local/usr.lib.ipsec.charon"
+        if [ -e /etc/apparmor.d/local/usr.lib.ipsec.charon ]; then
+            file_md5_sum=$( md5sum /etc/apparmor.d/local/usr.lib.ipsec.charon | awk '{print $1}');
+            if [ "${file_md5_sum}" = "8300beaa00face659fc5d2a587e405b2" ] || [ "${file_md5_sum}" = "833dcd70936a4b1c52088effac1794ea" ]; then
+                install --mode 644 /dev/null "/etc/apparmor.d/local/usr.lib.ipsec.charon"
+            fi
         fi
     ;;
     abort-upgrade|abort-remove|abort-deconfigure)
