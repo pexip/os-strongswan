@@ -1,3 +1,9 @@
+strongswan (5.7.2-1pexip6) pexip; urgency=medium
+
+  * Fix cleanup of old config files
+
+ -- Huw Jones <huw@pexip.com>  Thu, 2 Sep 2021 14:32:17 +0100
+
 strongswan (5.7.2-1pexip5) pexip; urgency=medium
 
   * Better cleanup of old config files
