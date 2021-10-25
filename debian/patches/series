@@ -2,6 +2,8 @@
 02_disable-bypass-lan.patch
 03_systemd-service.patch
 04_disable-libtls-tests.patch
+0006-cert-cache-Prevent-crash-due-to-integer-overflow-sig.patch
+0007-Reject-RSASSA-PSS-params-with-negative-salt-length.patch
 
-06-ipsec-stop-with-old-pidfile.patch
-07_service_file_update.patch
+pexip/01-ipsec-stop-with-old-pidfile.patch
+pexip/02_service_file_update.patch
