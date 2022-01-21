@@ -1,3 +1,11 @@
+strongswan (5.7.2-1+deb10u2) buster-security; urgency=medium
+
+  * gbp.conf: revert upstream branch name change for now
+  * eap-authenticator: Enforce failure if MSK generation fails
+    -  Fix incorrect handling of Early EAP-Success Messages (CVE-2021-45079)
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Fri, 21 Jan 2022 15:45:18 +0100
+
 strongswan (5.7.2-1+deb10u1) buster-security; urgency=medium
 
   * Reject RSASSA-PSS params with negative salt length

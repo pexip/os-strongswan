@@ -4,3 +4,4 @@
 04_disable-libtls-tests.patch
 0006-cert-cache-Prevent-crash-due-to-integer-overflow-sig.patch
 0007-Reject-RSASSA-PSS-params-with-negative-salt-length.patch
+0007-eap-authenticator-Enforce-failure-if-MSK-generation-.patch
