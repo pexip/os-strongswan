@@ -93,12 +93,6 @@ struct private_plugin_loader_t {
 		/** Number of features in critical plugins that failed to load */
 		int critical;
 	} stats;
-
-	/**
-	 * Fetch features from the given plugin, can optionally be overridden to
-	 * modify feature arrays at loading time
-	 */
-	int (*get_features)(plugin_t *plugin, plugin_feature_t *features[]);
 };
 
 /**
@@ -893,14 +887,6 @@ static void load_features(private_plugin_loader_t *this)
 }
 
 /**
- * Default implementation for plugin feature retrieval
- */
-static int get_features_default(plugin_t *plugin, plugin_feature_t *features[])
-{
-	return plugin->get_features(plugin, features);
-}
-
-/**
  * Register plugin features provided by the given plugin
  */
 static void register_features(private_plugin_loader_t *this,
@@ -918,7 +904,7 @@ static void register_features(private_plugin_loader_t *this,
 		return;
 	}
 	reg = NULL;
-	count = this->get_features(entry->plugin, &feature);
+	count = entry->plugin->get_features(entry->plugin, &feature);
 	for (i = 0; i < count; i++)
 	{
 		switch (feature->kind)
@@ -1463,13 +1449,7 @@ plugin_loader_t *plugin_loader_create()
 		.features = hashlist_create(
 							(hashtable_hash_t)registered_feature_hash,
 							(hashtable_equals_t)registered_feature_equals, 64),
-		.get_features = dlsym(RTLD_DEFAULT, "plugin_loader_feature_filter"),
 	);
-
-	if (!this->get_features)
-	{
-		this->get_features = get_features_default;
-	}
 
 	return &this->public;
 }

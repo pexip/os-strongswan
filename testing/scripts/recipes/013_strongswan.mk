@@ -107,8 +107,7 @@ CONFIG_OPTS = \
 	--enable-systemd \
 	--enable-counters \
 	--enable-save-keys \
-	--enable-python-eggs \
-	--enable-wolfssl
+	--enable-python-eggs
 
 export ADA_PROJECT_PATH=/usr/local/ada/lib/gnat
 
@@ -129,6 +128,6 @@ build: configure
 
 install: build
 	cd $(BUILDDIR) && make -j install && \
-		cd $(DIR)/src/libcharon/plugins/vici/python && python3 setup.py install
+		cd $(DIR)/src/libcharon/plugins/vici/python && python setup.py install
 	# for Python-based updown scripts
-	pip3 install python-daemon
+	pip install python-daemon

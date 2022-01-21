@@ -20,7 +20,6 @@
 #include <stdio.h>
 #include <errno.h>
 
-#include "swanctl.h"
 #include "command.h"
 
 #include <collections/hashtable.h>
@@ -136,7 +135,6 @@ CALLBACK(children_sn, int,
 		}
 		printf("\n");
 
-		print_label("    label:  ", child->get(child, "label"));
 		printf("    local:  %s\n", child->get(child, "local-ts"));
 		printf("    remote: %s\n", child->get(child, "remote-ts"));
 

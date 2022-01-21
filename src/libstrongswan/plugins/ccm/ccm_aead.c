@@ -417,7 +417,6 @@ ccm_aead_t *ccm_aead_create(encryption_algorithm_t algo,
 
 	if (!this->crypter)
 	{
-		this->iv_gen->destroy(this->iv_gen);
 		free(this);
 		return NULL;
 	}

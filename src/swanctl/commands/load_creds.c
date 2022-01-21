@@ -254,7 +254,6 @@ CALLBACK(password_cb, shared_key_t*,
 		*match_other = ID_MATCH_PERFECT;
 	}
 	shared = shared_key_create(type, chunk_clone(chunk_from_str(pwd)));
-	memwipe(pwd, strlen(pwd));
 	/* cache secret if it is required more than once (PKCS#12) */
 	data->cache->add_shared(data->cache, shared, NULL);
 	return shared->get_ref(shared);
@@ -446,7 +445,7 @@ static void load_keys(load_ctx_t *ctx, char *type, char *dir)
 					{
 						load_key(ctx, path, type, *map);
 					}
-					chunk_unmap_clear(map);
+					chunk_unmap(map);
 				}
 				else
 				{
@@ -553,7 +552,7 @@ static void load_containers(load_ctx_t *ctx, char *type, char *dir)
 				if (map)
 				{
 					load_encrypted_container(ctx, rel, path, type, *map);
-					chunk_unmap_clear(map);
+					chunk_unmap(map);
 				}
 				else
 				{
@@ -636,13 +635,14 @@ static void load_tokens(load_ctx_t *ctx)
 			{
 #ifdef HAVE_GETPASS
 				snprintf(prompt, sizeof(prompt), "PIN for %s: ", section);
-				pin = getpass(prompt);
+				pin = strdupnull(getpass(prompt));
 #endif
 			}
 			load_token(ctx, section, pin);
 			if (pin)
 			{
 				memwipe(pin, strlen(pin));
+				free(pin);
 				pin = NULL;
 			}
 		}
@@ -990,7 +990,7 @@ static int load_creds(vici_conn_t *conn)
 
 	ret = load_creds_cfg(conn, format, cfg, clear, noprompt);
 
-	cfg->destroy_clear(cfg);
+	cfg->destroy(cfg);
 
 	return ret;
 }

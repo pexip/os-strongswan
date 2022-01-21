@@ -396,9 +396,9 @@ chunk_t *chunk_map(char *path, bool wr)
 }
 
 /**
- * Unmap the given chunk and optionally clear it
+ * See header.
  */
-static bool chunk_unmap_internal(chunk_t *public, bool clear)
+bool chunk_unmap(chunk_t *public)
 {
 	mmaped_chunk_t *chunk;
 	bool ret = FALSE;
@@ -408,10 +408,6 @@ static bool chunk_unmap_internal(chunk_t *public, bool clear)
 #ifdef HAVE_MMAP
 	if (chunk->map && chunk->map != MAP_FAILED)
 	{
-		if (!chunk->wr && clear)
-		{
-			memwipe(chunk->map, chunk->len);
-		}
 		ret = munmap(chunk->map, chunk->len) == 0;
 		tmp = errno;
 	}
@@ -440,10 +436,6 @@ static bool chunk_unmap_internal(chunk_t *public, bool clear)
 	{
 		ret = TRUE;
 	}
-	if (clear)
-	{
-		memwipe(chunk->map, chunk->len);
-	}
 	free(chunk->map);
 #endif /* !HAVE_MMAP */
 	close(chunk->fd);
@@ -451,22 +443,6 @@ static bool chunk_unmap_internal(chunk_t *public, bool clear)
 	errno = tmp;
 
 	return ret;
-}
-
-/*
- * Described in header
- */
-bool chunk_unmap(chunk_t *public)
-{
-	return chunk_unmap_internal(public, FALSE);
-}
-
-/*
- * Described in header
- */
-bool chunk_unmap_clear(chunk_t *public)
-{
-	return chunk_unmap_internal(public, TRUE);
 }
 
 /** hex conversion digits */

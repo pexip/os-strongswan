@@ -385,11 +385,6 @@ struct settings_t {
 	 * Destroy a settings instance.
 	 */
 	void (*destroy)(settings_t *this);
-
-	/**
-	 * Destroy a settings instance after clearing memory used for values.
-	 */
-	void (*destroy_clear)(settings_t *this);
 };
 
 /**

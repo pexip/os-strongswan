@@ -205,7 +205,7 @@ botan_ec_diffie_hellman_t *botan_ec_diffie_hellman_create(
 			return NULL;
 	}
 
-	if (!botan_get_rng(&rng, RNG_STRONG))
+	if (botan_rng_init(&rng, "user"))
 	{
 		free(this);
 		return NULL;

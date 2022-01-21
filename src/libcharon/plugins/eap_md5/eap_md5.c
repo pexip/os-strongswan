@@ -213,7 +213,7 @@ METHOD(eap_method_t, get_type, eap_type_t,
 METHOD(eap_method_t, get_msk, status_t,
 	private_eap_md5_t *this, chunk_t *msk)
 {
-	return NOT_SUPPORTED;
+	return FAILED;
 }
 
 METHOD(eap_method_t, is_mutual, bool,

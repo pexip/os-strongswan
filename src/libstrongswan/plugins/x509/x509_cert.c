@@ -1710,7 +1710,6 @@ METHOD(certificate_t, issued_by, bool,
 	public_key_t *key;
 	bool valid;
 	x509_t *x509 = (x509_t*)issuer;
-	chunk_t keyid = chunk_empty;
 
 	if (&this->public.interface.interface == issuer)
 	{
@@ -1734,22 +1733,9 @@ METHOD(certificate_t, issued_by, bool,
 			return FALSE;
 		}
 	}
-
-	/* compare keyIdentifiers if available, otherwise use DNs */
-	if (this->authKeyIdentifier.ptr)
+	if (!this->issuer->equals(this->issuer, issuer->get_subject(issuer)))
 	{
-		keyid = x509->get_subjectKeyIdentifier(x509);
-		if (keyid.len && !chunk_equals(keyid, this->authKeyIdentifier))
-		{
-			return FALSE;
-		}
-	}
-	if (!keyid.len)
-	{
-		if (!this->issuer->equals(this->issuer, issuer->get_subject(issuer)))
-		{
-			return FALSE;
-		}
+		return FALSE;
 	}
 
 	/* get the public key of the issuer */

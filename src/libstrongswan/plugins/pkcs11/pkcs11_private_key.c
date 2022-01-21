@@ -388,7 +388,7 @@ METHOD(private_key_t, sign, bool,
 
 METHOD(private_key_t, decrypt, bool,
 	private_pkcs11_private_key_t *this, encryption_scheme_t scheme,
-	void *params, chunk_t crypt, chunk_t *plain)
+	chunk_t crypt, chunk_t *plain)
 {
 	CK_MECHANISM_PTR mechanism;
 	CK_SESSION_HANDLE session;
@@ -627,17 +627,13 @@ static pkcs11_library_t* find_lib_and_keyid_by_skid(chunk_t keyid_chunk,
 											  attr, countof(attr));
 		while (certs->enumerate(certs, &object))
 		{
-			if (attr[0].ulValueLen != CK_UNAVAILABLE_INFORMATION &&
-				attr[1].ulValueLen != CK_UNAVAILABLE_INFORMATION)
-			{
-				INIT(entry,
-					.value = chunk_clone(
-								chunk_create(attr[0].pValue, attr[0].ulValueLen)),
-					.ckaid = chunk_clone(
-								chunk_create(attr[1].pValue, attr[1].ulValueLen)),
-				);
-				raw->insert_last(raw, entry);
-			}
+			INIT(entry,
+				.value = chunk_clone(
+							chunk_create(attr[0].pValue, attr[0].ulValueLen)),
+				.ckaid = chunk_clone(
+							chunk_create(attr[1].pValue, attr[1].ulValueLen)),
+			);
+			raw->insert_last(raw, entry);
 		}
 		certs->destroy(certs);
 
@@ -712,8 +708,7 @@ static bool find_key(private_pkcs11_private_key_t *this, chunk_t keyid)
 	}
 	enumerator = this->lib->create_object_enumerator(this->lib,
 							this->session, tmpl, countof(tmpl), attr, count);
-	if (enumerator->enumerate(enumerator, &object) &&
-		attr[0].ulValueLen != CK_UNAVAILABLE_INFORMATION)
+	if (enumerator->enumerate(enumerator, &object))
 	{
 		this->type = KEY_RSA;
 		switch (type)
@@ -722,10 +717,7 @@ static bool find_key(private_pkcs11_private_key_t *this, chunk_t keyid)
 				this->type = KEY_ECDSA;
 				/* fall-through */
 			case CKK_RSA:
-				if (attr[1].ulValueLen != CK_UNAVAILABLE_INFORMATION)
-				{
-					this->reauth = reauth;
-				}
+				this->reauth = reauth;
 				this->object = object;
 				found = TRUE;
 				break;
@@ -811,8 +803,7 @@ static public_key_t* find_pubkey_in_certs(private_pkcs11_private_key_t *this,
 
 	enumerator = this->lib->create_object_enumerator(this->lib, this->session,
 									tmpl, countof(tmpl), attr, countof(attr));
-	if (enumerator->enumerate(enumerator, &object) &&
-		attr[0].ulValueLen != CK_UNAVAILABLE_INFORMATION)
+	if (enumerator->enumerate(enumerator, &object))
 	{
 		data = chunk_clone(chunk_create(attr[0].pValue, attr[0].ulValueLen));
 	}

@@ -191,7 +191,6 @@ static entry_t* find_entry(private_vici_socket_t *this, stream_t *stream,
 			}
 			if (entry->disconnecting)
 			{
-				entry->cond->signal(entry->cond);
 				continue;
 			}
 			candidate = TRUE;
@@ -245,7 +244,6 @@ static entry_t* remove_entry(private_vici_socket_t *this, u_int id)
 					break;
 				}
 				this->connections->remove_at(this->connections, enumerator);
-				entry->cond->broadcast(entry->cond);
 				found = entry;
 				break;
 			}
@@ -506,7 +504,7 @@ CALLBACK(process_queue, job_requeue_t,
 			break;
 		}
 
-		thread_cleanup_push((void*)chunk_clear, &chunk);
+		thread_cleanup_push(free, chunk.ptr);
 		sel->this->inbound(sel->this->user, id, chunk);
 		thread_cleanup_pop(TRUE);
 	}

@@ -1,9 +1,8 @@
-/* A Bison parser, made by GNU Bison 3.5.1.  */
+/* A Bison parser, made by GNU Bison 3.0.4.  */
 
 /* Bison interface for Yacc-like parsers in C
 
-   Copyright (C) 1984, 1989-1990, 2000-2015, 2018-2020 Free Software Foundation,
-   Inc.
+   Copyright (C) 1984, 1989-1990, 2000-2015 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -31,31 +30,20 @@
    This special exception was added by the Free Software Foundation in
    version 2.2 of Bison.  */
 
-/* Undocumented macros, especially those whose name start with YY_,
-   are private implementation details.  Do not rely on them.  */
-
 #ifndef YY_SETTINGS_PARSER_SETTINGS_SETTINGS_PARSER_H_INCLUDED
 # define YY_SETTINGS_PARSER_SETTINGS_SETTINGS_PARSER_H_INCLUDED
 /* Debug traces.  */
-#ifndef SETTINGS_PARSER_DEBUG
-# if defined YYDEBUG
+#ifndef YYDEBUG
+# define YYDEBUG 1
+#endif
 #if YYDEBUG
-#   define SETTINGS_PARSER_DEBUG 1
-#  else
-#   define SETTINGS_PARSER_DEBUG 0
-#  endif
-# else /* ! defined YYDEBUG */
-#  define SETTINGS_PARSER_DEBUG 1
-# endif /* ! defined YYDEBUG */
-#endif  /* ! defined SETTINGS_PARSER_DEBUG */
-#if SETTINGS_PARSER_DEBUG
 extern int settings_parser_debug;
 #endif
 
 /* Token type.  */
-#ifndef SETTINGS_PARSER_TOKENTYPE
-# define SETTINGS_PARSER_TOKENTYPE
-  enum settings_parser_tokentype
+#ifndef YYTOKENTYPE
+# define YYTOKENTYPE
+  enum yytokentype
   {
     NAME = 258,
     STRING = 259,
@@ -76,34 +64,27 @@ extern int settings_parser_debug;
 #define STRING_ERROR 264
 
 /* Value type.  */
-#if ! defined SETTINGS_PARSER_STYPE && ! defined SETTINGS_PARSER_STYPE_IS_DECLARED
-union SETTINGS_PARSER_STYPE
+#if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
+
+union YYSTYPE
 {
-#line 85 "settings/settings_parser.y"
+#line 78 "settings/settings_parser.y" /* yacc.c:1909  */
 
 	char *s;
 	struct section_t *sec;
 	struct kv_t *kv;
 	array_t *refs;
 
-#line 90 "settings/settings_parser.h"
-
+#line 79 "settings/settings_parser.h" /* yacc.c:1909  */
 };
-typedef union SETTINGS_PARSER_STYPE SETTINGS_PARSER_STYPE;
-# define SETTINGS_PARSER_STYPE_IS_TRIVIAL 1
-# define SETTINGS_PARSER_STYPE_IS_DECLARED 1
+
+typedef union YYSTYPE YYSTYPE;
+# define YYSTYPE_IS_TRIVIAL 1
+# define YYSTYPE_IS_DECLARED 1
 #endif
 
 
 
 int settings_parser_parse (parser_helper_t *ctx);
-/* "%code provides" blocks.  */
-#line 74 "settings/settings_parser.y"
-
-	#define YY_DECL \
-		int settings_parser_lex(SETTINGS_PARSER_STYPE *yylval, void *yyscanner)
-	YY_DECL;
-
-#line 108 "settings/settings_parser.h"
 
 #endif /* !YY_SETTINGS_PARSER_SETTINGS_SETTINGS_PARSER_H_INCLUDED  */

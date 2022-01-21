@@ -153,11 +153,11 @@ enum notify_type_t {
 	FRAGMENTATION_SUPPORTED = 16430,
 	/* Signature Hash Algorithms, RFC 7427 */
 	SIGNATURE_HASH_ALGORITHMS = 16431,
-	/* Use Postquantum Preshared Key, RFC 8784 */
+	/* Use Postquantum Preshared Key (draft-ietf-ipsecme-qr-ikev2) */
 	USE_PPK = 16435,
-	/* Postquantum Preshared Key Identity, RFC 8784 */
+	/* Postquantum Preshared Key Identity (draft-ietf-ipsecme-qr-ikev2) */
 	PPK_IDENTITY = 16436,
-	/* No Postquantum Preshared Key Auth, RFC 8784 */
+	/* No Postquantum Preshared Key Auth (draft-ietf-ipsecme-qr-ikev2) */
 	NO_PPK_AUTH = 16437,
 	/* IKEv1 initial contact */
 	INITIAL_CONTACT_IKEV1 = 24578,

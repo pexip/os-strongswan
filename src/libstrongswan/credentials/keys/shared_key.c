@@ -77,7 +77,7 @@ METHOD(shared_key_t, destroy, void,
 {
 	if (ref_put(&this->ref))
 	{
-		chunk_clear(&this->key);
+		free(this->key.ptr);
 		free(this);
 	}
 }

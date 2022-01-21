@@ -78,7 +78,7 @@ class Session(CommandWrappers, object):
             if command_response["success"] != b"yes":
                 raise CommandException(
                     "Command failed: {errmsg}".format(
-                        errmsg=command_response["errmsg"].decode("UTF-8")
+                        errmsg=command_response["errmsg"]
                     )
                 )
 
@@ -135,7 +135,7 @@ class Session(CommandWrappers, object):
             if command_response["success"] != b"yes":
                 raise CommandException(
                     "Command failed: {errmsg}".format(
-                        errmsg=command_response["errmsg"].decode("UTF-8")
+                        errmsg=command_response["errmsg"]
                     )
                 )
 

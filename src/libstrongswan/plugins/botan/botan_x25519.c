@@ -155,7 +155,7 @@ diffie_hellman_t *botan_x25519_create(diffie_hellman_group_t group)
 		},
 	);
 
-	if (!botan_get_rng(&rng, RNG_STRONG))
+	if (botan_rng_init(&rng, "user"))
 	{
 		free(this);
 		return NULL;

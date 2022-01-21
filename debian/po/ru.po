@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: strongswan 5.1.0-1\n"
 "Report-Msgid-Bugs-To: strongswan@packages.debian.org\n"
-"POT-Creation-Date: 2022-05-07 20:19+0200\n"
+"POT-Creation-Date: 2022-01-21 15:56+0100\n"
 "PO-Revision-Date: 2013-10-07 19:08+0400\n"
 "Last-Translator: Yuri Kozlov <yuray@komyakino.ru>\n"
 "Language-Team: Russian <debian-l10n-russian@lists.debian.org>\n"
@@ -16,8 +16,8 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "X-Generator: KBabel 1.11.4\n"
-"Plural-Forms:  nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && "
-"n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+"Plural-Forms:  nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n"
+"%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
 
 #. Type: boolean
 #. Description
@@ -331,8 +331,8 @@ msgstr "Название организации для запроса серти
 msgid ""
 "Please enter the organization the server belongs to (such as \"Debian\")."
 msgstr ""
-"Укажите название организации, которой принадлежит сервер (например, "
-"\"Debian\")."
+"Укажите название организации, которой принадлежит сервер (например, \"Debian"
+"\")."
 
 #. Type: string
 #. Description

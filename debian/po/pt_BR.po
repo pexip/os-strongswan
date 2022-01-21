@@ -9,7 +9,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: strongswan 5.1.3-4\n"
 "Report-Msgid-Bugs-To: strongswan@packages.debian.org\n"
-"POT-Creation-Date: 2022-05-07 20:19+0200\n"
+"POT-Creation-Date: 2022-01-21 15:56+0100\n"
 "PO-Revision-Date: 2014-06-25 18:13-0300\n"
 "Last-Translator: Adriano Rafael Gomes <adrianorg@arg.eti.br>\n"
 "Language-Team: Brazilian Portuguese <debian-l10n-portuguese@lists.debian."
@@ -323,8 +323,8 @@ msgid ""
 "Please enter the locality the server resides in (often a city, such as "
 "\"Vienna\")."
 msgstr ""
-"Por favor, informe a localidade em que o servidor reside (como \"São "
-"Paulo\")."
+"Por favor, informe a localidade em que o servidor reside (como \"São Paulo"
+"\")."
 
 #. Type: string
 #. Description
@@ -338,8 +338,8 @@ msgstr "Nome da organização para a requisição de certificado X.509:"
 msgid ""
 "Please enter the organization the server belongs to (such as \"Debian\")."
 msgstr ""
-"Por favor, informe a organização à qual o servidor pertence (como "
-"\"Debian\")."
+"Por favor, informe a organização à qual o servidor pertence (como \"Debian"
+"\")."
 
 #. Type: string
 #. Description

@@ -484,8 +484,7 @@ METHOD(keymat_v1_t, derive_ike_keys, bool,
 	{
 		return FALSE;
 	}
-	charon->bus->ike_derived_keys(charon->bus, this->skeyid_d, this->skeyid_a,
-								  chunk_empty, ka, chunk_empty, chunk_empty,
+	charon->bus->ike_derived_keys(charon->bus, ka, chunk_empty, this->skeyid_a,
 								  chunk_empty);
 	chunk_clear(&ka);
 	if (!this->hasher && !this->public.create_hasher(&this->public, proposal))
@@ -507,36 +506,6 @@ METHOD(keymat_v1_t, derive_ike_keys, bool,
 										this->aead->get_block_size(this->aead));
 }
 
-/**
- * Derive key material for CHILD_SAs according to section 5.5. in RFC 2409.
- */
-static bool derive_child_keymat(private_keymat_v1_t *this, chunk_t seed,
-								uint16_t enc_size, chunk_t *encr,
-								uint16_t int_size, chunk_t *integ)
-{
-	size_t block_size, i;
-	chunk_t keymat, prev = chunk_empty;
-
-	block_size = this->prf->get_block_size(this->prf);
-	keymat = chunk_alloc(round_up(enc_size + int_size, block_size));
-	keymat.len = enc_size + int_size;
-
-	for (i = 0; i < keymat.len; i += block_size)
-	{
-		if (!this->prf->get_bytes(this->prf, prev, NULL) ||
-			!this->prf->get_bytes(this->prf, seed, keymat.ptr + i))
-		{
-			chunk_clear(&keymat);
-			return FALSE;
-		}
-		prev = chunk_create(keymat.ptr + i, block_size);
-	}
-
-	chunk_split(keymat, "aa", enc_size, encr, int_size, integ);
-	chunk_clear(&keymat);
-	return TRUE;
-}
-
 METHOD(keymat_v1_t, derive_child_keys, bool,
 	private_keymat_v1_t *this, proposal_t *proposal, diffie_hellman_t *dh,
 	uint32_t spi_i, uint32_t spi_r, chunk_t nonce_i, chunk_t nonce_r,
@@ -544,7 +513,8 @@ METHOD(keymat_v1_t, derive_child_keys, bool,
 {
 	uint16_t enc_alg, int_alg, enc_size = 0, int_size = 0;
 	uint8_t protocol;
-	chunk_t seed = chunk_empty, secret = chunk_empty;
+	prf_plus_t *prf_plus;
+	chunk_t seed, secret = chunk_empty;
 	bool success = FALSE;
 
 	if (proposal->get_algorithm(proposal, ENCRYPTION_ALGORITHM,
@@ -628,7 +598,11 @@ METHOD(keymat_v1_t, derive_child_keys, bool,
 	seed = chunk_cata("ccccc", secret, chunk_from_thing(protocol),
 					  chunk_from_thing(spi_r), nonce_i, nonce_r);
 	DBG4(DBG_CHD, "initiator SA seed %B", &seed);
-	if (!derive_child_keymat(this, seed, enc_size, encr_i, int_size, integ_i))
+
+	prf_plus = prf_plus_create(this->prf, FALSE, seed);
+	if (!prf_plus ||
+		!prf_plus->allocate_bytes(prf_plus, enc_size, encr_i) ||
+		!prf_plus->allocate_bytes(prf_plus, int_size, integ_i))
 	{
 		goto failure;
 	}
@@ -636,7 +610,11 @@ METHOD(keymat_v1_t, derive_child_keys, bool,
 	seed = chunk_cata("ccccc", secret, chunk_from_thing(protocol),
 					  chunk_from_thing(spi_i), nonce_i, nonce_r);
 	DBG4(DBG_CHD, "responder SA seed %B", &seed);
-	if (!derive_child_keymat(this, seed, enc_size, encr_r, int_size, integ_r))
+	prf_plus->destroy(prf_plus);
+	prf_plus = prf_plus_create(this->prf, FALSE, seed);
+	if (!prf_plus ||
+		!prf_plus->allocate_bytes(prf_plus, enc_size, encr_r) ||
+		!prf_plus->allocate_bytes(prf_plus, int_size, integ_r))
 	{
 		goto failure;
 	}
@@ -661,7 +639,7 @@ failure:
 		chunk_clear(encr_r);
 		chunk_clear(integ_r);
 	}
-	memwipe(seed.ptr, seed.len);
+	DESTROY_IF(prf_plus);
 	chunk_clear(&secret);
 
 	return success;

@@ -104,7 +104,7 @@ struct xof_t {
 	/**
 	 * Set the key for this xof_t object.
 	 *
-	 * @param seed		seed to set
+	 * @param sed		seed to set
 	 * @return			TRUE if XOF initialized with seed successfully
 	 */
 	bool (*set_seed)(xof_t *this,

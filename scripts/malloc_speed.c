@@ -18,9 +18,9 @@
 #include <library.h>
 #include <utils/debug.h>
 
-#if defined(HAVE_MALLINFO2) || defined (HAVE_MALLINFO)
+#ifdef HAVE_MALLINFO
 #include <malloc.h>
-#endif
+#endif /* HAVE_MALLINFO */
 
 static void start_timing(struct timespec *start)
 {
@@ -38,15 +38,12 @@ static double end_timing(struct timespec *start)
 
 static void print_mallinfo()
 {
-#ifdef HAVE_MALLINFO2
-	struct mallinfo2 mi = mallinfo2();
-	printf("malloc: sbrk %zu, mmap %zu, used %zu, free %zu\n",
-		   mi.arena, mi.hblkhd, mi.uordblks, mi.fordblks);
-#elif defined(HAVE_MALLINFO)
+#ifdef HAVE_MALLINFO
 	struct mallinfo mi = mallinfo();
+
 	printf("malloc: sbrk %d, mmap %d, used %d, free %d\n",
 		   mi.arena, mi.hblkhd, mi.uordblks, mi.fordblks);
-#endif
+#endif /* HAVE_MALLINFO */
 }
 
 #define ALLOCS 1024

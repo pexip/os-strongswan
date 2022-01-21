@@ -148,7 +148,7 @@ static job_requeue_t monitor_changes(private_keychain_creds_t *this)
 	{
 		this->loop = CFRunLoopGetCurrent();
 
-		/* does not return until canceled */
+		/* does not return until cancelled */
 		CFRunLoopRun();
 
 		this->loop = NULL;

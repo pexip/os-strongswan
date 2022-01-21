@@ -50,6 +50,7 @@ typedef struct kernel_interface_t kernel_interface_t;
 typedef enum kernel_feature_t kernel_feature_t;
 
 #include <networking/host.h>
+#include <crypto/prf_plus.h>
 
 #include <kernel/kernel_listener.h>
 #include <kernel/kernel_ipsec.h>
@@ -144,15 +145,13 @@ struct kernel_interface_t {
 	 * @param mark_out	outbound mark on SA
 	 * @param if_id_in	inbound interface ID on SA
 	 * @param if_id_out	outbound interface ID on SA
-	 * @param label		security label (usually the one on the policy, not SA)
 	 * @param reqid		allocated reqid
 	 * @return			SUCCESS if reqid allocated
 	 */
 	status_t (*alloc_reqid)(kernel_interface_t *this,
 							linked_list_t *local_ts, linked_list_t *remote_ts,
 							mark_t mark_in, mark_t mark_out, uint32_t if_id_in,
-							uint32_t if_id_out, sec_label_t *label,
-							uint32_t *reqid);
+							uint32_t if_id_out, uint32_t *reqid);
 
 	/**
 	 * Release a previously allocated reqid.
@@ -162,13 +161,11 @@ struct kernel_interface_t {
 	 * @param mark_out	outbound mark on SA
 	 * @param if_id_in	inbound interface ID on SA
 	 * @param if_id_out	outbound interface ID on SA
-	 * @param label		security label (usually the one on the policy, not SA)
 	 * @return			SUCCESS if reqid released
 	 */
 	status_t (*release_reqid)(kernel_interface_t *this, uint32_t reqid,
 							  mark_t mark_in, mark_t mark_out,
-							  uint32_t if_id_in, uint32_t if_id_out,
-							  sec_label_t *label);
+							  uint32_t if_id_in, uint32_t if_id_out);
 
 	/**
 	 * Add an SA to the SAD.
@@ -516,10 +513,11 @@ struct kernel_interface_t {
 	 * Raise an acquire event.
 	 *
 	 * @param reqid			reqid of the policy to acquire
-	 * @param data			data from the acquire
+	 * @param src_ts		source traffic selector
+	 * @param dst_ts		destination traffic selector
 	 */
 	void (*acquire)(kernel_interface_t *this, uint32_t reqid,
-					kernel_acquire_data_t *data);
+					traffic_selector_t *src_ts, traffic_selector_t *dst_ts);
 
 	/**
 	 * Raise an expire event.

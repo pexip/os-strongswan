@@ -187,18 +187,6 @@ METHOD(public_key_t, verify, bool,
 		case SIGN_RSA_EMSA_PKCS1_SHA2_512:
 			return verify_emsa_pkcs1_signature(this, WC_HASH_TYPE_SHA512, data,
 											   signature);
-		case SIGN_RSA_EMSA_PKCS1_SHA3_224:
-			return verify_emsa_pkcs1_signature(this, WC_HASH_TYPE_SHA3_224, data,
-											   signature);
-		case SIGN_RSA_EMSA_PKCS1_SHA3_256:
-			return verify_emsa_pkcs1_signature(this, WC_HASH_TYPE_SHA3_256, data,
-											   signature);
-		case SIGN_RSA_EMSA_PKCS1_SHA3_384:
-			return verify_emsa_pkcs1_signature(this, WC_HASH_TYPE_SHA3_384, data,
-											   signature);
-		case SIGN_RSA_EMSA_PKCS1_SHA3_512:
-			return verify_emsa_pkcs1_signature(this, WC_HASH_TYPE_SHA3_512, data,
-											   signature);
 		case SIGN_RSA_EMSA_PKCS1_SHA1:
 			return verify_emsa_pkcs1_signature(this, WC_HASH_TYPE_SHA, data,
 											   signature);
@@ -218,16 +206,10 @@ METHOD(public_key_t, verify, bool,
 
 METHOD(public_key_t, encrypt, bool,
 	private_wolfssl_rsa_public_key_t *this, encryption_scheme_t scheme,
-	void *params, chunk_t plain, chunk_t *crypto)
+	chunk_t plain, chunk_t *crypto)
 {
 	int padding, mgf, len;
 	enum wc_HashType hash;
-	chunk_t label = chunk_empty;
-
-	if (params)
-	{
-		label = *(chunk_t *)params;
-	}
 
 	switch (scheme)
 	{
@@ -282,7 +264,7 @@ METHOD(public_key_t, encrypt, bool,
 	*crypto = chunk_alloc(len);
 	len = wc_RsaPublicEncrypt_ex(plain.ptr, plain.len, crypto->ptr, len,
 								 &this->rsa, &this->rng, padding, hash, mgf,
-								 label.ptr, label.len);
+								 NULL, 0);
 	if (len < 0)
 	{
 		DBG1(DBG_LIB, "RSA encryption failed");
