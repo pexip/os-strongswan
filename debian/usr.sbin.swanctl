@@ -1,6 +1,6 @@
 #include <tunables/global>
 
-/usr/sbin/swanctl {
+/usr/sbin/swanctl flags=(attach_disconnected) {
   #include <abstractions/base>
 
   # Allow /etc/swanctl/x509ca/ files to symlink to system-wide ca-certificates
@@ -20,6 +20,12 @@
 
   # Allow communication with VICI plugin UNIX domain socket
   /run/charon.vici              rw,
+
+  # Allow reading own binary
+  /usr/sbin/swanctl             r,
+
+  # for af-alg plugin
+  network alg seqpacket,
 
   # As of 5.5.2, swanctl unnecessarily loads plugins by default, even though no
   # plugins are actually used by swanctl.  The following can be removed if

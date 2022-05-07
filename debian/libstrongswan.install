@@ -3,9 +3,11 @@ usr/lib/ipsec/libstrongswan.so*
 usr/lib/ipsec/plugins/libstrongswan-aes.so
 usr/lib/ipsec/plugins/libstrongswan-constraints.so
 usr/lib/ipsec/plugins/libstrongswan-dnskey.so
+usr/lib/ipsec/plugins/libstrongswan-drbg.so
 usr/lib/ipsec/plugins/libstrongswan-fips-prf.so
 usr/lib/ipsec/plugins/libstrongswan-gmp.so
 usr/lib/ipsec/plugins/libstrongswan-hmac.so
+usr/lib/ipsec/plugins/libstrongswan-kdf.so
 usr/lib/ipsec/plugins/libstrongswan-md5.so
 usr/lib/ipsec/plugins/libstrongswan-mgf1.so
 usr/lib/ipsec/plugins/libstrongswan-nonce.so
@@ -28,9 +30,11 @@ usr/lib/ipsec/plugins/libstrongswan-xcbc.so
 usr/share/strongswan/templates/config/plugins/aes.conf
 usr/share/strongswan/templates/config/plugins/constraints.conf
 usr/share/strongswan/templates/config/plugins/dnskey.conf
+usr/share/strongswan/templates/config/plugins/drbg.conf
 usr/share/strongswan/templates/config/plugins/fips-prf.conf
 usr/share/strongswan/templates/config/plugins/gmp.conf
 usr/share/strongswan/templates/config/plugins/hmac.conf
+usr/share/strongswan/templates/config/plugins/kdf.conf
 usr/share/strongswan/templates/config/plugins/md5.conf
 usr/share/strongswan/templates/config/plugins/mgf1.conf
 usr/share/strongswan/templates/config/plugins/nonce.conf
@@ -52,9 +56,11 @@ usr/share/strongswan/templates/config/plugins/xcbc.conf
 etc/strongswan.d/charon/aes.conf
 etc/strongswan.d/charon/constraints.conf
 etc/strongswan.d/charon/dnskey.conf
+etc/strongswan.d/charon/drbg.conf
 etc/strongswan.d/charon/fips-prf.conf
 etc/strongswan.d/charon/gmp.conf
 etc/strongswan.d/charon/hmac.conf
+etc/strongswan.d/charon/kdf.conf
 etc/strongswan.d/charon/md5.conf
 etc/strongswan.d/charon/mgf1.conf
 etc/strongswan.d/charon/nonce.conf

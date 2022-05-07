@@ -1,3 +1,17 @@
+strongswan (5.8.0-1) unstable; urgency=medium
+
+  With 5.8.0, systemd service files for strongSwan have been renamed.
+  The strongswan service file, previously in the strongswan-starter package
+  and associated with the ipsec(8) command, is now called strongswan-starter.
+  The strongswan-swanctl service file in the strongswan-swanctl package and
+  associated to the swanctl (8) command, is now called strongswan.
+  .
+  Thus strongswan.service file has thus been moved from the strongswan-starter
+  to the strongswan-swanctl service and administrator should ensure they're
+  calling the right service for their usage.
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Mon, 26 Aug 2019 16:29:57 +0200
+
 strongswan (5.6.2-1) unstable; urgency=medium
 
   Starting 5.6.1, several algorithms were removed from the default ESP/AH and

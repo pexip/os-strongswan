@@ -1,5 +1,5 @@
 #!/usr/bin/make -f
-export DEB_LDFLAGS_MAINT_APPEND=-Wl,--as-needed -Wl,-O1
+export DEB_LDFLAGS_MAINT_APPEND=-Wl,-O1
 #export DEB_LDFLAGS_MAINT_APPEND=-Wl,--as-needed -Wl,-O1 -Wl,-z,defs
 export DEB_BUILD_MAINT_OPTIONS=hardening=+all
 
@@ -23,9 +23,11 @@ CONFIGUREARGS := --libdir=/usr/lib --libexecdir=/usr/lib \
 		--enable-eap-tnc \
 		--enable-eap-ttls \
 		--enable-error-notify \
+		--enable-forecast \
 		--enable-gcm \
 		--enable-gcrypt \
 		--enable-ha \
+		--enable-kernel-libipsec \
 		--enable-ldap \
 		--enable-led \
 		--enable-lookip \
@@ -34,10 +36,12 @@ CONFIGUREARGS := --libdir=/usr/lib --libexecdir=/usr/lib \
 		--enable-pkcs11 \
 		--enable-test-vectors \
 		--enable-tpm \
+		--enable-tss-tss2 \
 		--enable-unity \
 		--enable-xauth-eap \
 		--enable-xauth-pam \
 		--disable-blowfish \
+		--disable-fast \
 		--disable-des # BSD-Young license
 	#--with-user=strongswan --with-group=nogroup
 	#	--enable-kernel-pfkey --enable-kernel-klips \
@@ -129,7 +133,9 @@ ifeq ($(DEB_HOST_ARCH_OS),linux)
 	dh_install -p libstrongswan-extra-plugins usr/share/strongswan/templates/config/plugins/af-alg.conf
 	dh_install -p libstrongswan-extra-plugins etc/strongswan.d/charon/af-alg.conf
 	# the systemd service file only gets generated on Linux
-	dh_install -p strongswan-starter lib/systemd/system/strongswan.service
+	dh_install -p strongswan-starter lib/systemd/system/strongswan-starter.service
+	# XFRM is Linux only
+	dh_install -p strongswan-libcharon usr/lib/ipsec/xfrmi
 endif
 
 ifeq ($(DEB_HOST_ARCH_OS),kfreebsd)
@@ -180,7 +186,7 @@ endif
 		-Xlibstrongswan-rdrand.so -X rdrand.conf \
 		-Xlibstrongswan-aesni.so -X aesni.conf \
 		-Xlibstrongswan-af-alg.so -X af-alg.conf \
-		-Xstrongswan.service
+		-Xstrongswan-starter.service
 
 	# AppArmor.
 	dh_apparmor --profile-name=usr.lib.ipsec.charon -p strongswan-charon
@@ -191,12 +197,6 @@ endif
 
 	# add additional files not covered by upstream makefile...
 	install --mode=0600 $(CURDIR)/debian/ipsec.secrets.proto $(CURDIR)/debian/strongswan-starter/etc/ipsec.secrets
-	# also "patch" ipsec.conf to include the debconf-managed file
-	echo >> $(CURDIR)/debian/strongswan-starter/etc/ipsec.conf
-	echo "include /var/lib/strongswan/ipsec.conf.inc" >> $(CURDIR)/debian/strongswan-starter/etc/ipsec.conf
-	# and to enable both IKEv1 and IKEv2 by default
-	sed -r 's/^[ \t]+# *charonstart=(yes|no) */\tcharonstart=yes/' < $(CURDIR)/debian/strongswan-starter/etc/ipsec.conf > $(CURDIR)/debian/strongswan-starter/etc/ipsec.conf.tmp
-	mv $(CURDIR)/debian/strongswan-starter/etc/ipsec.conf.tmp $(CURDIR)/debian/strongswan-starter/etc/ipsec.conf
 
 	# set permissions on ipsec.secrets and private key directories
 	chmod 600 $(CURDIR)/debian/strongswan-starter/etc/ipsec.secrets
@@ -220,13 +220,10 @@ endif
 	find $(CURDIR)/debian/*strongswan*/ -name "/.svn/" | xargs --no-run-if-empty rm -rf
 
 override_dh_installinit:
-	dh_installinit -n --name=ipsec
+	dh_installinit --name=ipsec
 
 override_dh_installchangelogs:
 	dh_installchangelogs NEWS
-
-override_dh_strip:
-	dh_strip --dbgsym-migration='strongswan-dbg (<< 5.3.5-2~)'
 
 override_dh_fixperms:
 	dh_fixperms \
@@ -245,6 +242,9 @@ override_dh_makeshlibs:
 override_dh_installlogcheck:
 	dh_installlogcheck --name strongswan
 
+ifeq ($(HOME),/home/salsa-ci)
+override_dh_auto_test: export TESTS_SUITES_EXCLUDE=http fetcher, stream
+endif
 override_dh_auto_test:
 ifeq ($(DEB_BUILD_ARCH),amd64)
 	dh_auto_test
@@ -257,4 +257,4 @@ override_dh_missing-indep:
 	dh_missing --list-missing
 
 %:
-	dh $@ --with systemd
+	dh $@

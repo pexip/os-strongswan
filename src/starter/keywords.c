@@ -1,5 +1,5 @@
 /* ANSI-C code produced by gperf version 3.1 */
-/* Command-line: /usr/bin/gperf -m 10 -C -G -D -t  */
+/* Command-line: /usr/bin/gperf -m 10 -C -G -D -t --output-file=keywords.c ./keywords.txt  */
 /* Computed positions: -k'2-3,6,$' */
 
 #if !((' ' == 32) && ('!' == 33) && ('"' == 34) && ('#' == 35) \
@@ -29,6 +29,7 @@
 #error "gperf generated tables don't work with this execution character set. Please report a bug to <bug-gperf@gnu.org>."
 #endif
 
+#line 1 "./keywords.txt"
 
 /*
  * Copyright (C) 2005 Andreas Steffen
@@ -50,6 +51,7 @@
 #define IN_GPERF_GENERATED_FILE
 #include "keywords.h"
 
+#line 23 "./keywords.txt"
 struct kw_entry {
     char *name;
     kw_token_t token;
@@ -122,145 +124,285 @@ hash (register const char *str, register size_t len)
 
 static const struct kw_entry wordlist[] =
   {
+#line 165 "./keywords.txt"
     {"pfs",               KW_PFS_DEPRECATED},
+#line 135 "./keywords.txt"
     {"rightgroups",       KW_RIGHTGROUPS},
+#line 37 "./keywords.txt"
     {"aggressive",        KW_AGGRESSIVE},
+#line 46 "./keywords.txt"
     {"lifetime",          KW_KEYLIFE},
+#line 127 "./keywords.txt"
     {"rightsigkey",       KW_RIGHTSIGKEY},
+#line 50 "./keywords.txt"
     {"lifebytes",         KW_LIFEBYTES},
+#line 54 "./keywords.txt"
     {"keyingtries",       KW_KEYINGTRIES},
+#line 102 "./keywords.txt"
     {"leftsigkey",        KW_LEFTSIGKEY},
+#line 47 "./keywords.txt"
     {"keylife",           KW_KEYLIFE},
+#line 103 "./keywords.txt"
     {"leftrsasigkey",     KW_LEFTSIGKEY},
+#line 112 "./keywords.txt"
     {"right",             KW_RIGHT},
+#line 106 "./keywords.txt"
     {"leftcertpolicy",    KW_LEFTCERTPOLICY},
+#line 87 "./keywords.txt"
     {"left",              KW_LEFT},
+#line 114 "./keywords.txt"
     {"rightsubnet",       KW_RIGHTSUBNET},
+#line 113 "./keywords.txt"
     {"rightikeport",      KW_RIGHTIKEPORT},
+#line 132 "./keywords.txt"
     {"rightsendcert",     KW_RIGHTSENDCERT},
+#line 110 "./keywords.txt"
     {"leftgroups",        KW_LEFTGROUPS},
+#line 128 "./keywords.txt"
     {"rightrsasigkey",    KW_RIGHTSIGKEY},
+#line 104 "./keywords.txt"
     {"leftcert",          KW_LEFTCERT},
+#line 52 "./keywords.txt"
     {"lifepackets",       KW_LIFEPACKETS},
+#line 30 "./keywords.txt"
     {"uniqueids",         KW_UNIQUEIDS},
+#line 93 "./keywords.txt"
     {"leftdns",           KW_LEFTDNS},
+#line 107 "./keywords.txt"
     {"leftsendcert",      KW_LEFTSENDCERT},
+#line 115 "./keywords.txt"
     {"rightsubnetwithin", KW_RIGHTSUBNET},
+#line 121 "./keywords.txt"
     {"rightallowany",     KW_RIGHTALLOWANY},
+#line 156 "./keywords.txt"
     {"keep_alive",        KW_SETUP_DEPRECATED},
+#line 117 "./keywords.txt"
     {"rightsourceip",     KW_RIGHTSOURCEIP},
+#line 34 "./keywords.txt"
     {"type",              KW_TYPE},
+#line 125 "./keywords.txt"
     {"rightid",           KW_RIGHTID},
+#line 118 "./keywords.txt"
     {"rightdns",          KW_RIGHTDNS},
+#line 73 "./keywords.txt"
     {"reqid",             KW_REQID},
+#line 86 "./keywords.txt"
     {"certuribase",       KW_CERTURIBASE},
+#line 168 "./keywords.txt"
     {"leftnexthop",       KW_LEFT_DEPRECATED},
+#line 74 "./keywords.txt"
     {"replay_window",     KW_REPLAY_WINDOW},
+#line 91 "./keywords.txt"
     {"leftprotoport",     KW_LEFTPROTOPORT},
+#line 35 "./keywords.txt"
     {"compress",          KW_COMPRESS},
+#line 41 "./keywords.txt"
     {"mobike",	           KW_MOBIKE},
+#line 72 "./keywords.txt"
     {"me_peerid",         KW_ME_PEERID},
+#line 140 "./keywords.txt"
     {"interfaces",        KW_SETUP_DEPRECATED},
+#line 158 "./keywords.txt"
     {"virtual_private",   KW_SETUP_DEPRECATED},
+#line 95 "./keywords.txt"
     {"lefthostaccess",    KW_LEFTHOSTACCESS},
+#line 108 "./keywords.txt"
     {"leftca",            KW_LEFTCA},
+#line 119 "./keywords.txt"
     {"rightfirewall",     KW_RIGHTFIREWALL},
+#line 116 "./keywords.txt"
     {"rightprotoport",    KW_RIGHTPROTOPORT},
+#line 66 "./keywords.txt"
     {"inactivity",        KW_INACTIVITY},
+#line 94 "./keywords.txt"
     {"leftfirewall",      KW_LEFTFIREWALL},
+#line 59 "./keywords.txt"
     {"esp",               KW_ESP},
+#line 169 "./keywords.txt"
     {"rightnexthop",      KW_RIGHT_DEPRECATED},
+#line 42 "./keywords.txt"
     {"forceencaps",       KW_FORCEENCAPS},
+#line 96 "./keywords.txt"
     {"leftallowany",      KW_LEFTALLOWANY},
+#line 80 "./keywords.txt"
     {"crluri",            KW_CRLURI},
+#line 97 "./keywords.txt"
     {"leftupdown",        KW_LEFTUPDOWN},
+#line 76 "./keywords.txt"
     {"mark_in",           KW_MARK_IN},
+#line 32 "./keywords.txt"
     {"strictcrlpolicy",   KW_STRICTCRLPOLICY},
+#line 157 "./keywords.txt"
     {"force_keepalive",   KW_SETUP_DEPRECATED},
+#line 120 "./keywords.txt"
     {"righthostaccess",   KW_RIGHTHOSTACCESS},
+#line 51 "./keywords.txt"
     {"marginbytes",       KW_MARGINBYTES},
+#line 71 "./keywords.txt"
     {"mediated_by",       KW_MEDIATED_BY},
+#line 53 "./keywords.txt"
     {"marginpackets",     KW_MARGINPACKETS},
+#line 49 "./keywords.txt"
     {"margintime",        KW_REKEYMARGIN},
+#line 43 "./keywords.txt"
     {"fragmentation",     KW_FRAGMENTATION},
+#line 166 "./keywords.txt"
     {"pfsgroup",          KW_PFS_DEPRECATED},
+#line 81 "./keywords.txt"
     {"crluri1",           KW_CRLURI},
+#line 131 "./keywords.txt"
     {"rightcertpolicy",   KW_RIGHTCERTPOLICY},
+#line 151 "./keywords.txt"
     {"hidetos",           KW_SETUP_DEPRECATED},
+#line 33 "./keywords.txt"
     {"keyexchange",       KW_KEYEXCHANGE},
+#line 92 "./keywords.txt"
     {"leftsourceip",      KW_LEFTSOURCEIP},
+#line 83 "./keywords.txt"
     {"ocspuri",           KW_OCSPURI},
+#line 100 "./keywords.txt"
     {"leftid",            KW_LEFTID},
+#line 167 "./keywords.txt"
     {"eap",               KW_CONN_DEPRECATED},
+#line 36 "./keywords.txt"
     {"installpolicy",     KW_INSTALLPOLICY},
+#line 137 "./keywords.txt"
     {"also",              KW_ALSO},
+#line 129 "./keywords.txt"
     {"rightcert",         KW_RIGHTCERT},
+#line 123 "./keywords.txt"
     {"rightauth",         KW_RIGHTAUTH},
+#line 70 "./keywords.txt"
     {"mediation",         KW_MEDIATION},
+#line 133 "./keywords.txt"
     {"rightca",           KW_RIGHTCA},
+#line 144 "./keywords.txt"
     {"klipsdebug",        KW_SETUP_DEPRECATED},
+#line 164 "./keywords.txt"
     {"ldapbase",          KW_CA_DEPRECATED},
+#line 152 "./keywords.txt"
     {"overridemtu",       KW_SETUP_DEPRECATED},
+#line 65 "./keywords.txt"
     {"sha256_96",         KW_SHA256_96},
+#line 84 "./keywords.txt"
     {"ocspuri1",          KW_OCSPURI},
+#line 62 "./keywords.txt"
     {"dpdtimeout",        KW_DPDTIMEOUT},
+#line 40 "./keywords.txt"
     {"aaa_identity",      KW_AAA_IDENTITY},
+#line 58 "./keywords.txt"
     {"ike",               KW_IKE},
+#line 77 "./keywords.txt"
     {"mark_out",          KW_MARK_OUT},
+#line 141 "./keywords.txt"
     {"dumpdir",           KW_SETUP_DEPRECATED},
+#line 56 "./keywords.txt"
     {"rekey",             KW_REKEY},
+#line 126 "./keywords.txt"
     {"rightid2",          KW_RIGHTID2},
+#line 55 "./keywords.txt"
     {"rekeyfuzz",         KW_REKEYFUZZ},
+#line 39 "./keywords.txt"
     {"eap_identity",      KW_EAP_IDENTITY},
+#line 136 "./keywords.txt"
     {"rightgroups2",      KW_RIGHTGROUPS2},
+#line 45 "./keywords.txt"
     {"ikelifetime",       KW_IKELIFETIME},
+#line 89 "./keywords.txt"
     {"leftsubnet",        KW_LEFTSUBNET},
+#line 122 "./keywords.txt"
     {"rightupdown",       KW_RIGHTUPDOWN},
+#line 38 "./keywords.txt"
     {"authby",            KW_AUTHBY},
+#line 105 "./keywords.txt"
     {"leftcert2",         KW_LEFTCERT2},
+#line 155 "./keywords.txt"
     {"nat_traversal",     KW_SETUP_DEPRECATED},
+#line 29 "./keywords.txt"
     {"charondebug",       KW_CHARONDEBUG},
+#line 63 "./keywords.txt"
     {"dpdaction",         KW_DPDACTION},
+#line 69 "./keywords.txt"
     {"xauth_identity",    KW_XAUTH_IDENTITY},
+#line 60 "./keywords.txt"
     {"ah",                KW_AH},
+#line 90 "./keywords.txt"
     {"leftsubnetwithin",  KW_LEFTSUBNET},
+#line 67 "./keywords.txt"
     {"modeconfig",        KW_MODECONFIG},
+#line 163 "./keywords.txt"
     {"ldaphost",          KW_CA_DEPRECATED},
+#line 88 "./keywords.txt"
     {"leftikeport",       KW_LEFTIKEPORT},
+#line 153 "./keywords.txt"
     {"crlcheckinterval",  KW_SETUP_DEPRECATED},
+#line 61 "./keywords.txt"
     {"dpddelay",          KW_DPDDELAY},
+#line 79 "./keywords.txt"
     {"cacert",            KW_CACERT},
+#line 111 "./keywords.txt"
     {"leftgroups2",       KW_LEFTGROUPS2},
+#line 124 "./keywords.txt"
     {"rightauth2",        KW_RIGHTAUTH2},
+#line 78 "./keywords.txt"
     {"tfc",               KW_TFC},
+#line 147 "./keywords.txt"
     {"postpluto",         KW_SETUP_DEPRECATED},
+#line 48 "./keywords.txt"
     {"rekeymargin",       KW_REKEYMARGIN},
+#line 109 "./keywords.txt"
     {"leftca2",           KW_LEFTCA2},
+#line 150 "./keywords.txt"
     {"packetdefault",     KW_SETUP_DEPRECATED},
+#line 75 "./keywords.txt"
     {"mark",              KW_MARK},
+#line 142 "./keywords.txt"
     {"charonstart",       KW_SETUP_DEPRECATED},
+#line 148 "./keywords.txt"
     {"plutostderrlog",    KW_SETUP_DEPRECATED},
+#line 138 "./keywords.txt"
     {"auto",              KW_AUTO},
+#line 149 "./keywords.txt"
     {"fragicmp",          KW_SETUP_DEPRECATED},
+#line 64 "./keywords.txt"
     {"closeaction",       KW_CLOSEACTION},
+#line 146 "./keywords.txt"
     {"prepluto",          KW_SETUP_DEPRECATED},
+#line 101 "./keywords.txt"
     {"leftid2",           KW_LEFTID2},
+#line 154 "./keywords.txt"
     {"nocrsend",          KW_SETUP_DEPRECATED},
+#line 98 "./keywords.txt"
     {"leftauth",          KW_LEFTAUTH},
+#line 57 "./keywords.txt"
     {"reauth",            KW_REAUTH},
+#line 143 "./keywords.txt"
     {"plutostart",        KW_SETUP_DEPRECATED},
+#line 31 "./keywords.txt"
     {"cachecrls",         KW_CACHECRLS},
+#line 68 "./keywords.txt"
     {"xauth",             KW_XAUTH},
+#line 82 "./keywords.txt"
     {"crluri2",           KW_CRLURI2},
+#line 134 "./keywords.txt"
     {"rightca2",          KW_RIGHTCA2},
+#line 130 "./keywords.txt"
     {"rightcert2",        KW_RIGHTCERT2},
+#line 145 "./keywords.txt"
     {"plutodebug",        KW_SETUP_DEPRECATED},
+#line 160 "./keywords.txt"
     {"pkcs11initargs",    KW_PKCS11_DEPRECATED},
+#line 159 "./keywords.txt"
     {"pkcs11module",      KW_PKCS11_DEPRECATED},
+#line 162 "./keywords.txt"
     {"pkcs11proxy",       KW_PKCS11_DEPRECATED},
+#line 161 "./keywords.txt"
     {"pkcs11keepstate",   KW_PKCS11_DEPRECATED},
+#line 85 "./keywords.txt"
     {"ocspuri2",          KW_OCSPURI2},
+#line 99 "./keywords.txt"
     {"leftauth2",         KW_LEFTAUTH2},
+#line 44 "./keywords.txt"
     {"ikedscp",           KW_IKEDSCP,}
   };
 

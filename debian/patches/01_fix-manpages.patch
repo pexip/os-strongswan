@@ -7,7 +7,7 @@ Subject: Fix typo in ipsec-scepclient(8) manpage name
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/src/scepclient/scepclient.8 b/src/scepclient/scepclient.8
-index 78ce5c6..1267364 100644
+index a9d3bd9..987232f 100644
 --- a/src/scepclient/scepclient.8
 +++ b/src/scepclient/scepclient.8
 @@ -1,7 +1,7 @@

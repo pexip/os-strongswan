@@ -219,18 +219,6 @@
 
 /* %endif */
 
-#ifdef yyget_lval
-#define settings_parser_get_lval_ALREADY_DEFINED
-#else
-#define yyget_lval settings_parser_get_lval
-#endif
-
-#ifdef yyset_lval
-#define settings_parser_set_lval_ALREADY_DEFINED
-#else
-#define yyset_lval settings_parser_set_lval
-#endif
-
 #ifdef yyalloc
 #define settings_parser_alloc_ALREADY_DEFINED
 #else
@@ -886,14 +874,14 @@ bool settings_parser_open_next_file(parser_helper_t *ctx);
 
 static void include_files(parser_helper_t *ctx);
 
-#line 890 "settings/settings_lexer.c"
+#line 878 "settings/settings_lexer.c"
 /* use start conditions stack */
 /* do not declare unneeded functions */
 #define YY_NO_INPUT 1
 /* do not include unistd.h as it might conflict with our scanner states */
 #define YY_NO_UNISTD_H 1
 /* due to that disable interactive mode, which requires isatty() */
-/* don't use global variables, and interact properly with bison */
+/* don't use global variables */
 /* maintain the line number */
 /* don't generate a default rule */
 /* prefix function/variable declarations */
@@ -908,7 +896,7 @@ static void include_files(parser_helper_t *ctx);
 /* state used to scan quoted strings */
 
 /* pattern for section/key names */
-#line 912 "settings/settings_lexer.c"
+#line 900 "settings/settings_lexer.c"
 
 #define INITIAL 0
 #define ref 1
@@ -965,8 +953,6 @@ struct yyguts_t
     int yy_more_flag;
     int yy_more_len;
 
-    YYSTYPE * yylval_r;
-
     }; /* end struct yyguts_t */
 
 /* %if-c-only */
@@ -977,10 +963,6 @@ static int yy_init_globals ( yyscan_t yyscanner );
 
 /* %if-reentrant */
 
-    /* This must go here because YYSTYPE and YYLTYPE are included
-     * from bison output in section 1.*/
-    #    define yylval yyg->yylval_r
-    
 int yylex_init (yyscan_t* scanner);
 
 int yylex_init_extra ( YY_EXTRA_TYPE user_defined, yyscan_t* scanner);
@@ -1023,11 +1005,6 @@ int yyget_column  ( yyscan_t yyscanner );
 void yyset_column ( int _column_no , yyscan_t yyscanner );
 
 /* %if-bison-bridge */
-
-YYSTYPE * yyget_lval ( yyscan_t yyscanner );
-
-void yyset_lval ( YYSTYPE * yylval_param , yyscan_t yyscanner );
-
 /* %endif */
 
 /* Macros after this point can all be overridden by user definitions in
@@ -1184,11 +1161,9 @@ static int input ( yyscan_t yyscanner );
 #define YY_DECL_IS_OURS 1
 /* %if-c-only Standard (non-C++) definition */
 
-extern int yylex \
-               (YYSTYPE * yylval_param , yyscan_t yyscanner);
+extern int yylex (yyscan_t yyscanner);
 
-#define YY_DECL int yylex \
-               (YYSTYPE * yylval_param , yyscan_t yyscanner)
+#define YY_DECL int yylex (yyscan_t yyscanner)
 /* %endif */
 /* %if-c++-only C++ definition */
 /* %endif */
@@ -1219,8 +1194,6 @@ YY_DECL
 	char *yy_cp, *yy_bp;
 	int yy_act;
     struct yyguts_t * yyg = (struct yyguts_t*)yyscanner;
-
-    yylval = yylval_param;
 
 	if ( !yyg->yy_init )
 		{
@@ -1261,7 +1234,7 @@ YY_DECL
 #line 69 "settings/settings_lexer.l"
 
 
-#line 1265 "settings/settings_lexer.c"
+#line 1238 "settings/settings_lexer.c"
 
 	while ( /*CONSTCOND*/1 )		/* loops until end-of-file is reached */
 		{
@@ -1670,7 +1643,7 @@ YY_RULE_SETUP
 #line 241 "settings/settings_lexer.l"
 YY_FATAL_ERROR( "flex scanner jammed" );
 	YY_BREAK
-#line 1674 "settings/settings_lexer.c"
+#line 1647 "settings/settings_lexer.c"
 
 	case YY_END_OF_BUFFER:
 		{
@@ -2852,19 +2825,6 @@ void yyset_debug (int  _bdebug , yyscan_t yyscanner)
 /* Accessor methods for yylval and yylloc */
 
 /* %if-bison-bridge */
-
-YYSTYPE * yyget_lval  (yyscan_t yyscanner)
-{
-    struct yyguts_t * yyg = (struct yyguts_t*)yyscanner;
-    return yylval;
-}
-
-void yyset_lval (YYSTYPE *  yylval_param , yyscan_t yyscanner)
-{
-    struct yyguts_t * yyg = (struct yyguts_t*)yyscanner;
-    yylval = yylval_param;
-}
-
 /* %endif */
 
 /* User-visible API */

@@ -28,6 +28,7 @@
   capability chown,
   capability setgid,
   capability setuid,
+  capability setpcap,
 
   # libcharon-extra-plugins: xauth-pam
   capability audit_write,
@@ -67,6 +68,16 @@
   /usr/lib/*/opensc-pkcs11.so rm,
 
   /var/lib/strongswan/*     r,
+
+  /{,var/}run/systemd/notify w,
+
+  # allow self to read file descriptors (LP #1786250)
+  # restrict to our own process-ID as per apparmor vars
+  @{PROC}/@{pid}/fd/        r,
+
+  # for using the ha plugin (LP: #1773956)
+  @{PROC}/@{pid}/net/ipt_CLUSTERIP/ r,
+  @{PROC}/@{pid}/net/ipt_CLUSTERIP/* rw,
 
   # Site-specific additions and overrides. See local/README for details.
   #include <local/usr.lib.ipsec.charon>

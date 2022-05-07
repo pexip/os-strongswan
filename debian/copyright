@@ -2136,7 +2136,6 @@ Files: src/libstrongswan/tests/suites/test_asn1.c
   src/libstrongswan/tests/suites/test_mgf1.c
   src/libstrongswan/tests/suites/test_ntru.c
   src/libstrongswan/tests/suites/test_pen.c
-  src/libstrongswan/tests/suites/test_test_rng.c
 Copyright: 2001-2015, Andreas Steffen
 License: GPL-2+
 
@@ -2170,10 +2169,6 @@ License: GPL-2+
 
 Files: src/libstrongswan/tests/tests.h
 Copyright: 2007-2015, Tobias Brunner
-License: GPL-2+
-
-Files: src/libstrongswan/tests/utils/*
-Copyright: 2001-2015, Andreas Steffen
 License: GPL-2+
 
 Files: src/libstrongswan/threading/*
