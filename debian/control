@@ -33,7 +33,7 @@ Build-Depends: bison,
                systemd [linux-any],
                tzdata
 Homepage: http://www.strongswan.org
-XS-Pexip-Upstream: http://deb.debian.org/debian/ bullseye
+XS-Pexip-Upstream: http://ftp.debian.org/debian/ bookworm
 
 Package: strongswan
 Architecture: all
