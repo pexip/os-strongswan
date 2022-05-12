@@ -5,4 +5,3 @@
 dont-load-kernel-libipsec-plugin-by-default.patch
 0006-fix-format-string-issue-in-enum_flags_to_string.patch
 pexip/01-ipsec-stop-with-old-pidfile.patch
-pexip/02_service_file_update.patch
