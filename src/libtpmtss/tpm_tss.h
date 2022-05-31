@@ -192,22 +192,22 @@ struct tpm_tss_t {
 };
 
 /**
- * Initialize libtpmtss
+ * Create a tpm_tss instance.
+ *
+ * @param version	TPM version that must be supported by TSS
+ */
+tpm_tss_t *tpm_tss_probe(tpm_version_t version);
+
+/**
+ * libtpmtss initialization function
  *
  * @return					TRUE if initialization was successful
  */
 bool libtpmtss_init(void);
 
 /**
- * Deinitialize libtpmtss
+ * libtpmtss de-initialization function
  */
 void libtpmtss_deinit(void);
-
-/**
- * Create a tpm_tss instance.
- *
- * @param version			TPM version that must be supported by TSS
- */
-tpm_tss_t *tpm_tss_probe(tpm_version_t version);
 
 #endif /** TPM_TSS_H_ @}*/

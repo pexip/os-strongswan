@@ -43,6 +43,7 @@ static int acert()
 	chunk_t serial = chunk_empty, encoding = chunk_empty;
 	time_t not_before, not_after, lifetime = 24 * 60 * 60;
 	char *datenb = NULL, *datena = NULL, *dateform = NULL;
+	rng_t *rng;
 	char *arg;
 	bool pss = lib->settings->get_bool(lib->settings, "%s.rsa_pss", FALSE,
 									   lib->ns);
@@ -185,10 +186,22 @@ static int acert()
 	{
 		serial = chunk_from_hex(chunk_create(hex, strlen(hex)), NULL);
 	}
-	else if (!allocate_serial(8, &serial))
+	else
 	{
-		error = "failed to generate serial number";
-		goto end;
+		rng = lib->crypto->create_rng(lib->crypto, RNG_WEAK);
+		if (!rng)
+		{
+			error = "no random number generator found";
+			goto end;
+		}
+		if (!rng_allocate_bytes_not_zero(rng, 8, &serial, FALSE))
+		{
+			error = "failed to generate serial number";
+			rng->destroy(rng);
+			goto end;
+		}
+		serial.ptr[0] &= 0x7F;
+		rng->destroy(rng);
 	}
 
 	if (file)

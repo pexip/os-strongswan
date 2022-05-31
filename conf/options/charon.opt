@@ -28,8 +28,7 @@ charon.accept_unencrypted_mainmode_messages = no
 	example, some SonicWall boxes).
 
 charon.block_threshold = 5
-	Maximum number of half-open IKE_SAs (including unprocessed IKE_SA_INITs)
-	for a single peer IP.
+	Maximum number of half-open IKE_SAs for a single peer IP.
 
 charon.cert_cache = yes
 	Whether relations in validated certificate chains should be cached in
@@ -70,13 +69,8 @@ charon.cisco_unity = no
 charon.close_ike_on_child_failure = no
 	Close the IKE_SA if setup of the CHILD_SA along with IKE_AUTH failed.
 
-charon.cookie_threshold = 30
-	Number of half-open IKE_SAs (including unprocessed IKE_SA_INITs) that
-	activate the cookie mechanism.
-
-charon.cookie_threshold_ip = 3
-	Number of half-open IKE_SAs (including unprocessed IKE_SA_INITs) for a
-	single peer IP that activate the cookie	mechanism.
+charon.cookie_threshold = 10
+	Number of half-open IKE_SAs that activate the cookie mechanism.
 
 charon.crypto_test.bench = no
 	Benchmark crypto algorithms and order them by efficiency.
@@ -134,6 +128,9 @@ charon.dns2
 
 charon.dos_protection = yes
 	Enable Denial of Service protection using cookies and aggressiveness checks.
+
+charon.ecp_x_coordinate_only = yes
+	Compliance with the errata for RFC 4753.
 
 charon.flush_auth_cfg = no
 	Free objects during authentication (might conflict with plugins).
@@ -478,24 +475,6 @@ charon.tls.mac
 
 charon.tls.suites
 	List of TLS cipher suites.
-
-charon.tls.ke_group
-	List of TLS key exchange groups.
-
-charon.tls.signature
-	List of TLS signature schemes.
-
-charon.tls.send_certreq_authorities = yes
-	Whether to include CAs in a server's CertificateRequest message.
-
-	Whether to include CAs in a server's CertificateRequest message. May be
-	disabled if clients can't handle a long list of CAs.
-
-charon.tls.version_min = 1.2
-	Minimum TLS version to negotiate.
-
-charon.tls.version_max = 1.2
-	Maximum TLS version to negotiate.
 
 charon.user
 	Name of the user the daemon changes to after startup.

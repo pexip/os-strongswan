@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 #
 # Copyright (C) 2017 Tobias Brunner
 # HSR Hochschule fuer Technik Rapperswil

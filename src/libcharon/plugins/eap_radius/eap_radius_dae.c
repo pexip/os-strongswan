@@ -379,8 +379,7 @@ static void process_coa(private_eap_radius_dae_t *this,
 /**
  * Receive RADIUS DAE requests
  */
-CALLBACK(receive, bool,
-	private_eap_radius_dae_t *this, int fd, watcher_event_t event)
+static bool receive(private_eap_radius_dae_t *this)
 {
 	struct sockaddr_storage addr;
 	socklen_t addr_len = sizeof(addr);
@@ -531,7 +530,8 @@ eap_radius_dae_t *eap_radius_dae_create(eap_radius_accounting_t *accounting)
 		return NULL;
 	}
 
-	lib->watcher->add(lib->watcher, this->fd, WATCHER_READ, receive, this);
+	lib->watcher->add(lib->watcher, this->fd, WATCHER_READ,
+					  (watcher_cb_t)receive, this);
 
 	return &this->public;
 }

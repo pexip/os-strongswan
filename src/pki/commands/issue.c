@@ -432,10 +432,23 @@ static int issue()
 	{
 		serial = chunk_from_hex(chunk_create(hex, strlen(hex)), NULL);
 	}
-	else if (!allocate_serial(8, &serial))
+	else
 	{
-		error = "failed to generate serial number";
-		goto end;
+		rng_t *rng = lib->crypto->create_rng(lib->crypto, RNG_WEAK);
+
+		if (!rng)
+		{
+			error = "no random number generator found";
+			goto end;
+		}
+		if (!rng_allocate_bytes_not_zero(rng, 8, &serial, FALSE))
+		{
+			error = "failed to generate serial number";
+			rng->destroy(rng);
+			goto end;
+		}
+		serial.ptr[0] &= 0x7F;
+		rng->destroy(rng);
 	}
 
 	if (pkcs10)

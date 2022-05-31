@@ -21,7 +21,6 @@
  * THE SOFTWARE.
  */
 
-#include "botan_util.h"
 #include "botan_util_keys.h"
 #include "botan_ec_public_key.h"
 #include "botan_ec_private_key.h"
@@ -82,7 +81,7 @@ public_key_t *botan_public_key_load(key_type_t type, va_list args)
 		break;
 	}
 
-	if (!botan_get_rng(&rng, RNG_STRONG))
+	if (botan_rng_init(&rng, "user"))
 	{
 		return NULL;
 	}
@@ -184,7 +183,7 @@ private_key_t *botan_private_key_load(key_type_t type, va_list args)
 		break;
 	}
 
-	if (!botan_get_rng(&rng, RNG_STRONG))
+	if (botan_rng_init(&rng, "user"))
 	{
 		return NULL;
 	}

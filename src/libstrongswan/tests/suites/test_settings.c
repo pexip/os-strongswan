@@ -201,13 +201,6 @@ START_TEST(test_set_default_str)
 }
 END_TEST
 
-START_TEST(test_destroy_clear)
-{
-	/* just the most basic test as we can't reliably verify it works */
-	settings->destroy_clear(settings);
-}
-END_TEST
-
 START_SETUP(setup_bool_config)
 {
 	create_settings(chunk_from_str(
@@ -844,6 +837,7 @@ START_TEST(test_order_section)
 	unlink(include1);
 }
 END_TEST
+
 
 START_TEST(test_load_string)
 {
@@ -1658,11 +1652,6 @@ Suite *settings_suite_create()
 	tcase_add_test(tc, test_set_str);
 	tcase_add_test(tc, test_set_str_printf);
 	tcase_add_test(tc, test_set_default_str);
-	suite_add_tcase(s, tc);
-
-	tc = tcase_create("destroy_clear");
-	tcase_add_checked_fixture(tc, setup_base_config, NULL);
-	tcase_add_test(tc, test_destroy_clear);
 	suite_add_tcase(s, tc);
 
 	tc = tcase_create("get/set_bool");

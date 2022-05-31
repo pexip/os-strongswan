@@ -149,24 +149,23 @@ static status_t delete_child(private_quick_delete_t *this,
 
 		if (remote_close)
 		{
-			child_init_args_t args = {
-				.reqid = child_sa->get_reqid(child_sa),
-			};
-			action_t action;
-
-			action = child_sa->get_close_action(child_sa);
 			child_cfg = child_sa->get_config(child_sa);
 			child_cfg->get_ref(child_cfg);
-			if (action & ACTION_TRAP)
+
+			switch (child_sa->get_close_action(child_sa))
 			{
-				charon->traps->install(charon->traps,
-									   this->ike_sa->get_peer_cfg(this->ike_sa),
-									   child_cfg);
-			}
-			if (action & ACTION_START)
-			{
-				child_cfg->get_ref(child_cfg);
-				status = this->ike_sa->initiate(this->ike_sa, child_cfg, &args);
+				case ACTION_RESTART:
+					child_cfg->get_ref(child_cfg);
+					status = this->ike_sa->initiate(this->ike_sa, child_cfg,
+									child_sa->get_reqid(child_sa), NULL, NULL);
+					break;
+				case ACTION_ROUTE:
+					charon->traps->install(charon->traps,
+									this->ike_sa->get_peer_cfg(this->ike_sa),
+									child_cfg);
+					break;
+				default:
+					break;
 			}
 			child_cfg->destroy(child_cfg);
 		}

@@ -15,7 +15,7 @@
 
 /**
  * @defgroup mgf1_xof mgf1_xof
- * @{ @ingroup mgf1_p
+ * @{ @ingroup crypto
  */
 
 #ifndef MGF1_XOF_H_

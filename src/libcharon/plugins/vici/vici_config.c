@@ -563,9 +563,6 @@ static void log_child_data(child_data_t *data, char *name)
 		 cfg->set_mark_in.value, cfg->set_mark_in.mask);
 	DBG2(DBG_CFG, "   set_mark_out = %u/%u",
 		 cfg->set_mark_out.value, cfg->set_mark_out.mask);
-	DBG2(DBG_CFG, "   label = %s",
-		 cfg->label ? cfg->label->get_string(cfg->label) : NULL);
-	DBG2(DBG_CFG, "   label_mode = %N", sec_label_mode_names, cfg->label_mode);
 	DBG2(DBG_CFG, "   inactivity = %llu", cfg->inactivity);
 	DBG2(DBG_CFG, "   proposals = %#P", data->proposals);
 	DBG2(DBG_CFG, "   local_ts = %#R", data->local_ts);
@@ -588,7 +585,6 @@ static void free_child_data(child_data_t *data)
 									offsetof(traffic_selector_t, destroy));
 	data->remote_ts->destroy_offset(data->remote_ts,
 									offsetof(traffic_selector_t, destroy));
-	DESTROY_IF(data->cfg.label);
 	free(data->cfg.updown);
 	free(data->cfg.interface);
 }
@@ -1008,27 +1004,18 @@ CALLBACK(parse_action, bool,
 	action_t *out, chunk_t v)
 {
 	enum_map_t map[] = {
-		{ "start",		ACTION_START	},
-		{ "restart",	ACTION_START	},
-		{ "route",		ACTION_TRAP		},
-		{ "trap",		ACTION_TRAP		},
+		{ "start",		ACTION_RESTART	},
+		{ "restart",	ACTION_RESTART	},
+		{ "route",		ACTION_ROUTE	},
+		{ "trap",		ACTION_ROUTE	},
 		{ "none",		ACTION_NONE		},
 		{ "clear",		ACTION_NONE		},
 	};
-	char buf[BUF_LEN];
 	int d;
 
 	if (parse_map(map, countof(map), &d, v))
 	{
 		*out = d;
-		return TRUE;
-	}
-	if (!vici_stringify(v, buf, sizeof(buf)))
-	{
-		return FALSE;
-	}
-	if (enum_flags_from_string(action_names, buf, out))
-	{
 		return TRUE;
 	}
 	return FALSE;
@@ -1275,38 +1262,6 @@ CALLBACK(parse_if_id, bool,
 }
 
 /**
- * Parse security label
- */
-CALLBACK(parse_label, bool,
-	sec_label_t **out, chunk_t v)
-{
-	char buf[BUF_LEN];
-
-	if (!vici_stringify(v, buf, sizeof(buf)))
-	{
-		return FALSE;
-	}
-	*out = sec_label_from_string(buf);
-	return *out != NULL;
-}
-
-/**
- * Parse security label mode
- */
-CALLBACK(parse_label_mode, bool,
-	sec_label_mode_t *out, chunk_t v)
-{
-	char buf[BUF_LEN];
-
-	if (!vici_stringify(v, buf, sizeof(buf)) ||
-		!sec_label_mode_from_string(buf, out))
-	{
-		return FALSE;
-	}
-	return TRUE;
-}
-
-/**
  * Parse TFC padding option
  */
 CALLBACK(parse_tfc, bool,
@@ -1514,7 +1469,7 @@ static bool parse_cert(auth_data_t *auth, auth_rule_t rule, chunk_t v)
 	certificate_t *cert;
 
 	cert = lib->creds->create(lib->creds, CRED_CERTIFICATE, CERT_X509,
-							  BUILD_BLOB, v, BUILD_END);
+							  BUILD_BLOB_PEM, v, BUILD_END);
 	if (cert)
 	{
 		return add_cert(auth, rule, cert);
@@ -1549,7 +1504,7 @@ CALLBACK(parse_pubkeys, bool,
 	certificate_t *cert;
 
 	cert = lib->creds->create(lib->creds, CRED_CERTIFICATE, CERT_TRUSTED_PUBKEY,
-							  BUILD_BLOB, v, BUILD_END);
+							  BUILD_BLOB_PEM, v, BUILD_END);
 	if (cert)
 	{
 		return add_cert(auth, AUTH_RULE_SUBJECT_CERT, cert);
@@ -1805,8 +1760,6 @@ CALLBACK(child_kv, bool,
 		{ "copy_dscp",			parse_copy_dscp,	&child->cfg.copy_dscp				},
 		{ "if_id_in",			parse_if_id,		&child->cfg.if_id_in				},
 		{ "if_id_out",			parse_if_id,		&child->cfg.if_id_out				},
-		{ "label",				parse_label,		&child->cfg.label					},
-		{ "label_mode",			parse_label_mode,	&child->cfg.label_mode				},
 	};
 
 	return parse_rules(rules, countof(rules), name, value,
@@ -2157,7 +2110,7 @@ CALLBACK(peer_sn, bool,
 					default_id = TRUE;
 				}
 				else if (cert->get_type(cert) == CERT_TRUSTED_PUBKEY &&
-						 id->get_type(id) != ID_ANY)
+						 id->get_type != ID_ANY)
 				{
 					/* set the subject of all raw public keys to the id */
 					pubkey_cert = (pubkey_cert_t*)cert;
@@ -2190,33 +2143,30 @@ CALLBACK(peer_sn, bool,
 static void run_start_action(private_vici_config_t *this, peer_cfg_t *peer_cfg,
 							 child_cfg_t *child_cfg)
 {
-	action_t action;
-
-	action = child_cfg->get_start_action(child_cfg);
-
-	if (action & ACTION_TRAP)
+	switch (child_cfg->get_start_action(child_cfg))
 	{
-		DBG1(DBG_CFG, "installing '%s'", child_cfg->get_name(child_cfg));
-		switch (child_cfg->get_mode(child_cfg))
-		{
-			case MODE_PASS:
-			case MODE_DROP:
-				charon->shunts->install(charon->shunts,
-										peer_cfg->get_name(peer_cfg), child_cfg);
-				/* no need to check for ACTION_START */
-				return;
-			default:
-				charon->traps->install(charon->traps, peer_cfg, child_cfg);
-				break;
-		}
-	}
-
-	if (action & ACTION_START)
-	{
-		DBG1(DBG_CFG, "initiating '%s'", child_cfg->get_name(child_cfg));
-		charon->controller->initiate(charon->controller,
+		case ACTION_RESTART:
+			DBG1(DBG_CFG, "initiating '%s'", child_cfg->get_name(child_cfg));
+			charon->controller->initiate(charon->controller,
 					peer_cfg->get_ref(peer_cfg), child_cfg->get_ref(child_cfg),
 					NULL, NULL, 0, FALSE);
+			break;
+		case ACTION_ROUTE:
+			DBG1(DBG_CFG, "installing '%s'", child_cfg->get_name(child_cfg));
+			switch (child_cfg->get_mode(child_cfg))
+			{
+				case MODE_PASS:
+				case MODE_DROP:
+					charon->shunts->install(charon->shunts,
+									peer_cfg->get_name(peer_cfg), child_cfg);
+					break;
+				default:
+					charon->traps->install(charon->traps, peer_cfg, child_cfg);
+					break;
+			}
+			break;
+		default:
+			break;
 	}
 }
 
@@ -2231,101 +2181,100 @@ static void clear_start_action(private_vici_config_t *this, char *peer_name,
 	ike_sa_t *ike_sa;
 	uint32_t id = 0, others;
 	array_t *ids = NULL, *ikeids = NULL;
-	action_t action;
 	char *name;
 
 	name = child_cfg->get_name(child_cfg);
-	action = child_cfg->get_start_action(child_cfg);
 
-	if (action & ACTION_TRAP)
+	switch (child_cfg->get_start_action(child_cfg))
 	{
-		DBG1(DBG_CFG, "uninstalling '%s'", name);
-		switch (child_cfg->get_mode(child_cfg))
-		{
-			case MODE_PASS:
-			case MODE_DROP:
-				charon->shunts->uninstall(charon->shunts, peer_name, name);
-				/* no need to check for ACTION_START */
-				return;
-			default:
-				charon->traps->uninstall(charon->traps, peer_name, name);
-				break;
-		}
-	}
-
-	if (action & ACTION_START)
-	{
-		enumerator = charon->controller->create_ike_sa_enumerator(
+		case ACTION_RESTART:
+			enumerator = charon->controller->create_ike_sa_enumerator(
 													charon->controller, TRUE);
-		while (enumerator->enumerate(enumerator, &ike_sa))
-		{
-			if (!streq(ike_sa->get_name(ike_sa), peer_name))
+			while (enumerator->enumerate(enumerator, &ike_sa))
 			{
-				continue;
-			}
-			others = id = 0;
-			children = ike_sa->create_child_sa_enumerator(ike_sa);
-			while (children->enumerate(children, &child_sa))
-			{
-				if (child_sa->get_state(child_sa) != CHILD_DELETING &&
-					child_sa->get_state(child_sa) != CHILD_DELETED)
+				if (!streq(ike_sa->get_name(ike_sa), peer_name))
 				{
-					if (streq(name, child_sa->get_name(child_sa)))
-					{
-						id = child_sa->get_unique_id(child_sa);
-					}
-					else
-					{
-						others++;
-					}
+					continue;
 				}
-			}
-			children->destroy(children);
-
-			if (!ike_sa->get_child_count(ike_sa) || (id && !others))
-			{
-				/* found no children or only matching, delete IKE_SA */
-				id = ike_sa->get_unique_id(ike_sa);
-				array_insert_create_value(&ikeids, sizeof(id),
-										  ARRAY_TAIL, &id);
-			}
-			else
-			{
+				others = id = 0;
 				children = ike_sa->create_child_sa_enumerator(ike_sa);
 				while (children->enumerate(children, &child_sa))
 				{
-					if (streq(name, child_sa->get_name(child_sa)))
+					if (child_sa->get_state(child_sa) != CHILD_DELETING &&
+						child_sa->get_state(child_sa) != CHILD_DELETED)
 					{
-						id = child_sa->get_unique_id(child_sa);
-						array_insert_create_value(&ids, sizeof(id),
-												  ARRAY_TAIL, &id);
+						if (streq(name, child_sa->get_name(child_sa)))
+						{
+							id = child_sa->get_unique_id(child_sa);
+						}
+						else
+						{
+							others++;
+						}
 					}
 				}
 				children->destroy(children);
-			}
-		}
-		enumerator->destroy(enumerator);
 
-		if (array_count(ids))
-		{
-			while (array_remove(ids, ARRAY_HEAD, &id))
-			{
-				DBG1(DBG_CFG, "closing '%s' #%u", name, id);
-				charon->controller->terminate_child(charon->controller,
-													id, NULL, NULL, 0);
+				if (!ike_sa->get_child_count(ike_sa) || (id && !others))
+				{
+					/* found no children or only matching, delete IKE_SA */
+					id = ike_sa->get_unique_id(ike_sa);
+					array_insert_create_value(&ikeids, sizeof(id),
+											  ARRAY_TAIL, &id);
+				}
+				else
+				{
+					children = ike_sa->create_child_sa_enumerator(ike_sa);
+					while (children->enumerate(children, &child_sa))
+					{
+						if (streq(name, child_sa->get_name(child_sa)))
+						{
+							id = child_sa->get_unique_id(child_sa);
+							array_insert_create_value(&ids, sizeof(id),
+													  ARRAY_TAIL, &id);
+						}
+					}
+					children->destroy(children);
+				}
 			}
-			array_destroy(ids);
-		}
-		if (array_count(ikeids))
-		{
-			while (array_remove(ikeids, ARRAY_HEAD, &id))
+			enumerator->destroy(enumerator);
+
+			if (array_count(ids))
 			{
-				DBG1(DBG_CFG, "closing IKE_SA #%u", id);
-				charon->controller->terminate_ike(charon->controller, id,
-												  FALSE, NULL, NULL, 0);
+				while (array_remove(ids, ARRAY_HEAD, &id))
+				{
+					DBG1(DBG_CFG, "closing '%s' #%u", name, id);
+					charon->controller->terminate_child(charon->controller,
+														id, NULL, NULL, 0);
+				}
+				array_destroy(ids);
 			}
-			array_destroy(ikeids);
-		}
+			if (array_count(ikeids))
+			{
+				while (array_remove(ikeids, ARRAY_HEAD, &id))
+				{
+					DBG1(DBG_CFG, "closing IKE_SA #%u", id);
+					charon->controller->terminate_ike(charon->controller, id,
+													  FALSE, NULL, NULL, 0);
+				}
+				array_destroy(ikeids);
+			}
+			break;
+		case ACTION_ROUTE:
+			DBG1(DBG_CFG, "uninstalling '%s'", name);
+			switch (child_cfg->get_mode(child_cfg))
+			{
+				case MODE_PASS:
+				case MODE_DROP:
+					charon->shunts->uninstall(charon->shunts, peer_name, name);
+					break;
+				default:
+					charon->traps->uninstall(charon->traps, peer_name, name);
+					break;
+			}
+			break;
+		default:
+			break;
 	}
 }
 

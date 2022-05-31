@@ -1542,7 +1542,7 @@ jQuery.extend({
 });
 /*
  * A number of helper functions used for managing events.
- * Many of the ideas behind this code originated from
+ * Many of the ideas behind this code orignated from
  * Dean Edwards' addEvent library.
  */
 jQuery.event = {

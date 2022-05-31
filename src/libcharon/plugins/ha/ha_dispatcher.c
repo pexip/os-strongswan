@@ -259,10 +259,7 @@ static void process_ike_add(private_ha_dispatcher_t *this, ha_message_t *message
 		if (ok)
 		{
 			if (old_sa)
-			{	/* register IKE_SA before calling inherit_post() so no scheduled
-				 * jobs are lost */
-				charon->ike_sa_manager->checkout_new(charon->ike_sa_manager,
-													 ike_sa);
+			{
 				ike_sa->inherit_pre(ike_sa, old_sa);
 				ike_sa->inherit_post(ike_sa, old_sa);
 				charon->ike_sa_manager->checkin_and_destroy(
@@ -297,35 +294,23 @@ static void process_ike_add(private_ha_dispatcher_t *this, ha_message_t *message
 }
 
 /**
- * Apply all set conditions to the IKE_SA
+ * Apply a condition flag to the IKE_SA if it is in set
  */
-static void set_conditions(ike_sa_t *ike_sa, ike_condition_t conditions)
+static void set_condition(ike_sa_t *ike_sa, ike_condition_t set,
+						  ike_condition_t flag)
 {
-	ike_condition_t i;
-
-	for (i = 0; i < sizeof(i) * 8; ++i)
-	{
-		ike_condition_t cond = (1 << i);
-
-		ike_sa->set_condition(ike_sa, cond, (conditions & cond) != 0);
-	}
+	ike_sa->set_condition(ike_sa, flag, flag & set);
 }
 
 /**
- * Apply all enabled extensions to the IKE_SA
+ * Apply a extension flag to the IKE_SA if it is in set
  */
-static void set_extensions(ike_sa_t *ike_sa, ike_extension_t extensions)
+static void set_extension(ike_sa_t *ike_sa, ike_extension_t set,
+						  ike_extension_t flag)
 {
-	ike_extension_t i;
-
-	for (i = 0; i < sizeof(i) * 8; ++i)
+	if (flag & set)
 	{
-		ike_extension_t ext = (1 << i);
-
-		if (extensions & ext)
-		{
-			ike_sa->enable_extension(ike_sa, ext);
-		}
+		ike_sa->enable_extension(ike_sa, flag);
 	}
 }
 
@@ -415,10 +400,27 @@ static void process_ike_update(private_ha_dispatcher_t *this,
 				}
 				break;
 			case HA_EXTENSIONS:
-				set_extensions(ike_sa, value.u32);
+				set_extension(ike_sa, value.u32, EXT_NATT);
+				set_extension(ike_sa, value.u32, EXT_MOBIKE);
+				set_extension(ike_sa, value.u32, EXT_HASH_AND_URL);
+				set_extension(ike_sa, value.u32, EXT_MULTIPLE_AUTH);
+				set_extension(ike_sa, value.u32, EXT_STRONGSWAN);
+				set_extension(ike_sa, value.u32, EXT_EAP_ONLY_AUTHENTICATION);
+				set_extension(ike_sa, value.u32, EXT_MS_WINDOWS);
+				set_extension(ike_sa, value.u32, EXT_XAUTH);
+				set_extension(ike_sa, value.u32, EXT_DPD);
 				break;
 			case HA_CONDITIONS:
-				set_conditions(ike_sa, value.u32);
+				set_condition(ike_sa, value.u32, COND_NAT_ANY);
+				set_condition(ike_sa, value.u32, COND_NAT_HERE);
+				set_condition(ike_sa, value.u32, COND_NAT_THERE);
+				set_condition(ike_sa, value.u32, COND_NAT_FAKE);
+				set_condition(ike_sa, value.u32, COND_EAP_AUTHENTICATED);
+				set_condition(ike_sa, value.u32, COND_CERTREQ_SEEN);
+				set_condition(ike_sa, value.u32, COND_ORIGINAL_INITIATOR);
+				set_condition(ike_sa, value.u32, COND_STALE);
+				set_condition(ike_sa, value.u32, COND_INIT_CONTACT_SEEN);
+				set_condition(ike_sa, value.u32, COND_XAUTH_AUTHENTICATED);
 				break;
 			default:
 				break;

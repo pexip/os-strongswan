@@ -50,12 +50,7 @@ enum ts_type_t {
 	 * (inclusive). All addresses falling between the two specified
 	 *  addresses are considered to be within the list.
 	 */
-	TS_IPV6_ADDR_RANGE = 8,
-
-	/**
-	 * A security label.
-	 */
-	TS_SECLABEL = 10,
+	TS_IPV6_ADDR_RANGE = 8
 };
 
 /**

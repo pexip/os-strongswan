@@ -86,7 +86,7 @@ static int load_all(vici_conn_t *conn)
 		ret = load_conns_cfg(conn, format, cfg);
 	}
 
-	cfg->destroy_clear(cfg);
+	cfg->destroy(cfg);
 
 	return ret;
 }

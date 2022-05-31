@@ -733,9 +733,7 @@ METHOD(eap_method_t, get_msk, status_t,
 		*out = msk;
 		return SUCCESS;
 	}
-	/* we assume the selected method did not establish an MSK, if it failed
-	 * to establish one, process() would have failed */
-	return NOT_SUPPORTED;
+	return FAILED;
 }
 
 METHOD(eap_method_t, get_identifier, uint8_t,

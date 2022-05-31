@@ -233,7 +233,7 @@ int load_pools_cfg(vici_conn_t *conn, command_format_options_t format,
 	}
 	if (found == 0)
 	{
-		printf("no pools found, %u unloaded\n", unloaded);
+		fprintf(stderr, "no pools found, %u unloaded\n", unloaded);
 		return 0;
 	}
 	if (loaded == found)
@@ -285,7 +285,7 @@ static int load_pools(vici_conn_t *conn)
 
 	ret = load_pools_cfg(conn, format, cfg);
 
-	cfg->destroy_clear(cfg);
+	cfg->destroy(cfg);
 
 	return ret;
 }
