@@ -1,12 +1,9 @@
-diff --git a/init/systemd/strongswan.service.in b/init/systemd/strongswan.service.in
-index 474284a1..86d55304 100644
 --- a/init/systemd/strongswan.service.in
 +++ b/init/systemd/strongswan.service.in
-@@ -4,7 +4,7 @@ After=syslog.target network-online.target
- [Service]
- ExecStart=@SBINDIR@/@IPSEC_SCRIPT@ start --nofork
- ExecReload=@SBINDIR@/@IPSEC_SCRIPT@ reload
--StandardOutput=syslog
+@@ -8,6 +8,7 @@
+ ExecStartPost=@SBINDIR@/swanctl --load-all --noprompt
+ ExecReload=@SBINDIR@/swanctl --reload
+ ExecReload=@SBINDIR@/swanctl --load-all --noprompt
 +StandardOutput=journal
  Restart=on-abnormal
  
