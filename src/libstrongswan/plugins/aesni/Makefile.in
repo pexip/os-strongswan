@@ -138,8 +138,8 @@ am__installdirs = "$(DESTDIR)$(plugindir)"
 LTLIBRARIES = $(noinst_LTLIBRARIES) $(plugin_LTLIBRARIES)
 libstrongswan_aesni_la_LIBADD =
 am_libstrongswan_aesni_la_OBJECTS = aesni_key.lo aesni_cbc.lo \
-	aesni_ctr.lo aesni_ccm.lo aesni_gcm.lo aesni_xcbc.lo \
-	aesni_cmac.lo aesni_plugin.lo
+	aesni_ecb.lo aesni_ctr.lo aesni_ccm.lo aesni_gcm.lo \
+	aesni_xcbc.lo aesni_cmac.lo aesni_plugin.lo
 libstrongswan_aesni_la_OBJECTS = $(am_libstrongswan_aesni_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -247,9 +247,11 @@ ECHO_T = @ECHO_T@
 EGREP = @EGREP@
 EXEEXT = @EXEEXT@
 FGREP = @FGREP@
+FUZZING_CFLAGS = @FUZZING_CFLAGS@
 FUZZING_LDFLAGS = @FUZZING_LDFLAGS@
 GEM = @GEM@
 GENHTML = @GENHTML@
+GIT_VERSION = @GIT_VERSION@
 GPERF = @GPERF@
 GPERF_LEN_TYPE = @GPERF_LEN_TYPE@
 GPRBUILD = @GPRBUILD@
@@ -319,6 +321,7 @@ SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 SOCKLIB = @SOCKLIB@
 STRIP = @STRIP@
+TOX = @TOX@
 UNWINDLIB = @UNWINDLIB@
 VERSION = @VERSION@
 YACC = @YACC@
@@ -354,6 +357,8 @@ clearsilver_LIBS = @clearsilver_LIBS@
 cmd_plugins = @cmd_plugins@
 datadir = @datadir@
 datarootdir = @datarootdir@
+dbusdatadir = @dbusdatadir@
+dbuspolicydir = @dbuspolicydir@
 dev_headers = @dev_headers@
 docdir = @docdir@
 dvidir = @dvidir@
@@ -451,6 +456,8 @@ tss2_sys_LIBS = @tss2_sys_LIBS@
 tss2_tabrmd_CFLAGS = @tss2_tabrmd_CFLAGS@
 tss2_tabrmd_LIBS = @tss2_tabrmd_LIBS@
 urandom_device = @urandom_device@
+wolfssl_CFLAGS = @wolfssl_CFLAGS@
+wolfssl_LIBS = @wolfssl_LIBS@
 xml_CFLAGS = @xml_CFLAGS@
 xml_LIBS = @xml_LIBS@
 AM_CPPFLAGS = \
@@ -467,6 +474,7 @@ AM_CFLAGS = \
 libstrongswan_aesni_la_SOURCES = \
 	aesni_key.h aesni_key.c \
 	aesni_cbc.h aesni_cbc.c \
+	aesni_ecb.h aesni_ecb.c \
 	aesni_ctr.h aesni_ctr.c \
 	aesni_ccm.h aesni_ccm.c \
 	aesni_gcm.h aesni_gcm.c \
@@ -568,6 +576,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/aesni_ccm.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/aesni_cmac.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/aesni_ctr.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/aesni_ecb.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/aesni_gcm.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/aesni_key.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/aesni_plugin.Plo@am__quote@

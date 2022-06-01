@@ -49,7 +49,7 @@ ENUM_NEXT(ck_rv_names, CKR_ATTRIBUTE_READ_ONLY, CKR_ATTRIBUTE_VALUE_INVALID,
 	"ATTRIBUTE_VALUE_INVALID");
 ENUM_NEXT(ck_rv_names, CKR_DATA_INVALID, CKR_DATA_LEN_RANGE,
 		CKR_ATTRIBUTE_VALUE_INVALID,
-	"DATA_INVALID"
+	"DATA_INVALID",
 	"DATA_LEN_RANGE");
 ENUM_NEXT(ck_rv_names, CKR_DEVICE_ERROR, CKR_DEVICE_REMOVED,
 		CKR_DATA_LEN_RANGE,
@@ -540,6 +540,7 @@ ENUM_NEXT(ck_attr_names, CKA_HW_FEATURE_TYPE, CKA_HAS_RESET,
 	"HAS_RESET");
 ENUM_NEXT(ck_attr_names, CKA_PIXEL_X, CKA_BITS_PER_PIXEL, CKA_HAS_RESET,
 	"PIXEL_X",
+	"PIXEL_Y",
 	"RESOLUTION",
 	"CHAR_ROWS",
 	"CHAR_COLUMNS",
@@ -642,7 +643,7 @@ static void free_attrs(object_enumerator_t *this)
 }
 
 /**
- * CKA_EC_POINT is encodeed as ASN.1 octet string, we can't handle that and
+ * CKA_EC_POINT is encoded as ASN.1 octet string, we can't handle that and
  * some tokens actually return them even unwrapped.
  *
  * Because ASN1_OCTET_STRING is 0x04 and uncompressed EC_POINTs also begin with

@@ -353,7 +353,7 @@ START_TEST(test_strpfx)
 END_TEST
 
 /*******************************************************************************
- * mallac_align/free_align
+ * malloc_align/free_align
  */
 
 START_TEST(test_malloc_align)
@@ -544,6 +544,63 @@ START_TEST(test_memstr)
 	{
 		ck_assert(ret == NULL);
 	}
+}
+END_TEST
+
+/*******************************************************************************
+ * memwipe
+ */
+
+START_TEST(test_memwipe_null)
+{
+	memwipe(NULL, 16);
+}
+END_TEST
+
+static inline bool test_wiped_memory(char *buf, size_t len)
+{
+	int i;
+
+	/* comparing two bytes at once reduces the chances of conflicts if memory
+	 * got overwritten already */
+	for (i = 0; i < len; i += 2)
+	{
+		if (buf[i] != 0 && buf[i] == i &&
+			buf[i+1] != 0 && buf[i+1] == i+1)
+		{
+			return FALSE;
+		}
+	}
+	return TRUE;
+}
+
+START_TEST(test_memwipe_stack)
+{
+	char buf[64];
+	int i;
+
+	for (i = 0; i < sizeof(buf); i++)
+	{
+		buf[i] = i;
+	}
+	memwipe(buf, sizeof(buf));
+	ck_assert(test_wiped_memory(buf, sizeof(buf)));
+}
+END_TEST
+
+START_TEST(test_memwipe_heap)
+{
+	size_t len = 64;
+	char *buf = malloc(len);
+	int i;
+
+	for (i = 0; i < len; i++)
+	{
+		buf[i] = i;
+	}
+	memwipe(buf, len);
+	ck_assert(test_wiped_memory(buf, len));
+	free(buf);
 }
 END_TEST
 
@@ -941,6 +998,84 @@ START_TEST(test_mark_from_string)
 END_TEST
 
 /*******************************************************************************
+ * if_id_from_string
+ */
+
+static struct {
+	char *s;
+	bool ok;
+	uint32_t i;
+} if_id_data[] = {
+	{NULL,			FALSE,	0 },
+	{"",			TRUE,	0 },
+	{"/",			FALSE,	0 },
+	{"42",			TRUE,	42 },
+	{"0x42",		TRUE,	0x42 },
+	{"x",			FALSE,	0 },
+	{"42/",			FALSE,	0 },
+	{"42/0",		FALSE,	0 },
+	{"%unique",		TRUE,	IF_ID_UNIQUE },
+	{"%unique/",	FALSE,	0},
+	{"%unique0xffffffffff",	FALSE,	0},
+	{"0xffffffff",	TRUE,	IF_ID_UNIQUE},
+	{"%unique-dir",	TRUE,	IF_ID_UNIQUE_DIR},
+	{"%unique-dir/",FALSE,	0},
+	{"0xfffffffe",	TRUE,	IF_ID_UNIQUE_DIR},
+	{"%unique-",	FALSE,	0},
+	{"%unique-foo",	FALSE,	0},
+};
+
+START_TEST(test_if_id_from_string)
+{
+	uint32_t if_id;
+
+	if (if_id_from_string(if_id_data[_i].s, &if_id))
+	{
+		ck_assert_int_eq(if_id, if_id_data[_i].i);
+	}
+	else
+	{
+		ck_assert(!if_id_data[_i].ok);
+	}
+}
+END_TEST
+
+/*******************************************************************************
+ * allocate_unique_if_ids
+ */
+
+static struct {
+	uint32_t in;
+	uint32_t out;
+	uint32_t exp_in;
+	uint32_t exp_out;
+} unique_if_id_data[] = {
+	{0,	0, 0, 0 },
+	{42, 42, 42, 42 },
+	{42, 1337, 42, 1337 },
+	/* each call increases the internal counter by 1 or 2*/
+	{IF_ID_UNIQUE, 42, 1, 42 },
+	{42, IF_ID_UNIQUE, 42, 2 },
+	{IF_ID_UNIQUE_DIR, 42, 3, 42 },
+	{42, IF_ID_UNIQUE_DIR, 42, 4 },
+	{IF_ID_UNIQUE, IF_ID_UNIQUE, 5, 5 },
+	{IF_ID_UNIQUE_DIR, IF_ID_UNIQUE, 6, 7 },
+	{IF_ID_UNIQUE, IF_ID_UNIQUE_DIR, 8, 9 },
+	{IF_ID_UNIQUE_DIR, IF_ID_UNIQUE_DIR, 10, 11 },
+};
+
+START_TEST(test_allocate_unique_if_ids)
+{
+	uint32_t if_id_in = unique_if_id_data[_i].in,
+			 if_id_out = unique_if_id_data[_i].out;
+
+	allocate_unique_if_ids(&if_id_in, &if_id_out);
+	ck_assert_int_eq(if_id_in, unique_if_id_data[_i].exp_in);
+	ck_assert_int_eq(if_id_out, unique_if_id_data[_i].exp_out);
+}
+END_TEST
+
+/*******************************************************************************
  * signature_schemes_for_key
  */
 
@@ -1054,6 +1189,12 @@ Suite *utils_suite_create()
 	tcase_add_loop_test(tc, test_memstr, 0, countof(memstr_data));
 	suite_add_tcase(s, tc);
 
+	tc = tcase_create("memwipe");
+	tcase_add_test(tc, test_memwipe_null);
+	tcase_add_test(tc, test_memwipe_stack);
+	tcase_add_test(tc, test_memwipe_heap);
+	suite_add_tcase(s, tc);
+
 	tc = tcase_create("utils_memrchr");
 	tcase_add_loop_test(tc, test_utils_memrchr, 0, countof(memrchr_data));
 	suite_add_tcase(s, tc);
@@ -1085,6 +1226,14 @@ Suite *utils_suite_create()
 
 	tc = tcase_create("mark_from_string");
 	tcase_add_loop_test(tc, test_mark_from_string, 0, countof(mark_data));
+	suite_add_tcase(s, tc);
+
+	tc = tcase_create("if_id_from_string");
+	tcase_add_loop_test(tc, test_if_id_from_string, 0, countof(if_id_data));
+	suite_add_tcase(s, tc);
+
+	tc = tcase_create("allocate_unique_if_ids");
+	tcase_add_loop_test(tc, test_allocate_unique_if_ids, 0, countof(unique_if_id_data));
 	suite_add_tcase(s, tc);
 
 	tc = tcase_create("signature_schemes_for_key");

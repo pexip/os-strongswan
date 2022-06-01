@@ -1,32 +1,146 @@
+strongswan (5.9.1-1+deb11u2) bullseye-security; urgency=medium
+
+  * gbp: revert upstream branch name change
+  * eap-authenticator: Enforce failure if MSK generation fails
+    - Fix incorrect handling of Early EAP-Success Messages (CVE-2021-45079)
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Fri, 21 Jan 2022 15:55:38 +0100
+
+strongswan (5.9.1-1+deb11u1) bullseye-security; urgency=medium
+
+  * Reject RSASSA-PSS params with negative salt length
+    - fix remote denial of service (CVE-2021-41990)
+  * Prevent crash due to integer overflow / sign change
+    - fix remote denial of service (CVE-2021-41991)
+  * d/gpp.conf: track bullseye branches
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Thu, 14 Oct 2021 22:36:24 +0200
+
+strongswan (5.9.1-1) unstable; urgency=medium
+
+  * New upstream version 5.9.1
+  * d/patches: rebase against new upstream version
+  * d/watch: update to version 4
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Wed, 11 Nov 2020 17:54:34 +0100
+
+strongswan (5.9.0-1) unstable; urgency=medium
+
+  * New upstream version 5.9.0
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Thu, 17 Sep 2020 10:21:30 +0200
+
+strongswan (5.8.4-1) unstable; urgency=medium
+
+  * New upstream version 5.8.4 (Closes: #956446)
+  * d/rules: drop --as-needed from linker flags
+  * d/control: update standards version to 4.5.0
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Thu, 30 Apr 2020 08:57:26 +0200
+
+strongswan (5.8.2-2) unstable; urgency=medium
+
+  * d/control: replace libip{4,6}tc-dev by libiptc-dev (Closes: #951016)
+  * d/copyright updated
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Thu, 13 Feb 2020 22:46:40 +0100
+
+strongswan (5.8.2-1) unstable; urgency=medium
+
+  [ Jean-Michel Vourgère ]
+  * README.Debian: Fixed typo
+
+  [ Yves-Alexis Perez ]
+  * d/control: replace iptables-dev b-dep by libip{4,6}tc-dev (Closes: #946148)
+  * d/watch: use uscan special strings
+  * New upstream version 5.8.2
+  * d/control: update dh compat level to 12
+  * strongswan-nm: update path for dbus service file
+  * install DRBG plugin to libstrongswan
+  * d/control: add ${misc:Pre-Depends} to strongswan-starter
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Wed, 01 Jan 2020 14:35:46 +0100
+
+strongswan (5.8.1-1) unstable; urgency=medium
+
+  * d/rules: disable http and stream tests under CI
+  * New upstream version 5.8.1
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Fri, 18 Oct 2019 16:44:27 +0200
+
+strongswan (5.8.0-2) unstable; urgency=medium
+
+  [ Christian Ehrhardt ]
+  * d/control: Mention mgf1 plugin which is in libstrongswan now
+  * Complete the disabling of libfast
+  * Clean up d/strongswan-starter.postinst: section about runlevel changes
+  * Clean up d/strongswan-starter.postinst: opportunistic encryption
+  * Enable kernel-libipsec for use of strongswan in containers
+  * d/control, d/libcharon-{extras,extauth}-plugins.install: Add
+    extauth-plugins package (Recommends)
+  * apparmor: d/usr.lib.ipsec.charon: sync notify rule from charon-systemd
+  * apparmor: fix apparmor denies reading the own FDs (LP: 1786250)
+  * apparmor: d/usr.sbin.charon-systemd: allow CLUSTERIP for ha plugin
+    (LP: 1773956)
+  * apparmor: d/usr.lib.ipsec.stroke: executables need to be able to read map
+    and execute themselves
+  * apparmor: d/usr.lib.ipsec.lookip: executables need to be able to read map
+    and execute themselves
+  * apparmor: d/usr.sbin.swanctl: add apparmor rule for af-alg plugin
+    (LP: 1807962)
+  * d/control: libtpmtss is actually packaged in libstrongswan-extra-plugins
+
+  [ Ryan Harper ]
+  * Remove code related to unused debconf managed config
+
+  [ Yves-Alexis Perez ]
+  * ship xfrmi only on Linux, fix FTBFS on kfreebsd
+  * d/libcharon-extra-plugins.install: drop plugins disabled in Debian
+  * d/control: update standards version to 4.4.1
+  * d/strongswan-starter.templates: drop runlevel_changes
+  * let dh_installinit handle update-rc.d calls
+  * d/salsa-ci.yml: add a salsa pipeline config
+  * d/rules: drop dbgsym migration
+  * strongswan-starter: update line number in lintian override
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Sat, 05 Oct 2019 15:03:59 +0200
+
+strongswan (5.8.0-1) unstable; urgency=medium
+
+  [ Christian Ehrhardt ]
+  * Fix fails in debian CI (Closes: #926479)
+
+  [ Simon Deziel ]
+  * d/usr.lib.ipsec.charon, d/usr.sbin.charon-systemd: add CAP_SETPCAP to
+    apparmor to allow dropping caps
+  * d/usr.sbin.swanctl: add attach_disconnected to work inside containers
+  * d/usr.sbin.charon-systemd: allow accessing the binary
+  * d/usr.sbin.swanctl: allow reading own binary
+
+  [ Yves-Alexis Perez ]
+  * New upstream version 5.8.0
+  * d/control: update standards version to 4.4.0
+  * use debhelper-compat b-d for dh compat level
+  * d/control: bump dh compat level to 11
+  * d/rules: drop systemd addon, useless in compat 11
+  * strongswan-libcharon: install xfrmi binary
+  * d/patches refreshed for new upstream release
+  * handle renaming of systemd service files
+  * d/control: remove obsolete breaks/replaces
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Mon, 26 Aug 2019 12:58:23 +0200
+
 strongswan (5.7.2-1+deb10u2pexip1) pexip; urgency=medium
 
   * New upstream release
 
  -- Steve McIntyre <steve.mcintyre@pexip.com>  Tue, 01 Feb 2022 12:00:30 +0000
 
-strongswan (5.7.2-1+deb10u2) buster-security; urgency=medium
-
-  * gbp.conf: revert upstream branch name change for now
-  * eap-authenticator: Enforce failure if MSK generation fails
-    -  Fix incorrect handling of Early EAP-Success Messages (CVE-2021-45079)
-
- -- Yves-Alexis Perez <corsac@debian.org>  Fri, 21 Jan 2022 15:45:18 +0100
-
 strongswan (5.7.2-1+deb10u1pexip1) pexip; urgency=medium
 
   * New upstream release
 
  -- Steve McIntyre <steve.mcintyre@pexip.com>  Mon, 25 Oct 2021 15:44:10 +0100
-
-strongswan (5.7.2-1+deb10u1) buster-security; urgency=medium
-
-  * Reject RSASSA-PSS params with negative salt length
-    - fix remote denial of service (CVE-2021-41990)
-  * Prevent crash due to integer overflow / sign change
-    - fix remote denial of service (CVE-2021-41991)
-  * d/gbp.conf: track buster-security branches
-
- -- Yves-Alexis Perez <corsac@debian.org>  Thu, 14 Oct 2021 20:17:07 +0200
 
 strongswan (5.7.2-1pexip6) pexip; urgency=medium
 

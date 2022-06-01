@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2018 Tobias Brunner
+ * Copyright (C) 2008-2019 Tobias Brunner
  * Copyright (C) 2016 Andreas Steffen
  * Copyright (C) 2005-2007 Martin Willi
  * Copyright (C) 2005 Jan Hutter
@@ -96,17 +96,14 @@ struct child_cfg_t {
 	/**
 	 * Select a proposal from a supplied list.
 	 *
-	 * Returned propsal is newly created and must be destroyed after usage.
+	 * Returned proposal is newly created and must be destroyed after usage.
 	 *
 	 * @param proposals		list from which proposals are selected
-	 * @param strip_dh		TRUE strip out diffie hellman groups
-	 * @param private		accept algorithms from a private range
-	 * @param prefer_self	whether to prefer configured or supplied proposals
+	 * @param flags			flags to consider during proposal selection
 	 * @return				selected proposal, or NULL if nothing matches
 	 */
 	proposal_t* (*select_proposal)(child_cfg_t*this, linked_list_t *proposals,
-								   bool strip_dh, bool private,
-								   bool prefer_self);
+								   proposal_selection_flag_t flags);
 
 	/**
 	 * Add a traffic selector to the config.
@@ -127,7 +124,7 @@ struct child_cfg_t {
 	 * side, one for the remote side.
 	 * If a list with traffic selectors is supplied, these are used to narrow
 	 * down the traffic selector list to the greatest common divisor.
-	 * Some traffic selector may be "dymamic", meaning they are narrowed down
+	 * Some traffic selector may be "dynamic", meaning they are narrowed down
 	 * to a specific address (host-to-host or virtual-IP setups). Use
 	 * the "host" parameter to narrow such traffic selectors to that address.
 	 * Resulted list and its traffic selectors must be destroyed after use.
@@ -225,6 +222,14 @@ struct child_cfg_t {
 	 * @return				reqid
 	 */
 	uint32_t (*get_reqid)(child_cfg_t *this);
+
+	/**
+	 * Optional interface ID to set on policies/SAs.
+	 *
+	 * @param inbound		TRUE for inbound, FALSE for outbound
+	 * @return				interface ID
+	 */
+	uint32_t (*get_if_id)(child_cfg_t *this, bool inbound);
 
 	/**
 	 * Optional mark to set on policies/SAs.
@@ -350,6 +355,10 @@ struct child_cfg_create_t {
 	child_cfg_option_t options;
 	/** Specific reqid to use for CHILD_SA, 0 for auto assignment */
 	uint32_t reqid;
+	/** Optional inbound interface ID */
+	uint32_t if_id_in;
+	/** Optional outbound interface ID */
+	uint32_t if_id_out;
 	/** Optional inbound mark */
 	mark_t mark_in;
 	/** Optional outbound mark */

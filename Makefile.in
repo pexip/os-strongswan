@@ -276,9 +276,11 @@ ECHO_T = @ECHO_T@
 EGREP = @EGREP@
 EXEEXT = @EXEEXT@
 FGREP = @FGREP@
+FUZZING_CFLAGS = @FUZZING_CFLAGS@
 FUZZING_LDFLAGS = @FUZZING_LDFLAGS@
 GEM = @GEM@
 GENHTML = @GENHTML@
+GIT_VERSION = @GIT_VERSION@
 GPERF = @GPERF@
 GPERF_LEN_TYPE = @GPERF_LEN_TYPE@
 GPRBUILD = @GPRBUILD@
@@ -348,6 +350,7 @@ SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 SOCKLIB = @SOCKLIB@
 STRIP = @STRIP@
+TOX = @TOX@
 UNWINDLIB = @UNWINDLIB@
 VERSION = @VERSION@
 YACC = @YACC@
@@ -383,6 +386,8 @@ clearsilver_LIBS = @clearsilver_LIBS@
 cmd_plugins = @cmd_plugins@
 datadir = @datadir@
 datarootdir = @datarootdir@
+dbusdatadir = @dbusdatadir@
+dbuspolicydir = @dbuspolicydir@
 dev_headers = @dev_headers@
 docdir = @docdir@
 dvidir = @dvidir@
@@ -480,6 +485,8 @@ tss2_sys_LIBS = @tss2_sys_LIBS@
 tss2_tabrmd_CFLAGS = @tss2_tabrmd_CFLAGS@
 tss2_tabrmd_LIBS = @tss2_tabrmd_LIBS@
 urandom_device = @urandom_device@
+wolfssl_CFLAGS = @wolfssl_CFLAGS@
+wolfssl_LIBS = @wolfssl_LIBS@
 xml_CFLAGS = @xml_CFLAGS@
 xml_LIBS = @xml_LIBS@
 SUBDIRS = src man conf init testing $(am__append_1) $(am__append_2)
@@ -746,6 +753,9 @@ distdir: $(DISTFILES)
 	      || exit 1; \
 	  fi; \
 	done
+	$(MAKE) $(AM_MAKEFLAGS) \
+	  top_distdir="$(top_distdir)" distdir="$(distdir)" \
+	  dist-hook
 	-test -n "$(am__skip_mode_fix)" \
 	|| find "$(distdir)" -type d ! -perm -755 \
 		-exec chmod u+rwx,go+rx {} \; -o \
@@ -996,8 +1006,8 @@ uninstall-am: uninstall-nodist_config_includeHEADERS
 .PHONY: $(am__recursive_targets) CTAGS GTAGS TAGS all all-am \
 	am--refresh check check-am clean clean-cscope clean-generic \
 	clean-libtool clean-local cscope cscopelist-am ctags ctags-am \
-	dist dist-all dist-bzip2 dist-gzip dist-lzip dist-shar \
-	dist-tarZ dist-xz dist-zip distcheck distclean \
+	dist dist-all dist-bzip2 dist-gzip dist-hook dist-lzip \
+	dist-shar dist-tarZ dist-xz dist-zip distcheck distclean \
 	distclean-generic distclean-hdr distclean-libtool \
 	distclean-tags distcleancheck distdir distuninstallcheck dvi \
 	dvi-am html html-am info info-am install install-am \
@@ -1020,6 +1030,9 @@ Android.common.mk :	Android.common.mk.in configure.ac
 		sed \
 		-e "s:\@PACKAGE_VERSION\@:$(PACKAGE_VERSION):" \
 		$(srcdir)/$@.in > $@
+
+dist-hook:
+		@echo $(GIT_VERSION) > $(distdir)/.tarball-git-version
 
 Doxyfile :	Doxyfile.in
 		$(AM_V_GEN) \

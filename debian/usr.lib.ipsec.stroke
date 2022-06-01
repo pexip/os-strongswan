@@ -17,6 +17,8 @@
 
   capability dac_override,
 
+  /usr/lib/ipsec/stroke         rmix,
+
   /etc/strongswan.conf          r,
   /etc/strongswan.d/            r,
   /etc/strongswan.d/**          r,

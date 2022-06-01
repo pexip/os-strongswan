@@ -49,7 +49,7 @@
 bool openssl_hash_chunk(int hash_type, chunk_t data, chunk_t *hash);
 
 /**
- * Concatenates two bignums into a chunk, thereby enfocing the length of
+ * Concatenates two bignums into a chunk, thereby enforcing the length of
  * a single BIGNUM, if necessary, by pre-pending it with zeros.
  *
  * Note: this function allocates memory for the chunk
@@ -101,7 +101,7 @@ bool openssl_bn2chunk(const BIGNUM *bn, chunk_t *chunk);
  * @param asn1		asn1 object to convert
  * @return			chunk, pointing into asn1 object
  */
-chunk_t openssl_asn1_obj2chunk(ASN1_OBJECT *asn1);
+chunk_t openssl_asn1_obj2chunk(const ASN1_OBJECT *asn1);
 
 /**
  * Convert an OpenSSL ASN1_STRING to a chunk.
@@ -125,7 +125,7 @@ identification_t *openssl_x509_name2id(X509_NAME *name);
  * @param obj		openssl ASN1 object
  * @returns			OID, as defined in <asn1/oid.h>
  */
-int openssl_asn1_known_oid(ASN1_OBJECT *obj);
+int openssl_asn1_known_oid(const ASN1_OBJECT *obj);
 
 /**
  * Convert an OpenSSL ASN1_TIME to a time_t.

@@ -1314,7 +1314,7 @@ yyg->yy_c_buf_p = yy_cp -= 1;
 YY_DO_BEFORE_ACTION; /* set up yytext again */
 YY_RULE_SETUP
 #line 65 "parser/lexer.l"
-/* eat legacy version delcaration */
+/* eat legacy version declaration */
 	YY_BREAK
 case 2:
 YY_RULE_SETUP

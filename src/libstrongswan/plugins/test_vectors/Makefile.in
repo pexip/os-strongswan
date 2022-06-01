@@ -140,14 +140,14 @@ libstrongswan_test_vectors_la_LIBADD =
 am__dirstamp = $(am__leading_dot)dirstamp
 am_libstrongswan_test_vectors_la_OBJECTS = test_vectors_plugin.lo \
 	test_vectors/3des_cbc.lo test_vectors/aes_cbc.lo \
-	test_vectors/aes_ctr.lo test_vectors/aes_xcbc.lo \
-	test_vectors/aes_cmac.lo test_vectors/aes_ccm.lo \
-	test_vectors/aes_gcm.lo test_vectors/chacha20poly1305.lo \
-	test_vectors/chacha20_xof.lo test_vectors/blowfish.lo \
-	test_vectors/camellia_cbc.lo test_vectors/camellia_ctr.lo \
-	test_vectors/camellia_xcbc.lo test_vectors/cast.lo \
-	test_vectors/des.lo test_vectors/idea.lo test_vectors/null.lo \
-	test_vectors/rc2.lo test_vectors/rc5.lo \
+	test_vectors/aes_ecb.lo test_vectors/aes_ctr.lo \
+	test_vectors/aes_xcbc.lo test_vectors/aes_cmac.lo \
+	test_vectors/aes_ccm.lo test_vectors/aes_gcm.lo \
+	test_vectors/chacha20poly1305.lo test_vectors/chacha20_xof.lo \
+	test_vectors/blowfish.lo test_vectors/camellia_cbc.lo \
+	test_vectors/camellia_ctr.lo test_vectors/camellia_xcbc.lo \
+	test_vectors/cast.lo test_vectors/des.lo test_vectors/idea.lo \
+	test_vectors/null.lo test_vectors/rc2.lo test_vectors/rc5.lo \
 	test_vectors/serpent_cbc.lo test_vectors/twofish_cbc.lo \
 	test_vectors/md2.lo test_vectors/md4.lo test_vectors/md5.lo \
 	test_vectors/md5_hmac.lo test_vectors/sha1.lo \
@@ -157,6 +157,7 @@ am_libstrongswan_test_vectors_la_OBJECTS = test_vectors_plugin.lo \
 	test_vectors/modp.lo test_vectors/modpsub.lo \
 	test_vectors/ecp.lo test_vectors/ecpbp.lo \
 	test_vectors/curve25519.lo test_vectors/curve448.lo \
+	test_vectors/drbg_ctr.lo test_vectors/drbg_hmac.lo \
 	test_vectors/rng.lo
 libstrongswan_test_vectors_la_OBJECTS =  \
 	$(am_libstrongswan_test_vectors_la_OBJECTS)
@@ -266,9 +267,11 @@ ECHO_T = @ECHO_T@
 EGREP = @EGREP@
 EXEEXT = @EXEEXT@
 FGREP = @FGREP@
+FUZZING_CFLAGS = @FUZZING_CFLAGS@
 FUZZING_LDFLAGS = @FUZZING_LDFLAGS@
 GEM = @GEM@
 GENHTML = @GENHTML@
+GIT_VERSION = @GIT_VERSION@
 GPERF = @GPERF@
 GPERF_LEN_TYPE = @GPERF_LEN_TYPE@
 GPRBUILD = @GPRBUILD@
@@ -338,6 +341,7 @@ SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 SOCKLIB = @SOCKLIB@
 STRIP = @STRIP@
+TOX = @TOX@
 UNWINDLIB = @UNWINDLIB@
 VERSION = @VERSION@
 YACC = @YACC@
@@ -373,6 +377,8 @@ clearsilver_LIBS = @clearsilver_LIBS@
 cmd_plugins = @cmd_plugins@
 datadir = @datadir@
 datarootdir = @datarootdir@
+dbusdatadir = @dbusdatadir@
+dbuspolicydir = @dbuspolicydir@
 dev_headers = @dev_headers@
 docdir = @docdir@
 dvidir = @dvidir@
@@ -470,6 +476,8 @@ tss2_sys_LIBS = @tss2_sys_LIBS@
 tss2_tabrmd_CFLAGS = @tss2_tabrmd_CFLAGS@
 tss2_tabrmd_LIBS = @tss2_tabrmd_LIBS@
 urandom_device = @urandom_device@
+wolfssl_CFLAGS = @wolfssl_CFLAGS@
+wolfssl_LIBS = @wolfssl_LIBS@
 xml_CFLAGS = @xml_CFLAGS@
 xml_LIBS = @xml_LIBS@
 AM_CPPFLAGS = \
@@ -484,6 +492,7 @@ libstrongswan_test_vectors_la_SOURCES = \
 	test_vectors_plugin.h test_vectors_plugin.c test_vectors.h \
 	test_vectors/3des_cbc.c \
 	test_vectors/aes_cbc.c \
+	test_vectors/aes_ecb.c \
 	test_vectors/aes_ctr.c \
 	test_vectors/aes_xcbc.c \
 	test_vectors/aes_cmac.c \
@@ -520,6 +529,8 @@ libstrongswan_test_vectors_la_SOURCES = \
 	test_vectors/ecpbp.c \
 	test_vectors/curve25519.c \
 	test_vectors/curve448.c \
+	test_vectors/drbg_ctr.c \
+	test_vectors/drbg_hmac.c \
 	test_vectors/rng.c
 
 libstrongswan_test_vectors_la_LDFLAGS = -module -avoid-version
@@ -612,6 +623,8 @@ test_vectors/3des_cbc.lo: test_vectors/$(am__dirstamp) \
 	test_vectors/$(DEPDIR)/$(am__dirstamp)
 test_vectors/aes_cbc.lo: test_vectors/$(am__dirstamp) \
 	test_vectors/$(DEPDIR)/$(am__dirstamp)
+test_vectors/aes_ecb.lo: test_vectors/$(am__dirstamp) \
+	test_vectors/$(DEPDIR)/$(am__dirstamp)
 test_vectors/aes_ctr.lo: test_vectors/$(am__dirstamp) \
 	test_vectors/$(DEPDIR)/$(am__dirstamp)
 test_vectors/aes_xcbc.lo: test_vectors/$(am__dirstamp) \
@@ -684,6 +697,10 @@ test_vectors/curve25519.lo: test_vectors/$(am__dirstamp) \
 	test_vectors/$(DEPDIR)/$(am__dirstamp)
 test_vectors/curve448.lo: test_vectors/$(am__dirstamp) \
 	test_vectors/$(DEPDIR)/$(am__dirstamp)
+test_vectors/drbg_ctr.lo: test_vectors/$(am__dirstamp) \
+	test_vectors/$(DEPDIR)/$(am__dirstamp)
+test_vectors/drbg_hmac.lo: test_vectors/$(am__dirstamp) \
+	test_vectors/$(DEPDIR)/$(am__dirstamp)
 test_vectors/rng.lo: test_vectors/$(am__dirstamp) \
 	test_vectors/$(DEPDIR)/$(am__dirstamp)
 
@@ -704,6 +721,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@test_vectors/$(DEPDIR)/aes_ccm.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@test_vectors/$(DEPDIR)/aes_cmac.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@test_vectors/$(DEPDIR)/aes_ctr.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@test_vectors/$(DEPDIR)/aes_ecb.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@test_vectors/$(DEPDIR)/aes_gcm.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@test_vectors/$(DEPDIR)/aes_xcbc.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@test_vectors/$(DEPDIR)/blowfish.Plo@am__quote@
@@ -716,6 +734,8 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@test_vectors/$(DEPDIR)/curve25519.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@test_vectors/$(DEPDIR)/curve448.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@test_vectors/$(DEPDIR)/des.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@test_vectors/$(DEPDIR)/drbg_ctr.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@test_vectors/$(DEPDIR)/drbg_hmac.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@test_vectors/$(DEPDIR)/ecp.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@test_vectors/$(DEPDIR)/ecpbp.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@test_vectors/$(DEPDIR)/fips_prf.Plo@am__quote@

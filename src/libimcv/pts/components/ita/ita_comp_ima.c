@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2017 Andreas Steffen
+ * Copyright (C) 2011-2020 Andreas Steffen
  * HSR Hochschule fuer Technik Rapperswil
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -167,16 +167,14 @@ static pts_comp_evidence_t* extend_pcr(pts_ita_comp_ima_t* this,
 									   uint8_t qualifier, pts_pcr_t *pcrs,
 									   uint32_t pcr, chunk_t measurement)
 {
-	size_t pcr_len;
 	pts_pcr_transform_t pcr_transform;
-	pts_meas_algorithms_t hash_algo;
+	pts_meas_algorithms_t pcr_algo;
 	pts_comp_func_name_t *name;
 	pts_comp_evidence_t *evidence;
 	chunk_t pcr_before = chunk_empty, pcr_after = chunk_empty;
 
-	hash_algo = PTS_MEAS_ALGO_SHA1;
-	pcr_len = HASH_SIZE_SHA1;
-	pcr_transform = pts_meas_algo_to_pcr_transform(hash_algo, pcr_len);
+	pcr_algo = pcrs->get_pcr_algo(pcrs);
+	pcr_transform = PTS_PCR_TRANSFORM_MATCH;
 
 	if (this->pcr_info)
 	{
@@ -190,7 +188,7 @@ static pts_comp_evidence_t* extend_pcr(pts_ita_comp_ima_t* this,
 	}
 	name = this->name->clone(this->name);
 	name->set_qualifier(name, qualifier);
-	evidence = pts_comp_evidence_create(name, this->depth, pcr, hash_algo,
+	evidence = pts_comp_evidence_create(name, this->depth, pcr, pcr_algo,
 						pcr_transform, this->creation_time, measurement);
 	if (this->pcr_info)
 	{
@@ -350,6 +348,10 @@ METHOD(pts_component_t, measure, status_t,
 	status_t status;
 
 	pcrs = pts->get_pcrs(pts);
+	if (!pcrs)
+	{
+		return FAILED;
+	}
 
 	if (qualifier == (PTS_ITA_QUALIFIER_FLAG_KERNEL |
 					  PTS_ITA_QUALIFIER_TYPE_TRUSTED))
@@ -357,8 +359,9 @@ METHOD(pts_component_t, measure, status_t,
 		switch (this->state)
 		{
 			case IMA_STATE_INIT:
-				this->bios_list = pts_ima_bios_list_create(
-												IMA_BIOS_MEASUREMENTS);
+				this->bios_list = pts_ima_bios_list_create(pts->get_tpm(pts),
+													IMA_BIOS_MEASUREMENTS,
+									 				pcrs->get_pcr_algo(pcrs));
 				if (!this->bios_list)
 				{
 					return FAILED;
@@ -534,6 +537,10 @@ METHOD(pts_component_t, verify, status_t,
 
 	this->aik_id = pts->get_aik_id(pts);
 	pcrs = pts->get_pcrs(pts);
+	if (!pcrs)
+	{
+		return FAILED;
+	}
 	measurement = evidence->get_measurement(evidence, &pcr,	&algo, &transform,
 											&creation_time);
 

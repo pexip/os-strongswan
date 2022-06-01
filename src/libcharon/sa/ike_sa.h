@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006-2018 Tobias Brunner
+ * Copyright (C) 2006-2020 Tobias Brunner
  * Copyright (C) 2006 Daniel Roethlisberger
  * Copyright (C) 2005-2009 Martin Willi
  * Copyright (C) 2005 Jan Hutter
@@ -161,6 +161,11 @@ enum ike_extension_t {
 	 * Postquantum Preshared Keys, draft-ietf-ipsecme-qr-ikev2
 	 */
 	EXT_PPK = (1<<15),
+
+	/**
+	 * Responder accepts childless IKE_SAs, RFC 6023
+	 */
+	EXT_IKE_CHILDLESS = (1<<16),
 };
 
 /**
@@ -243,7 +248,7 @@ enum ike_condition_t {
  * Timing information and statistics to query from an SA
  */
 enum statistic_t {
-	/** Timestamp of SA establishement */
+	/** Timestamp of SA establishment */
 	STAT_ESTABLISHED = 0,
 	/** Timestamp of scheduled rekeying */
 	STAT_REKEY,
@@ -761,7 +766,7 @@ struct ike_sa_t {
 	 * to the CHILD_SA.
 	 *
 	 * @param child_cfg		child config to create CHILD from
-	 * @param reqid			reqid to use for CHILD_SA, 0 assigne uniquely
+	 * @param reqid			reqid to use for CHILD_SA, 0 assign uniquely
 	 * @param tsi			source of triggering packet
 	 * @param tsr			destination of triggering packet.
 	 * @return
@@ -867,10 +872,11 @@ struct ike_sa_t {
 	 *
 	 * @param message_id	ID of the request to retransmit
 	 * @return
-	 *						- SUCCESS
-	 *						- NOT_FOUND if request doesn't have to be retransmitted
+	 *						- SUCCESS if retransmit was sent
+	 *						- INVALID_STATE if no retransmit required
+	 *						- DESTROY_ME if this IKE_SA MUST be deleted
 	 */
-	status_t (*retransmit) (ike_sa_t *this, uint32_t message_id);
+	status_t (*retransmit)(ike_sa_t *this, uint32_t message_id);
 
 	/**
 	 * Sends a DPD request to the peer.
@@ -1031,7 +1037,7 @@ struct ike_sa_t {
 	status_t (*reauth) (ike_sa_t *this);
 
 	/**
-	 * Restablish the IKE_SA.
+	 * Reestablish the IKE_SA.
 	 *
 	 * Reestablish an IKE_SA after it has been closed.
 	 *
@@ -1067,6 +1073,14 @@ struct ike_sa_t {
 	 * @param local			TRUE to clear local addresses, FALSE for remote
 	 */
 	void (*clear_virtual_ips) (ike_sa_t *this, bool local);
+
+	/**
+	 * Get interface ID to use as default for children of this IKE_SA.
+	 *
+	 * @param inbound		TRUE for inbound interface ID
+	 * @return				interface ID
+	 */
+	uint32_t (*get_if_id)(ike_sa_t *this, bool inbound);
 
 	/**
 	 * Create an enumerator over virtual IPs.
@@ -1127,7 +1141,7 @@ struct ike_sa_t {
 	/**
 	 * Remove the task the given enumerator points to.
 	 *
-	 * @note This should be used with caution, in partciular, for tasks in the
+	 * @note This should be used with caution, in particular, for tasks in the
 	 * active and passive queues.
 	 *
 	 * @param enumerator	enumerator created with the method above
@@ -1142,7 +1156,7 @@ struct ike_sa_t {
 	void (*flush_queue)(ike_sa_t *this, task_queue_t queue);
 
 	/**
-	 * Queue a task for initiaton to the task manager.
+	 * Queue a task for initiation to the task manager.
 	 *
 	 * @param task			task to queue
 	 */

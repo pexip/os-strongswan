@@ -218,39 +218,43 @@ host_triplet = @host@
 @MONOLITHIC_TRUE@@USE_PADLOCK_TRUE@am__append_104 = plugins/padlock/libstrongswan-padlock.la
 @USE_OPENSSL_TRUE@am__append_105 = plugins/openssl
 @MONOLITHIC_TRUE@@USE_OPENSSL_TRUE@am__append_106 = plugins/openssl/libstrongswan-openssl.la
-@USE_GCRYPT_TRUE@am__append_107 = plugins/gcrypt
-@MONOLITHIC_TRUE@@USE_GCRYPT_TRUE@am__append_108 = plugins/gcrypt/libstrongswan-gcrypt.la
-@USE_BOTAN_TRUE@am__append_109 = plugins/botan
-@MONOLITHIC_TRUE@@USE_BOTAN_TRUE@am__append_110 = plugins/botan/libstrongswan-botan.la
-@USE_FIPS_PRF_TRUE@am__append_111 = plugins/fips_prf
-@MONOLITHIC_TRUE@@USE_FIPS_PRF_TRUE@am__append_112 = plugins/fips_prf/libstrongswan-fips-prf.la
-@USE_AGENT_TRUE@am__append_113 = plugins/agent
-@MONOLITHIC_TRUE@@USE_AGENT_TRUE@am__append_114 = plugins/agent/libstrongswan-agent.la
-@USE_KEYCHAIN_TRUE@am__append_115 = plugins/keychain
-@MONOLITHIC_TRUE@@USE_KEYCHAIN_TRUE@am__append_116 = plugins/keychain/libstrongswan-keychain.la
-@USE_PKCS11_TRUE@am__append_117 = plugins/pkcs11
-@MONOLITHIC_TRUE@@USE_PKCS11_TRUE@am__append_118 = plugins/pkcs11/libstrongswan-pkcs11.la
-@USE_CHAPOLY_TRUE@am__append_119 = plugins/chapoly
-@MONOLITHIC_TRUE@@USE_CHAPOLY_TRUE@am__append_120 = plugins/chapoly/libstrongswan-chapoly.la
-@USE_CTR_TRUE@am__append_121 = plugins/ctr
-@MONOLITHIC_TRUE@@USE_CTR_TRUE@am__append_122 = plugins/ctr/libstrongswan-ctr.la
-@USE_CCM_TRUE@am__append_123 = plugins/ccm
-@MONOLITHIC_TRUE@@USE_CCM_TRUE@am__append_124 = plugins/ccm/libstrongswan-ccm.la
-@USE_GCM_TRUE@am__append_125 = plugins/gcm
-@MONOLITHIC_TRUE@@USE_GCM_TRUE@am__append_126 = plugins/gcm/libstrongswan-gcm.la
-@USE_MGF1_TRUE@am__append_127 = plugins/mgf1
-@MONOLITHIC_TRUE@@USE_MGF1_TRUE@am__append_128 = plugins/mgf1/libstrongswan-mgf1.la
-@USE_NTRU_TRUE@am__append_129 = plugins/ntru
-@MONOLITHIC_TRUE@@USE_NTRU_TRUE@am__append_130 = plugins/ntru/libstrongswan-ntru.la
-@USE_BLISS_TRUE@am__append_131 = plugins/bliss
-@MONOLITHIC_TRUE@@USE_BLISS_TRUE@am__append_132 = plugins/bliss/libstrongswan-bliss.la
-@USE_NEWHOPE_TRUE@am__append_133 = plugins/newhope
-@MONOLITHIC_TRUE@@USE_NEWHOPE_TRUE@am__append_134 = plugins/newhope/libstrongswan-newhope.la
-@USE_TEST_VECTORS_TRUE@am__append_135 = plugins/test_vectors
-@MONOLITHIC_TRUE@@USE_TEST_VECTORS_TRUE@am__append_136 = plugins/test_vectors/libstrongswan-test-vectors.la
-@USE_LIBNTTFFT_TRUE@am__append_137 = math/libnttfft/tests
-@USE_BLISS_TRUE@am__append_138 = plugins/bliss/tests
-@USE_NEWHOPE_TRUE@am__append_139 = plugins/newhope/tests
+@USE_WOLFSSL_TRUE@am__append_107 = plugins/wolfssl
+@MONOLITHIC_TRUE@@USE_WOLFSSL_TRUE@am__append_108 = plugins/wolfssl/libstrongswan-wolfssl.la
+@USE_GCRYPT_TRUE@am__append_109 = plugins/gcrypt
+@MONOLITHIC_TRUE@@USE_GCRYPT_TRUE@am__append_110 = plugins/gcrypt/libstrongswan-gcrypt.la
+@USE_BOTAN_TRUE@am__append_111 = plugins/botan
+@MONOLITHIC_TRUE@@USE_BOTAN_TRUE@am__append_112 = plugins/botan/libstrongswan-botan.la
+@USE_FIPS_PRF_TRUE@am__append_113 = plugins/fips_prf
+@MONOLITHIC_TRUE@@USE_FIPS_PRF_TRUE@am__append_114 = plugins/fips_prf/libstrongswan-fips-prf.la
+@USE_AGENT_TRUE@am__append_115 = plugins/agent
+@MONOLITHIC_TRUE@@USE_AGENT_TRUE@am__append_116 = plugins/agent/libstrongswan-agent.la
+@USE_KEYCHAIN_TRUE@am__append_117 = plugins/keychain
+@MONOLITHIC_TRUE@@USE_KEYCHAIN_TRUE@am__append_118 = plugins/keychain/libstrongswan-keychain.la
+@USE_PKCS11_TRUE@am__append_119 = plugins/pkcs11
+@MONOLITHIC_TRUE@@USE_PKCS11_TRUE@am__append_120 = plugins/pkcs11/libstrongswan-pkcs11.la
+@USE_CHAPOLY_TRUE@am__append_121 = plugins/chapoly
+@MONOLITHIC_TRUE@@USE_CHAPOLY_TRUE@am__append_122 = plugins/chapoly/libstrongswan-chapoly.la
+@USE_CTR_TRUE@am__append_123 = plugins/ctr
+@MONOLITHIC_TRUE@@USE_CTR_TRUE@am__append_124 = plugins/ctr/libstrongswan-ctr.la
+@USE_CCM_TRUE@am__append_125 = plugins/ccm
+@MONOLITHIC_TRUE@@USE_CCM_TRUE@am__append_126 = plugins/ccm/libstrongswan-ccm.la
+@USE_GCM_TRUE@am__append_127 = plugins/gcm
+@MONOLITHIC_TRUE@@USE_GCM_TRUE@am__append_128 = plugins/gcm/libstrongswan-gcm.la
+@USE_MGF1_TRUE@am__append_129 = plugins/mgf1
+@MONOLITHIC_TRUE@@USE_MGF1_TRUE@am__append_130 = plugins/mgf1/libstrongswan-mgf1.la
+@USE_NTRU_TRUE@am__append_131 = plugins/ntru
+@MONOLITHIC_TRUE@@USE_NTRU_TRUE@am__append_132 = plugins/ntru/libstrongswan-ntru.la
+@USE_BLISS_TRUE@am__append_133 = plugins/bliss
+@MONOLITHIC_TRUE@@USE_BLISS_TRUE@am__append_134 = plugins/bliss/libstrongswan-bliss.la
+@USE_NEWHOPE_TRUE@am__append_135 = plugins/newhope
+@MONOLITHIC_TRUE@@USE_NEWHOPE_TRUE@am__append_136 = plugins/newhope/libstrongswan-newhope.la
+@USE_DRBG_TRUE@am__append_137 = plugins/drbg
+@MONOLITHIC_TRUE@@USE_DRBG_TRUE@am__append_138 = plugins/drbg/libstrongswan-drbg.la
+@USE_TEST_VECTORS_TRUE@am__append_139 = plugins/test_vectors
+@MONOLITHIC_TRUE@@USE_TEST_VECTORS_TRUE@am__append_140 = plugins/test_vectors/libstrongswan-test-vectors.la
+@USE_LIBNTTFFT_TRUE@am__append_141 = math/libnttfft/tests
+@USE_BLISS_TRUE@am__append_142 = plugins/bliss/tests
+@USE_NEWHOPE_TRUE@am__append_143 = plugins/newhope/tests
 subdir = src/libstrongswan
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/config/libtool.m4 \
@@ -331,21 +335,23 @@ libstrongswan_la_DEPENDENCIES = $(am__DEPENDENCIES_1) \
 	$(am__append_118) $(am__append_120) $(am__append_122) \
 	$(am__append_124) $(am__append_126) $(am__append_128) \
 	$(am__append_130) $(am__append_132) $(am__append_134) \
-	$(am__append_136)
+	$(am__append_136) $(am__append_138) $(am__append_140)
 am__libstrongswan_la_SOURCES_DIST = library.c asn1/asn1.c \
 	asn1/asn1_parser.c asn1/oid.c bio/bio_reader.c \
 	bio/bio_writer.c collections/blocking_queue.c \
 	collections/enumerator.c collections/hashtable.c \
-	collections/array.c collections/linked_list.c \
-	crypto/crypters/crypter.c crypto/hashers/hasher.c \
+	collections/hashlist.c collections/array.c \
+	collections/linked_list.c crypto/crypters/crypter.c \
+	crypto/drbgs/drbg.c crypto/hashers/hasher.c \
 	crypto/hashers/hash_algorithm_set.c crypto/proposal/proposal.c \
 	crypto/proposal/proposal_keywords.c \
 	crypto/proposal/proposal_keywords_static.c crypto/prfs/prf.c \
 	crypto/prfs/mac_prf.c crypto/pkcs5.c crypto/rngs/rng.c \
-	crypto/prf_plus.c crypto/signers/signer.c \
-	crypto/signers/mac_signer.c crypto/crypto_factory.c \
-	crypto/crypto_tester.c crypto/diffie_hellman.c crypto/aead.c \
-	crypto/transform.c crypto/iv/iv_gen.c crypto/iv/iv_gen_rand.c \
+	crypto/rngs/rng_tester.c crypto/prf_plus.c \
+	crypto/signers/signer.c crypto/signers/mac_signer.c \
+	crypto/crypto_factory.c crypto/crypto_tester.c \
+	crypto/diffie_hellman.c crypto/aead.c crypto/transform.c \
+	crypto/iv/iv_gen.c crypto/iv/iv_gen_rand.c \
 	crypto/iv/iv_gen_seq.c crypto/iv/iv_gen_null.c \
 	crypto/xofs/xof.c crypto/xofs/xof_bitspender.c \
 	credentials/credential_factory.c credentials/builder.c \
@@ -425,20 +431,21 @@ am_libstrongswan_la_OBJECTS = library.lo asn1/asn1.lo \
 	asn1/asn1_parser.lo asn1/oid.lo bio/bio_reader.lo \
 	bio/bio_writer.lo collections/blocking_queue.lo \
 	collections/enumerator.lo collections/hashtable.lo \
-	collections/array.lo collections/linked_list.lo \
-	crypto/crypters/crypter.lo crypto/hashers/hasher.lo \
+	collections/hashlist.lo collections/array.lo \
+	collections/linked_list.lo crypto/crypters/crypter.lo \
+	crypto/drbgs/drbg.lo crypto/hashers/hasher.lo \
 	crypto/hashers/hash_algorithm_set.lo \
 	crypto/proposal/proposal.lo \
 	crypto/proposal/proposal_keywords.lo \
 	crypto/proposal/proposal_keywords_static.lo crypto/prfs/prf.lo \
 	crypto/prfs/mac_prf.lo crypto/pkcs5.lo crypto/rngs/rng.lo \
-	crypto/prf_plus.lo crypto/signers/signer.lo \
-	crypto/signers/mac_signer.lo crypto/crypto_factory.lo \
-	crypto/crypto_tester.lo crypto/diffie_hellman.lo \
-	crypto/aead.lo crypto/transform.lo crypto/iv/iv_gen.lo \
-	crypto/iv/iv_gen_rand.lo crypto/iv/iv_gen_seq.lo \
-	crypto/iv/iv_gen_null.lo crypto/xofs/xof.lo \
-	crypto/xofs/xof_bitspender.lo \
+	crypto/rngs/rng_tester.lo crypto/prf_plus.lo \
+	crypto/signers/signer.lo crypto/signers/mac_signer.lo \
+	crypto/crypto_factory.lo crypto/crypto_tester.lo \
+	crypto/diffie_hellman.lo crypto/aead.lo crypto/transform.lo \
+	crypto/iv/iv_gen.lo crypto/iv/iv_gen_rand.lo \
+	crypto/iv/iv_gen_seq.lo crypto/iv/iv_gen_null.lo \
+	crypto/xofs/xof.lo crypto/xofs/xof_bitspender.lo \
 	credentials/credential_factory.lo credentials/builder.lo \
 	credentials/cred_encoding.lo credentials/keys/private_key.lo \
 	credentials/keys/public_key.lo credentials/keys/shared_key.lo \
@@ -557,23 +564,25 @@ am__nobase_strongswan_include_HEADERS_DIST = library.h asn1/asn1.h \
 	asn1/asn1_parser.h asn1/oid.h bio/bio_reader.h \
 	bio/bio_writer.h collections/blocking_queue.h \
 	collections/enumerator.h collections/hashtable.h \
-	collections/linked_list.h collections/array.h \
-	collections/dictionary.h crypto/crypters/crypter.h \
+	collections/hashtable_profiler.h collections/linked_list.h \
+	collections/array.h collections/dictionary.h \
+	crypto/crypters/crypter.h crypto/drbgs/drbg.h \
 	crypto/hashers/hasher.h crypto/hashers/hash_algorithm_set.h \
 	crypto/mac.h crypto/proposal/proposal.h \
 	crypto/proposal/proposal_keywords.h \
-	crypto/proposal/proposal_keywords_static.h crypto/prfs/prf.h \
-	crypto/prfs/mac_prf.h crypto/rngs/rng.h crypto/nonce_gen.h \
-	crypto/prf_plus.h crypto/signers/signer.h \
-	crypto/signers/mac_signer.h crypto/crypto_factory.h \
-	crypto/crypto_tester.h crypto/diffie_hellman.h crypto/aead.h \
-	crypto/transform.h crypto/pkcs5.h crypto/iv/iv_gen.h \
-	crypto/iv/iv_gen_rand.h crypto/iv/iv_gen_seq.h \
-	crypto/iv/iv_gen_null.h crypto/xofs/xof.h \
-	crypto/xofs/xof_bitspender.h crypto/xofs/mgf1.h \
-	credentials/credential_factory.h credentials/builder.h \
-	credentials/cred_encoding.h credentials/keys/private_key.h \
-	credentials/keys/public_key.h credentials/keys/shared_key.h \
+	crypto/proposal/proposal_keywords_static.h crypto/rngs/rng.h \
+	crypto/rngs/rng_tester.h crypto/prfs/prf.h \
+	crypto/prfs/mac_prf.h crypto/nonce_gen.h crypto/prf_plus.h \
+	crypto/signers/signer.h crypto/signers/mac_signer.h \
+	crypto/crypto_factory.h crypto/crypto_tester.h \
+	crypto/diffie_hellman.h crypto/aead.h crypto/transform.h \
+	crypto/pkcs5.h crypto/iv/iv_gen.h crypto/iv/iv_gen_rand.h \
+	crypto/iv/iv_gen_seq.h crypto/iv/iv_gen_null.h \
+	crypto/xofs/xof.h crypto/xofs/xof_bitspender.h \
+	crypto/xofs/mgf1.h credentials/credential_factory.h \
+	credentials/builder.h credentials/cred_encoding.h \
+	credentials/keys/private_key.h credentials/keys/public_key.h \
+	credentials/keys/shared_key.h \
 	credentials/keys/signature_params.h \
 	credentials/certificates/certificate.h \
 	credentials/certificates/x509.h credentials/certificates/ac.h \
@@ -668,11 +677,12 @@ DIST_SUBDIRS = . math/libnttfft plugins/af_alg plugins/aes plugins/des \
 	plugins/sshkey plugins/pem plugins/curl plugins/files \
 	plugins/winhttp plugins/unbound plugins/soup plugins/ldap \
 	plugins/mysql plugins/sqlite plugins/padlock plugins/openssl \
-	plugins/gcrypt plugins/botan plugins/fips_prf plugins/agent \
-	plugins/keychain plugins/pkcs11 plugins/chapoly plugins/ctr \
-	plugins/ccm plugins/gcm plugins/mgf1 plugins/ntru \
-	plugins/bliss plugins/newhope plugins/test_vectors tests \
-	math/libnttfft/tests plugins/bliss/tests plugins/newhope/tests
+	plugins/wolfssl plugins/gcrypt plugins/botan plugins/fips_prf \
+	plugins/agent plugins/keychain plugins/pkcs11 plugins/chapoly \
+	plugins/ctr plugins/ccm plugins/gcm plugins/mgf1 plugins/ntru \
+	plugins/bliss plugins/newhope plugins/drbg \
+	plugins/test_vectors tests math/libnttfft/tests \
+	plugins/bliss/tests plugins/newhope/tests
 am__DIST_COMMON = $(srcdir)/Makefile.in $(top_srcdir)/depcomp \
 	$(top_srcdir)/ylwrap settings/settings_lexer.c \
 	settings/settings_parser.c settings/settings_parser.h
@@ -735,9 +745,11 @@ ECHO_T = @ECHO_T@
 EGREP = @EGREP@
 EXEEXT = @EXEEXT@
 FGREP = @FGREP@
+FUZZING_CFLAGS = @FUZZING_CFLAGS@
 FUZZING_LDFLAGS = @FUZZING_LDFLAGS@
 GEM = @GEM@
 GENHTML = @GENHTML@
+GIT_VERSION = @GIT_VERSION@
 GPERF = @GPERF@
 GPERF_LEN_TYPE = @GPERF_LEN_TYPE@
 GPRBUILD = @GPRBUILD@
@@ -807,6 +819,7 @@ SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 SOCKLIB = @SOCKLIB@
 STRIP = @STRIP@
+TOX = @TOX@
 UNWINDLIB = @UNWINDLIB@
 VERSION = @VERSION@
 YACC = @YACC@
@@ -842,6 +855,8 @@ clearsilver_LIBS = @clearsilver_LIBS@
 cmd_plugins = @cmd_plugins@
 datadir = @datadir@
 datarootdir = @datarootdir@
+dbusdatadir = @dbusdatadir@
+dbuspolicydir = @dbuspolicydir@
 dev_headers = @dev_headers@
 docdir = @docdir@
 dvidir = @dvidir@
@@ -939,22 +954,26 @@ tss2_sys_LIBS = @tss2_sys_LIBS@
 tss2_tabrmd_CFLAGS = @tss2_tabrmd_CFLAGS@
 tss2_tabrmd_LIBS = @tss2_tabrmd_LIBS@
 urandom_device = @urandom_device@
+wolfssl_CFLAGS = @wolfssl_CFLAGS@
+wolfssl_LIBS = @wolfssl_LIBS@
 xml_CFLAGS = @xml_CFLAGS@
 xml_LIBS = @xml_LIBS@
 ipseclib_LTLIBRARIES = libstrongswan.la
 libstrongswan_la_SOURCES = library.c asn1/asn1.c asn1/asn1_parser.c \
 	asn1/oid.c bio/bio_reader.c bio/bio_writer.c \
 	collections/blocking_queue.c collections/enumerator.c \
-	collections/hashtable.c collections/array.c \
-	collections/linked_list.c crypto/crypters/crypter.c \
+	collections/hashtable.c collections/hashlist.c \
+	collections/array.c collections/linked_list.c \
+	crypto/crypters/crypter.c crypto/drbgs/drbg.c \
 	crypto/hashers/hasher.c crypto/hashers/hash_algorithm_set.c \
 	crypto/proposal/proposal.c crypto/proposal/proposal_keywords.c \
 	crypto/proposal/proposal_keywords_static.c crypto/prfs/prf.c \
 	crypto/prfs/mac_prf.c crypto/pkcs5.c crypto/rngs/rng.c \
-	crypto/prf_plus.c crypto/signers/signer.c \
-	crypto/signers/mac_signer.c crypto/crypto_factory.c \
-	crypto/crypto_tester.c crypto/diffie_hellman.c crypto/aead.c \
-	crypto/transform.c crypto/iv/iv_gen.c crypto/iv/iv_gen_rand.c \
+	crypto/rngs/rng_tester.c crypto/prf_plus.c \
+	crypto/signers/signer.c crypto/signers/mac_signer.c \
+	crypto/crypto_factory.c crypto/crypto_tester.c \
+	crypto/diffie_hellman.c crypto/aead.c crypto/transform.c \
+	crypto/iv/iv_gen.c crypto/iv/iv_gen_rand.c \
 	crypto/iv/iv_gen_seq.c crypto/iv/iv_gen_null.c \
 	crypto/xofs/xof.c crypto/xofs/xof_bitspender.c \
 	credentials/credential_factory.c credentials/builder.c \
@@ -1009,11 +1028,13 @@ settings/settings_types.h
 @USE_DEV_HEADERS_TRUE@library.h \
 @USE_DEV_HEADERS_TRUE@asn1/asn1.h asn1/asn1_parser.h asn1/oid.h bio/bio_reader.h bio/bio_writer.h \
 @USE_DEV_HEADERS_TRUE@collections/blocking_queue.h collections/enumerator.h collections/hashtable.h \
+@USE_DEV_HEADERS_TRUE@collections/hashtable_profiler.h \
 @USE_DEV_HEADERS_TRUE@collections/linked_list.h collections/array.h collections/dictionary.h \
-@USE_DEV_HEADERS_TRUE@crypto/crypters/crypter.h crypto/hashers/hasher.h \
+@USE_DEV_HEADERS_TRUE@crypto/crypters/crypter.h crypto/drbgs/drbg.h crypto/hashers/hasher.h \
 @USE_DEV_HEADERS_TRUE@crypto/hashers/hash_algorithm_set.h crypto/mac.h crypto/proposal/proposal.h \
 @USE_DEV_HEADERS_TRUE@crypto/proposal/proposal_keywords.h crypto/proposal/proposal_keywords_static.h \
-@USE_DEV_HEADERS_TRUE@crypto/prfs/prf.h crypto/prfs/mac_prf.h crypto/rngs/rng.h crypto/nonce_gen.h \
+@USE_DEV_HEADERS_TRUE@crypto/rngs/rng.h crypto/rngs/rng_tester.h \
+@USE_DEV_HEADERS_TRUE@crypto/prfs/prf.h crypto/prfs/mac_prf.h crypto/nonce_gen.h \
 @USE_DEV_HEADERS_TRUE@crypto/prf_plus.h crypto/signers/signer.h crypto/signers/mac_signer.h \
 @USE_DEV_HEADERS_TRUE@crypto/crypto_factory.h crypto/crypto_tester.h crypto/diffie_hellman.h \
 @USE_DEV_HEADERS_TRUE@crypto/aead.h crypto/transform.h crypto/pkcs5.h crypto/iv/iv_gen.h \
@@ -1084,7 +1105,8 @@ libstrongswan_la_LIBADD = $(DLLIB) $(ATOMICLIB) $(BTLIB) $(SOCKLIB) \
 	$(am__append_114) $(am__append_116) $(am__append_118) \
 	$(am__append_120) $(am__append_122) $(am__append_124) \
 	$(am__append_126) $(am__append_128) $(am__append_130) \
-	$(am__append_132) $(am__append_134) $(am__append_136)
+	$(am__append_132) $(am__append_134) $(am__append_136) \
+	$(am__append_138) $(am__append_140)
 AM_CPPFLAGS = -I$(top_srcdir)/src/libstrongswan \
 	-DIPSEC_DIR=\"${ipsecdir}\" -DIPSEC_LIB_DIR=\"${ipseclibdir}\" \
 	-DPLUGINDIR=\"${plugindir}\" \
@@ -1146,9 +1168,10 @@ $(srcdir)/crypto/proposal/proposal_keywords_static.c
 @MONOLITHIC_FALSE@	$(am__append_121) $(am__append_123) \
 @MONOLITHIC_FALSE@	$(am__append_125) $(am__append_127) \
 @MONOLITHIC_FALSE@	$(am__append_129) $(am__append_131) \
-@MONOLITHIC_FALSE@	$(am__append_133) $(am__append_135) tests \
-@MONOLITHIC_FALSE@	$(am__append_137) $(am__append_138) \
-@MONOLITHIC_FALSE@	$(am__append_139)
+@MONOLITHIC_FALSE@	$(am__append_133) $(am__append_135) \
+@MONOLITHIC_FALSE@	$(am__append_137) $(am__append_139) tests \
+@MONOLITHIC_FALSE@	$(am__append_141) $(am__append_142) \
+@MONOLITHIC_FALSE@	$(am__append_143)
 
 # build unit tests
 ##################
@@ -1180,9 +1203,10 @@ $(srcdir)/crypto/proposal/proposal_keywords_static.c
 @MONOLITHIC_TRUE@	$(am__append_121) $(am__append_123) \
 @MONOLITHIC_TRUE@	$(am__append_125) $(am__append_127) \
 @MONOLITHIC_TRUE@	$(am__append_129) $(am__append_131) \
-@MONOLITHIC_TRUE@	$(am__append_133) $(am__append_135) . tests \
-@MONOLITHIC_TRUE@	$(am__append_137) $(am__append_138) \
-@MONOLITHIC_TRUE@	$(am__append_139)
+@MONOLITHIC_TRUE@	$(am__append_133) $(am__append_135) \
+@MONOLITHIC_TRUE@	$(am__append_137) $(am__append_139) . tests \
+@MONOLITHIC_TRUE@	$(am__append_141) $(am__append_142) \
+@MONOLITHIC_TRUE@	$(am__append_143)
 all: $(BUILT_SOURCES)
 	$(MAKE) $(AM_MAKEFLAGS) all-recursive
 
@@ -1282,6 +1306,8 @@ collections/enumerator.lo: collections/$(am__dirstamp) \
 	collections/$(DEPDIR)/$(am__dirstamp)
 collections/hashtable.lo: collections/$(am__dirstamp) \
 	collections/$(DEPDIR)/$(am__dirstamp)
+collections/hashlist.lo: collections/$(am__dirstamp) \
+	collections/$(DEPDIR)/$(am__dirstamp)
 collections/array.lo: collections/$(am__dirstamp) \
 	collections/$(DEPDIR)/$(am__dirstamp)
 collections/linked_list.lo: collections/$(am__dirstamp) \
@@ -1294,6 +1320,14 @@ crypto/crypters/$(DEPDIR)/$(am__dirstamp):
 	@: > crypto/crypters/$(DEPDIR)/$(am__dirstamp)
 crypto/crypters/crypter.lo: crypto/crypters/$(am__dirstamp) \
 	crypto/crypters/$(DEPDIR)/$(am__dirstamp)
+crypto/drbgs/$(am__dirstamp):
+	@$(MKDIR_P) crypto/drbgs
+	@: > crypto/drbgs/$(am__dirstamp)
+crypto/drbgs/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) crypto/drbgs/$(DEPDIR)
+	@: > crypto/drbgs/$(DEPDIR)/$(am__dirstamp)
+crypto/drbgs/drbg.lo: crypto/drbgs/$(am__dirstamp) \
+	crypto/drbgs/$(DEPDIR)/$(am__dirstamp)
 crypto/hashers/$(am__dirstamp):
 	@$(MKDIR_P) crypto/hashers
 	@: > crypto/hashers/$(am__dirstamp)
@@ -1342,6 +1376,8 @@ crypto/rngs/$(DEPDIR)/$(am__dirstamp):
 	@$(MKDIR_P) crypto/rngs/$(DEPDIR)
 	@: > crypto/rngs/$(DEPDIR)/$(am__dirstamp)
 crypto/rngs/rng.lo: crypto/rngs/$(am__dirstamp) \
+	crypto/rngs/$(DEPDIR)/$(am__dirstamp)
+crypto/rngs/rng_tester.lo: crypto/rngs/$(am__dirstamp) \
 	crypto/rngs/$(DEPDIR)/$(am__dirstamp)
 crypto/prf_plus.lo: crypto/$(am__dirstamp) \
 	crypto/$(DEPDIR)/$(am__dirstamp)
@@ -1761,6 +1797,8 @@ mostlyclean-compile:
 	-rm -f crypto/*.lo
 	-rm -f crypto/crypters/*.$(OBJEXT)
 	-rm -f crypto/crypters/*.lo
+	-rm -f crypto/drbgs/*.$(OBJEXT)
+	-rm -f crypto/drbgs/*.lo
 	-rm -f crypto/hashers/*.$(OBJEXT)
 	-rm -f crypto/hashers/*.lo
 	-rm -f crypto/iv/*.$(OBJEXT)
@@ -1826,6 +1864,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@collections/$(DEPDIR)/array.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@collections/$(DEPDIR)/blocking_queue.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@collections/$(DEPDIR)/enumerator.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@collections/$(DEPDIR)/hashlist.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@collections/$(DEPDIR)/hashtable.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@collections/$(DEPDIR)/linked_list.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@credentials/$(DEPDIR)/auth_cfg.Plo@am__quote@
@@ -1857,6 +1896,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@crypto/$(DEPDIR)/prf_plus.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@crypto/$(DEPDIR)/transform.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@crypto/crypters/$(DEPDIR)/crypter.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@crypto/drbgs/$(DEPDIR)/drbg.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@crypto/hashers/$(DEPDIR)/hash_algorithm_set.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@crypto/hashers/$(DEPDIR)/hasher.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@crypto/iv/$(DEPDIR)/iv_gen.Plo@am__quote@
@@ -1869,6 +1909,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@crypto/proposal/$(DEPDIR)/proposal_keywords.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@crypto/proposal/$(DEPDIR)/proposal_keywords_static.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@crypto/rngs/$(DEPDIR)/rng.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@crypto/rngs/$(DEPDIR)/rng_tester.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@crypto/signers/$(DEPDIR)/mac_signer.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@crypto/signers/$(DEPDIR)/signer.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@crypto/xofs/$(DEPDIR)/xof.Plo@am__quote@
@@ -1992,6 +2033,7 @@ clean-libtool:
 	-rm -rf credentials/sets/.libs credentials/sets/_libs
 	-rm -rf crypto/.libs crypto/_libs
 	-rm -rf crypto/crypters/.libs crypto/crypters/_libs
+	-rm -rf crypto/drbgs/.libs crypto/drbgs/_libs
 	-rm -rf crypto/hashers/.libs crypto/hashers/_libs
 	-rm -rf crypto/iv/.libs crypto/iv/_libs
 	-rm -rf crypto/prfs/.libs crypto/prfs/_libs
@@ -2254,6 +2296,8 @@ distclean-generic:
 	-rm -f crypto/$(am__dirstamp)
 	-rm -f crypto/crypters/$(DEPDIR)/$(am__dirstamp)
 	-rm -f crypto/crypters/$(am__dirstamp)
+	-rm -f crypto/drbgs/$(DEPDIR)/$(am__dirstamp)
+	-rm -f crypto/drbgs/$(am__dirstamp)
 	-rm -f crypto/hashers/$(DEPDIR)/$(am__dirstamp)
 	-rm -f crypto/hashers/$(am__dirstamp)
 	-rm -f crypto/iv/$(DEPDIR)/$(am__dirstamp)
@@ -2321,7 +2365,7 @@ clean-am: clean-generic clean-ipseclibLTLIBRARIES clean-libtool \
 	mostlyclean-am
 
 distclean: distclean-recursive
-	-rm -rf ./$(DEPDIR) asn1/$(DEPDIR) bio/$(DEPDIR) collections/$(DEPDIR) credentials/$(DEPDIR) credentials/certificates/$(DEPDIR) credentials/containers/$(DEPDIR) credentials/keys/$(DEPDIR) credentials/sets/$(DEPDIR) crypto/$(DEPDIR) crypto/crypters/$(DEPDIR) crypto/hashers/$(DEPDIR) crypto/iv/$(DEPDIR) crypto/prfs/$(DEPDIR) crypto/proposal/$(DEPDIR) crypto/rngs/$(DEPDIR) crypto/signers/$(DEPDIR) crypto/xofs/$(DEPDIR) database/$(DEPDIR) eap/$(DEPDIR) fetcher/$(DEPDIR) ipsec/$(DEPDIR) networking/$(DEPDIR) networking/streams/$(DEPDIR) pen/$(DEPDIR) plugins/$(DEPDIR) processing/$(DEPDIR) processing/jobs/$(DEPDIR) resolver/$(DEPDIR) selectors/$(DEPDIR) settings/$(DEPDIR) threading/$(DEPDIR) threading/windows/$(DEPDIR) utils/$(DEPDIR) utils/compat/$(DEPDIR) utils/printf_hook/$(DEPDIR) utils/utils/$(DEPDIR)
+	-rm -rf ./$(DEPDIR) asn1/$(DEPDIR) bio/$(DEPDIR) collections/$(DEPDIR) credentials/$(DEPDIR) credentials/certificates/$(DEPDIR) credentials/containers/$(DEPDIR) credentials/keys/$(DEPDIR) credentials/sets/$(DEPDIR) crypto/$(DEPDIR) crypto/crypters/$(DEPDIR) crypto/drbgs/$(DEPDIR) crypto/hashers/$(DEPDIR) crypto/iv/$(DEPDIR) crypto/prfs/$(DEPDIR) crypto/proposal/$(DEPDIR) crypto/rngs/$(DEPDIR) crypto/signers/$(DEPDIR) crypto/xofs/$(DEPDIR) database/$(DEPDIR) eap/$(DEPDIR) fetcher/$(DEPDIR) ipsec/$(DEPDIR) networking/$(DEPDIR) networking/streams/$(DEPDIR) pen/$(DEPDIR) plugins/$(DEPDIR) processing/$(DEPDIR) processing/jobs/$(DEPDIR) resolver/$(DEPDIR) selectors/$(DEPDIR) settings/$(DEPDIR) threading/$(DEPDIR) threading/windows/$(DEPDIR) utils/$(DEPDIR) utils/compat/$(DEPDIR) utils/printf_hook/$(DEPDIR) utils/utils/$(DEPDIR)
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-tags
@@ -2368,7 +2412,7 @@ install-ps-am:
 installcheck-am:
 
 maintainer-clean: maintainer-clean-recursive
-	-rm -rf ./$(DEPDIR) asn1/$(DEPDIR) bio/$(DEPDIR) collections/$(DEPDIR) credentials/$(DEPDIR) credentials/certificates/$(DEPDIR) credentials/containers/$(DEPDIR) credentials/keys/$(DEPDIR) credentials/sets/$(DEPDIR) crypto/$(DEPDIR) crypto/crypters/$(DEPDIR) crypto/hashers/$(DEPDIR) crypto/iv/$(DEPDIR) crypto/prfs/$(DEPDIR) crypto/proposal/$(DEPDIR) crypto/rngs/$(DEPDIR) crypto/signers/$(DEPDIR) crypto/xofs/$(DEPDIR) database/$(DEPDIR) eap/$(DEPDIR) fetcher/$(DEPDIR) ipsec/$(DEPDIR) networking/$(DEPDIR) networking/streams/$(DEPDIR) pen/$(DEPDIR) plugins/$(DEPDIR) processing/$(DEPDIR) processing/jobs/$(DEPDIR) resolver/$(DEPDIR) selectors/$(DEPDIR) settings/$(DEPDIR) threading/$(DEPDIR) threading/windows/$(DEPDIR) utils/$(DEPDIR) utils/compat/$(DEPDIR) utils/printf_hook/$(DEPDIR) utils/utils/$(DEPDIR)
+	-rm -rf ./$(DEPDIR) asn1/$(DEPDIR) bio/$(DEPDIR) collections/$(DEPDIR) credentials/$(DEPDIR) credentials/certificates/$(DEPDIR) credentials/containers/$(DEPDIR) credentials/keys/$(DEPDIR) credentials/sets/$(DEPDIR) crypto/$(DEPDIR) crypto/crypters/$(DEPDIR) crypto/drbgs/$(DEPDIR) crypto/hashers/$(DEPDIR) crypto/iv/$(DEPDIR) crypto/prfs/$(DEPDIR) crypto/proposal/$(DEPDIR) crypto/rngs/$(DEPDIR) crypto/signers/$(DEPDIR) crypto/xofs/$(DEPDIR) database/$(DEPDIR) eap/$(DEPDIR) fetcher/$(DEPDIR) ipsec/$(DEPDIR) networking/$(DEPDIR) networking/streams/$(DEPDIR) pen/$(DEPDIR) plugins/$(DEPDIR) processing/$(DEPDIR) processing/jobs/$(DEPDIR) resolver/$(DEPDIR) selectors/$(DEPDIR) settings/$(DEPDIR) threading/$(DEPDIR) threading/windows/$(DEPDIR) utils/$(DEPDIR) utils/compat/$(DEPDIR) utils/printf_hook/$(DEPDIR) utils/utils/$(DEPDIR)
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 
@@ -2426,13 +2470,13 @@ $(srcdir)/crypto/proposal/proposal_keywords_static.h: $(srcdir)/crypto/proposal/
 		$(AM_V_GEN) \
 		sed \
 		-e "s:\@GPERF_LEN_TYPE\@:$(GPERF_LEN_TYPE):" \
-		$< > $@
+		$(srcdir)/crypto/proposal/proposal_keywords_static.h.in > $@
 
 $(srcdir)/crypto/proposal/proposal_keywords_static.c:	$(srcdir)/crypto/proposal/proposal_keywords_static.txt \
 														$(srcdir)/crypto/proposal/proposal_keywords_static.h
 		$(AM_V_GEN) \
-		$(GPERF) -N proposal_get_token_static -m 10 -C -G -c -t -D < \
-												$(srcdir)/crypto/proposal/proposal_keywords_static.txt > $@
+		$(GPERF) -N proposal_get_token_static -m 10 -C -G -c -t -D \
+			--output-file=$@ $(srcdir)/crypto/proposal/proposal_keywords_static.txt
 
 @STATIC_PLUGIN_CONSTRUCTORS_TRUE@$(srcdir)/plugin_constructors.c: $(srcdir)/plugins/plugin_constructors.py
 @STATIC_PLUGIN_CONSTRUCTORS_TRUE@		$(AM_V_GEN) \

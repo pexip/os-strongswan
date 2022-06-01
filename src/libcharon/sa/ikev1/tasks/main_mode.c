@@ -302,7 +302,13 @@ METHOD(task_t, build_i, status_t,
 		}
 		case MM_SA:
 		{
+			identification_t *id;
 			uint16_t group;
+
+			/* we might need the identity to look up a PSK when processing the
+			 * response */
+			id = this->ph1->get_id(this->ph1, this->peer_cfg, TRUE);
+			this->ike_sa->set_my_id(this->ike_sa, id->clone(id));
 
 			if (!this->ph1->create_hasher(this->ph1))
 			{
@@ -331,8 +337,7 @@ METHOD(task_t, build_i, status_t,
 			id_payload_t *id_payload;
 			identification_t *id;
 
-			id = this->ph1->get_id(this->ph1, this->peer_cfg, TRUE);
-			this->ike_sa->set_my_id(this->ike_sa, id->clone(id));
+			id = this->ike_sa->get_my_id(this->ike_sa);
 			id_payload = id_payload_create_from_identification(PLV1_ID, id);
 			message->add_payload(message, &id_payload->payload_interface);
 
@@ -362,7 +367,7 @@ METHOD(task_t, process_r, status_t,
 		{
 			linked_list_t *list;
 			sa_payload_t *sa_payload;
-			bool private, prefer_configured;
+			proposal_selection_flag_t flags = 0;
 
 			this->ike_cfg = this->ike_sa->get_ike_cfg(this->ike_sa);
 			DBG0(DBG_IKE, "%H is initiating a Main Mode IKE_SA",
@@ -386,12 +391,19 @@ METHOD(task_t, process_r, status_t,
 			}
 
 			list = sa_payload->get_proposals(sa_payload);
-			private = this->ike_sa->supports_extension(this->ike_sa,
-													   EXT_STRONGSWAN);
-			prefer_configured = lib->settings->get_bool(lib->settings,
-							"%s.prefer_configured_proposals", TRUE, lib->ns);
+			if (!this->ike_sa->supports_extension(this->ike_sa, EXT_STRONGSWAN)
+				&& !lib->settings->get_bool(lib->settings,
+									"%s.accept_private_algs", FALSE, lib->ns))
+			{
+				flags |= PROPOSAL_SKIP_PRIVATE;
+			}
+			if (!lib->settings->get_bool(lib->settings,
+							"%s.prefer_configured_proposals", TRUE, lib->ns))
+			{
+				flags |= PROPOSAL_PREFER_SUPPLIED;
+			}
 			this->proposal = this->ike_cfg->select_proposal(this->ike_cfg,
-											list, private, prefer_configured);
+											list, flags);
 			list->destroy_offset(list, offsetof(proposal_t, destroy));
 			if (!this->proposal)
 			{
@@ -401,7 +413,8 @@ METHOD(task_t, process_r, status_t,
 			this->ike_sa->set_proposal(this->ike_sa, this->proposal);
 
 			this->method = sa_payload->get_auth_method(sa_payload);
-			this->lifetime = sa_payload->get_lifetime(sa_payload);
+			this->lifetime = sa_payload->get_lifetime(sa_payload,
+													  this->proposal);
 
 			this->state = MM_SA;
 			return NEED_MORE;
@@ -624,8 +637,8 @@ METHOD(task_t, process_i, status_t,
 			linked_list_t *list;
 			sa_payload_t *sa_payload;
 			auth_method_t method;
+			proposal_selection_flag_t flags = 0;
 			uint32_t lifetime;
-			bool private;
 
 			sa_payload = (sa_payload_t*)message->get_payload(message,
 													PLV1_SECURITY_ASSOCIATION);
@@ -635,10 +648,14 @@ METHOD(task_t, process_i, status_t,
 				return send_notify(this, INVALID_PAYLOAD_TYPE);
 			}
 			list = sa_payload->get_proposals(sa_payload);
-			private = this->ike_sa->supports_extension(this->ike_sa,
-														   EXT_STRONGSWAN);
+			if (!this->ike_sa->supports_extension(this->ike_sa, EXT_STRONGSWAN)
+				&& !lib->settings->get_bool(lib->settings,
+									"%s.accept_private_algs", FALSE, lib->ns))
+			{
+				flags |= PROPOSAL_SKIP_PRIVATE;
+			}
 			this->proposal = this->ike_cfg->select_proposal(this->ike_cfg,
-															list, private, TRUE);
+															list, flags);
 			list->destroy_offset(list, offsetof(proposal_t, destroy));
 			if (!this->proposal)
 			{
@@ -647,7 +664,7 @@ METHOD(task_t, process_i, status_t,
 			}
 			this->ike_sa->set_proposal(this->ike_sa, this->proposal);
 
-			lifetime = sa_payload->get_lifetime(sa_payload);
+			lifetime = sa_payload->get_lifetime(sa_payload, this->proposal);
 			if (lifetime != this->lifetime)
 			{
 				DBG1(DBG_IKE, "received lifetime %us does not match configured "

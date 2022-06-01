@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006-2018 Tobias Brunner
+ * Copyright (C) 2006-2019 Tobias Brunner
  * Copyright (C) 2005-2009 Martin Willi
  * Copyright (C) 2008-2016 Andreas Steffen
  * Copyright (C) 2006-2007 Fabian Hartmann, Noah Heusser
@@ -261,27 +261,6 @@ static kernel_algorithm_t compression_algs[] = {
 };
 
 /**
- * IPsec HW offload state in kernel
- */
-typedef enum {
-	NL_OFFLOAD_UNKNOWN,
-	NL_OFFLOAD_UNSUPPORTED,
-	NL_OFFLOAD_SUPPORTED
-} nl_offload_state_t;
-
-/**
- * Global metadata used for IPsec HW offload
- */
-static struct {
-	/** bit in feature set */
-	u_int bit;
-	/** total number of device feature blocks */
-	u_int total_blocks;
-	/** determined HW offload state */
-	nl_offload_state_t state;
-} netlink_hw_offload;
-
-/**
  * Look up a kernel algorithm name and its key size
  */
 static const char* lookup_algorithm(transform_type_t type, int ikev2)
@@ -391,51 +370,6 @@ struct private_kernel_netlink_ipsec_t {
 							 kernel_ipsec_manage_policy_t *data);
 };
 
-typedef struct route_entry_t route_entry_t;
-
-/**
- * Installed routing entry
- */
-struct route_entry_t {
-	/** Name of the interface the route is bound to */
-	char *if_name;
-
-	/** Source ip of the route */
-	host_t *src_ip;
-
-	/** Gateway for this route */
-	host_t *gateway;
-
-	/** Destination net */
-	chunk_t dst_net;
-
-	/** Destination net prefixlen */
-	uint8_t prefixlen;
-};
-
-/**
- * Destroy a route_entry_t object
- */
-static void route_entry_destroy(route_entry_t *this)
-{
-	free(this->if_name);
-	this->src_ip->destroy(this->src_ip);
-	DESTROY_IF(this->gateway);
-	chunk_free(&this->dst_net);
-	free(this);
-}
-
-/**
- * Compare two route_entry_t objects
- */
-static bool route_entry_equals(route_entry_t *a, route_entry_t *b)
-{
-	return a->if_name && b->if_name && streq(a->if_name, b->if_name) &&
-		   a->src_ip->ip_equals(a->src_ip, b->src_ip) &&
-		   a->gateway->ip_equals(a->gateway, b->gateway) &&
-		   chunk_equals(a->dst_net, b->dst_net) && a->prefixlen == b->prefixlen;
-}
-
 typedef struct ipsec_sa_t ipsec_sa_t;
 
 /**
@@ -450,6 +384,9 @@ struct ipsec_sa_t {
 
 	/** Optional mark */
 	mark_t mark;
+
+	/** Optional mark */
+	uint32_t if_id;
 
 	/** Description of this SA */
 	ipsec_sa_cfg_t cfg;
@@ -466,7 +403,8 @@ static u_int ipsec_sa_hash(ipsec_sa_t *sa)
 	return chunk_hash_inc(sa->src->get_address(sa->src),
 						  chunk_hash_inc(sa->dst->get_address(sa->dst),
 						  chunk_hash_inc(chunk_from_thing(sa->mark),
-						  chunk_hash(chunk_from_thing(sa->cfg)))));
+						  chunk_hash_inc(chunk_from_thing(sa->if_id),
+						  chunk_hash(chunk_from_thing(sa->cfg))))));
 }
 
 /**
@@ -478,6 +416,7 @@ static bool ipsec_sa_equals(ipsec_sa_t *sa, ipsec_sa_t *other_sa)
 		   sa->dst->ip_equals(sa->dst, other_sa->dst) &&
 		   sa->mark.value == other_sa->mark.value &&
 		   sa->mark.mask == other_sa->mark.mask &&
+		   sa->if_id == other_sa->if_id &&
 		   ipsec_sa_cfg_equals(&sa->cfg, &other_sa->cfg);
 }
 
@@ -486,13 +425,14 @@ static bool ipsec_sa_equals(ipsec_sa_t *sa, ipsec_sa_t *other_sa)
  */
 static ipsec_sa_t *ipsec_sa_create(private_kernel_netlink_ipsec_t *this,
 								   host_t *src, host_t *dst, mark_t mark,
-								   ipsec_sa_cfg_t *cfg)
+								   uint32_t if_id, ipsec_sa_cfg_t *cfg)
 {
 	ipsec_sa_t *sa, *found;
 	INIT(sa,
 		.src = src,
 		.dst = dst,
 		.mark = mark,
+		.if_id = if_id,
 		.cfg = *cfg,
 	);
 	found = this->sas->get(this->sas, sa);
@@ -567,7 +507,7 @@ struct policy_sa_out_t {
 static policy_sa_t *policy_sa_create(private_kernel_netlink_ipsec_t *this,
 	policy_dir_t dir, policy_type_t type, host_t *src, host_t *dst,
 	traffic_selector_t *src_ts, traffic_selector_t *dst_ts, mark_t mark,
-	ipsec_sa_cfg_t *cfg)
+	uint32_t if_id, ipsec_sa_cfg_t *cfg)
 {
 	policy_sa_t *policy;
 
@@ -585,7 +525,7 @@ static policy_sa_t *policy_sa_create(private_kernel_netlink_ipsec_t *this,
 		INIT(policy, .priority = 0);
 	}
 	policy->type = type;
-	policy->sa = ipsec_sa_create(this, src, dst, mark, cfg);
+	policy->sa = ipsec_sa_create(this, src, dst, mark, if_id, cfg);
 	return policy;
 }
 
@@ -631,6 +571,9 @@ struct policy_entry_t {
 	/** Optional mark */
 	uint32_t mark;
 
+	/** Optional interface ID */
+	uint32_t if_id;
+
 	/** Associated route installed for this policy */
 	route_entry_t *route;
 
@@ -672,7 +615,8 @@ static void policy_entry_destroy(private_kernel_netlink_ipsec_t *this,
 static u_int policy_hash(policy_entry_t *key)
 {
 	chunk_t chunk = chunk_from_thing(key->sel);
-	return chunk_hash_inc(chunk, chunk_hash(chunk_from_thing(key->mark)));
+	return chunk_hash_inc(chunk, chunk_hash_inc(chunk_from_thing(key->mark),
+						  chunk_hash(chunk_from_thing(key->if_id))));
 }
 
 /**
@@ -682,6 +626,7 @@ static bool policy_equals(policy_entry_t *key, policy_entry_t *other_key)
 {
 	return memeq(&key->sel, &other_key->sel, sizeof(struct xfrm_selector)) &&
 		   key->mark == other_key->mark &&
+		   key->if_id == other_key->if_id &&
 		   key->direction == other_key->direction;
 }
 
@@ -1352,19 +1297,39 @@ static bool add_uint32(struct nlmsghdr *hdr, int buflen,
 	return TRUE;
 }
 
+/* ETHTOOL_GSSET_INFO is available since 2.6.34 and ETH_SS_FEATURES (enum) and
+ * ETHTOOL_GFEATURES since 2.6.39, so check for the latter */
+#ifdef ETHTOOL_GFEATURES
+
 /**
- * Check if kernel supports HW offload
+ * Global metadata used for IPsec HW offload
  */
-static void netlink_find_offload_feature(const char *ifname, int query_socket)
+static struct {
+	/** determined HW offload support */
+	bool supported;
+	/** bit in feature set */
+	u_int bit;
+	/** total number of device feature blocks */
+	u_int total_blocks;
+} netlink_hw_offload;
+
+/**
+ * Check if kernel supports HW offload and determine feature flag
+ */
+static void netlink_find_offload_feature(const char *ifname)
 {
 	struct ethtool_sset_info *sset_info;
 	struct ethtool_gstrings *cmd = NULL;
 	struct ifreq ifr;
 	uint32_t sset_len, i;
 	char *str;
-	int err;
+	int err, query_socket;
 
-	netlink_hw_offload.state = NL_OFFLOAD_UNSUPPORTED;
+	query_socket = socket(AF_NETLINK, SOCK_DGRAM, NETLINK_XFRM);
+	if (query_socket < 0)
+	{
+		return;
+	}
 
 	/* determine number of device features */
 	INIT_EXTRA(sset_info, sizeof(uint32_t),
@@ -1403,9 +1368,9 @@ static void netlink_find_offload_feature(const char *ifname, int query_socket)
 	{
 		if (strneq(str, "esp-hw-offload", ETH_GSTRING_LEN))
 		{
+			netlink_hw_offload.supported = TRUE;
 			netlink_hw_offload.bit = i;
 			netlink_hw_offload.total_blocks = (sset_len + 31) / 32;
-			netlink_hw_offload.state = NL_OFFLOAD_SUPPORTED;
 			break;
 		}
 		str += ETH_GSTRING_LEN;
@@ -1414,6 +1379,7 @@ static void netlink_find_offload_feature(const char *ifname, int query_socket)
 out:
 	free(sset_info);
 	free(cmd);
+	close(query_socket);
 }
 
 /**
@@ -1428,23 +1394,16 @@ static bool netlink_detect_offload(const char *ifname)
 	int block;
 	bool ret = FALSE;
 
+	if (!netlink_hw_offload.supported)
+	{
+		DBG1(DBG_KNL, "HW offload is not supported by kernel");
+		return FALSE;
+	}
+
 	query_socket = socket(AF_NETLINK, SOCK_DGRAM, NETLINK_XFRM);
 	if (query_socket < 0)
 	{
 		return FALSE;
-	}
-
-	/* kernel requires a real interface in order to query the kernel-wide
-	 * capability, so we do it here on first invocation.
-	 */
-	if (netlink_hw_offload.state == NL_OFFLOAD_UNKNOWN)
-	{
-		netlink_find_offload_feature(ifname, query_socket);
-	}
-	if (netlink_hw_offload.state == NL_OFFLOAD_UNSUPPORTED)
-	{
-		DBG1(DBG_KNL, "HW offload is not supported by kernel");
-		goto out;
 	}
 
 	/* feature is supported by kernel, query device features */
@@ -1456,28 +1415,37 @@ static bool netlink_detect_offload(const char *ifname)
 	ifr.ifr_name[IFNAMSIZ-1] = '\0';
 	ifr.ifr_data = (void*)cmd;
 
-	if (ioctl(query_socket, SIOCETHTOOL, &ifr))
+	if (!ioctl(query_socket, SIOCETHTOOL, &ifr))
 	{
-		goto out_free;
+		block = netlink_hw_offload.bit / 32;
+		feature_bit = 1U << (netlink_hw_offload.bit % 32);
+		if (cmd->features[block].active & feature_bit)
+		{
+			ret = TRUE;
+		}
 	}
 
-	block = netlink_hw_offload.bit / 32;
-	feature_bit = 1U << (netlink_hw_offload.bit % 32);
-	if (cmd->features[block].active & feature_bit)
-	{
-		ret = TRUE;
-	}
-
-out_free:
-	free(cmd);
 	if (!ret)
 	{
 		DBG1(DBG_KNL, "HW offload is not supported by device");
 	}
-out:
+	free(cmd);
 	close(query_socket);
 	return ret;
 }
+
+#else
+
+static void netlink_find_offload_feature(const char *ifname)
+{
+}
+
+static bool netlink_detect_offload(const char *ifname)
+{
+	return FALSE;
+}
+
+#endif
 
 /**
  * There are 3 HW offload configuration values:
@@ -1564,6 +1532,7 @@ METHOD(kernel_ipsec_t, add_sa, status_t,
 			.spi = htonl(ntohs(data->cpi)),
 			.proto = IPPROTO_COMP,
 			.mark = id->mark,
+			.if_id = id->if_id,
 		};
 		kernel_ipsec_add_sa_t ipcomp_sa = {
 			.reqid = data->reqid,
@@ -1889,6 +1858,11 @@ METHOD(kernel_ipsec_t, add_sa, status_t,
 		goto failed;
 	}
 
+	if (id->if_id && !add_uint32(hdr, sizeof(request), XFRMA_IF_ID, id->if_id))
+	{
+		goto failed;
+	}
+
 	if (ipcomp == IPCOMP_NONE && (data->mark.value | data->mark.mask))
 	{
 		if (!add_uint32(hdr, sizeof(request), XFRMA_SET_MARK,
@@ -2021,6 +1995,10 @@ static void get_replay_state(private_kernel_netlink_ipsec_t *this,
 	{
 		return;
 	}
+	if (sa->if_id && !add_uint32(hdr, sizeof(request), XFRMA_IF_ID, sa->if_id))
+	{
+		return;
+	}
 
 	if (this->socket_xfrm->send(this->socket_xfrm, hdr, &out, &len) == SUCCESS)
 	{
@@ -2116,6 +2094,10 @@ METHOD(kernel_ipsec_t, query_sa, status_t,
 	sa_id->family = id->dst->get_family(id->dst);
 
 	if (!add_mark(hdr, sizeof(request), id->mark))
+	{
+		return FAILED;
+	}
+	if (id->if_id && !add_uint32(hdr, sizeof(request), XFRMA_IF_ID, id->if_id))
 	{
 		return FAILED;
 	}
@@ -2223,6 +2205,10 @@ METHOD(kernel_ipsec_t, del_sa, status_t,
 	{
 		return FAILED;
 	}
+	if (id->if_id && !add_uint32(hdr, sizeof(request), XFRMA_IF_ID, id->if_id))
+	{
+		return FAILED;
+	}
 
 	switch (this->socket_xfrm->send_ack(this->socket_xfrm, hdr))
 	{
@@ -2269,6 +2255,7 @@ METHOD(kernel_ipsec_t, update_sa, status_t,
 			.spi = htonl(ntohs(data->cpi)),
 			.proto = IPPROTO_COMP,
 			.mark = id->mark,
+			.if_id = id->if_id,
 		};
 		kernel_ipsec_update_sa_t ipcomp = {
 			.new_src = data->new_src,
@@ -2296,6 +2283,10 @@ METHOD(kernel_ipsec_t, update_sa, status_t,
 	sa_id->family = id->dst->get_family(id->dst);
 
 	if (!add_mark(hdr, sizeof(request), id->mark))
+	{
+		return FAILED;
+	}
+	if (id->if_id && !add_uint32(hdr, sizeof(request), XFRMA_IF_ID, id->if_id))
 	{
 		return FAILED;
 	}
@@ -2574,89 +2565,97 @@ static void install_route(private_kernel_netlink_ipsec_t *this,
 
 	INIT(route,
 		.prefixlen = policy->sel.prefixlen_d,
+		.pass = mapping->type == POLICY_PASS,
 	);
 
 	if (charon->kernel->get_address_by_ts(charon->kernel, out->src_ts,
-										  &route->src_ip, NULL) == SUCCESS)
+										  &route->src_ip, NULL) != SUCCESS)
 	{
-		if (!ipsec->dst->is_anyaddr(ipsec->dst))
+		if (!route->pass)
 		{
-			route->gateway = charon->kernel->get_nexthop(charon->kernel,
-												ipsec->dst, -1, ipsec->src,
-												&route->if_name);
+			free(route);
+			return;
 		}
-		else
-		{	/* for shunt policies */
-			iface = xfrm2host(policy->sel.family, &policy->sel.daddr, 0);
-			route->gateway = charon->kernel->get_nexthop(charon->kernel,
-												iface, policy->sel.prefixlen_d,
-												route->src_ip, &route->if_name);
-			iface->destroy(iface);
-		}
-		route->dst_net = chunk_alloc(policy->sel.family == AF_INET ? 4 : 16);
-		memcpy(route->dst_net.ptr, &policy->sel.daddr, route->dst_net.len);
+		/* allow blank source IP for passthrough policies */
+		route->src_ip = host_create_any(policy->sel.family);
+	}
 
-		/* get the interface to install the route for, if we haven't one yet.
-		 * If we have a local address, use it. Otherwise (for shunt policies)
-		 * use the route's source address. */
-		if (!route->if_name)
-		{
-			iface = ipsec->src;
-			if (iface->is_anyaddr(iface))
-			{
-				iface = route->src_ip;
-			}
-			if (!charon->kernel->get_interface(charon->kernel, iface,
-											   &route->if_name))
-			{
-				route_entry_destroy(route);
-				return;
-			}
-		}
-		if (policy->route)
-		{
-			route_entry_t *old = policy->route;
-			if (route_entry_equals(old, route))
-			{
-				route_entry_destroy(route);
-				return;
-			}
-			/* uninstall previously installed route */
-			if (charon->kernel->del_route(charon->kernel, old->dst_net,
-										  old->prefixlen, old->gateway,
-										  old->src_ip, old->if_name) != SUCCESS)
-			{
-				DBG1(DBG_KNL, "error uninstalling route installed with policy "
-					 "%R === %R %N", out->src_ts, out->dst_ts, policy_dir_names,
-					 policy->direction);
-			}
-			route_entry_destroy(old);
-			policy->route = NULL;
-		}
-
-		DBG2(DBG_KNL, "installing route: %R via %H src %H dev %s", out->dst_ts,
-			 route->gateway, route->src_ip, route->if_name);
-		switch (charon->kernel->add_route(charon->kernel, route->dst_net,
-										  route->prefixlen, route->gateway,
-										  route->src_ip, route->if_name))
-		{
-			default:
-				DBG1(DBG_KNL, "unable to install source route for %H",
-					 route->src_ip);
-				/* FALL */
-			case ALREADY_DONE:
-				/* route exists, do not uninstall */
-				route_entry_destroy(route);
-				break;
-			case SUCCESS:
-				/* cache the installed route */
-				policy->route = route;
-				break;
-		}
+	if (!ipsec->dst->is_anyaddr(ipsec->dst))
+	{
+		route->gateway = charon->kernel->get_nexthop(charon->kernel,
+											ipsec->dst, -1, ipsec->src,
+											&route->if_name);
 	}
 	else
+	{	/* for shunt policies */
+		iface = xfrm2host(policy->sel.family, &policy->sel.daddr, 0);
+		route->gateway = charon->kernel->get_nexthop(charon->kernel,
+											iface, policy->sel.prefixlen_d,
+											route->src_ip, &route->if_name);
+		iface->destroy(iface);
+	}
+	route->dst_net = chunk_alloc(policy->sel.family == AF_INET ? 4 : 16);
+	memcpy(route->dst_net.ptr, &policy->sel.daddr, route->dst_net.len);
+
+	/* get the interface to install the route for, if we haven't one yet.
+	 * If we have a local address, use it. Otherwise (for shunt policies)
+	 * use the route's source address. */
+	if (!route->if_name)
 	{
-		free(route);
+		iface = ipsec->src;
+		if (iface->is_anyaddr(iface))
+		{
+			iface = route->src_ip;
+		}
+		if (!charon->kernel->get_interface(charon->kernel, iface,
+										   &route->if_name) &&
+			!route->pass)
+		{	/* don't require an interface for passthrough policies */
+			route_entry_destroy(route);
+			return;
+		}
+	}
+	if (policy->route)
+	{
+		route_entry_t *old = policy->route;
+		if (route_entry_equals(old, route))
+		{
+			route_entry_destroy(route);
+			return;
+		}
+		/* uninstall previously installed route */
+		if (charon->kernel->del_route(charon->kernel, old->dst_net,
+									  old->prefixlen, old->gateway,
+									  old->src_ip, old->if_name,
+									  old->pass) != SUCCESS)
+		{
+			DBG1(DBG_KNL, "error uninstalling route installed with policy "
+				 "%R === %R %N", out->src_ts, out->dst_ts, policy_dir_names,
+				 policy->direction);
+		}
+		route_entry_destroy(old);
+		policy->route = NULL;
+	}
+
+	DBG2(DBG_KNL, "installing route: %R via %H src %H dev %s", out->dst_ts,
+		 route->gateway, route->src_ip, route->if_name);
+	switch (charon->kernel->add_route(charon->kernel, route->dst_net,
+									  route->prefixlen, route->gateway,
+									  route->src_ip, route->if_name,
+									  route->pass))
+	{
+		default:
+			DBG1(DBG_KNL, "unable to install source route for %H",
+				 route->src_ip);
+			/* FALL */
+		case ALREADY_DONE:
+			/* route exists, do not uninstall */
+			route_entry_destroy(route);
+			break;
+		case SUCCESS:
+			/* cache the installed route */
+			policy->route = route;
+			break;
 	}
 }
 
@@ -2773,6 +2772,12 @@ static status_t add_policy_internal(private_kernel_netlink_ipsec_t *this,
 		policy_change_done(this, policy);
 		return FAILED;
 	}
+	if (ipsec->if_id &&
+		!add_uint32(hdr, sizeof(request), XFRMA_IF_ID, ipsec->if_id))
+	{
+		policy_change_done(this, policy);
+		return FAILED;
+	}
 	this->mutex->unlock(this->mutex);
 
 	status = this->socket_xfrm->send_ack(this->socket_xfrm, hdr);
@@ -2793,10 +2798,12 @@ static status_t add_policy_internal(private_kernel_netlink_ipsec_t *this,
 	 * - this is an outbound policy (to just get one for each child)
 	 * - routing is not disabled via strongswan.conf
 	 * - the selector is not for a specific protocol/port
+	 * - no XFRM interface ID is configured
 	 * - we are in tunnel/BEET mode or install a bypass policy
 	 */
 	if (policy->direction == POLICY_OUT && this->install_routes &&
-		!policy->sel.proto && !policy->sel.dport && !policy->sel.sport)
+		!policy->sel.proto && !policy->sel.dport && !policy->sel.sport &&
+		!policy->if_id)
 	{
 		if (mapping->type == POLICY_PASS ||
 		   (mapping->type == POLICY_IPSEC && ipsec->cfg.mode != MODE_TRANSPORT))
@@ -2824,6 +2831,7 @@ METHOD(kernel_ipsec_t, add_policy, status_t,
 	INIT(policy,
 		.sel = ts2selector(id->src_ts, id->dst_ts, id->interface),
 		.mark = id->mark.value & id->mark.mask,
+		.if_id = id->if_id,
 		.direction = id->dir,
 		.reqid = data->sa->reqid,
 	);
@@ -2869,7 +2877,8 @@ METHOD(kernel_ipsec_t, add_policy, status_t,
 
 	/* cache the assigned IPsec SA */
 	assigned_sa = policy_sa_create(this, id->dir, data->type, data->src,
-						data->dst, id->src_ts, id->dst_ts, id->mark, data->sa);
+								   data->dst, id->src_ts, id->dst_ts, id->mark,
+								   id->if_id, data->sa);
 	assigned_sa->auto_priority = get_priority(policy, data->prio, id->interface);
 	assigned_sa->priority = this->get_priority ? this->get_priority(id, data)
 											   : data->manual_prio;
@@ -2967,6 +2976,10 @@ METHOD(kernel_ipsec_t, query_policy, status_t,
 	{
 		return FAILED;
 	}
+	if (id->if_id && !add_uint32(hdr, sizeof(request), XFRMA_IF_ID, id->if_id))
+	{
+		return FAILED;
+	}
 
 	if (this->socket_xfrm->send(this->socket_xfrm, hdr, &out, &len) == SUCCESS)
 	{
@@ -3035,6 +3048,7 @@ METHOD(kernel_ipsec_t, del_policy, status_t,
 		.src = data->src,
 		.dst = data->dst,
 		.mark = id->mark,
+		.if_id = id->if_id,
 		.cfg = *data->sa,
 	};
 	char markstr[32] = "";
@@ -3050,6 +3064,7 @@ METHOD(kernel_ipsec_t, del_policy, status_t,
 	memset(&policy, 0, sizeof(policy_entry_t));
 	policy.sel = ts2selector(id->src_ts, id->dst_ts, id->interface);
 	policy.mark = id->mark.value & id->mark.mask;
+	policy.if_id = id->if_id;
 	policy.direction = id->dir;
 
 	/* find the policy */
@@ -3140,13 +3155,19 @@ METHOD(kernel_ipsec_t, del_policy, status_t,
 		policy_change_done(this, current);
 		return FAILED;
 	}
+	if (id->if_id && !add_uint32(hdr, sizeof(request), XFRMA_IF_ID, id->if_id))
+	{
+		policy_change_done(this, current);
+		return FAILED;
+	}
 
 	if (current->route)
 	{
 		route_entry_t *route = current->route;
 		if (charon->kernel->del_route(charon->kernel, route->dst_net,
 									  route->prefixlen, route->gateway,
-									  route->src_ip, route->if_name) != SUCCESS)
+									  route->src_ip, route->if_name,
+									  route->pass) != SUCCESS)
 		{
 			DBG1(DBG_KNL, "error uninstalling route installed with policy "
 				 "%R === %R %N%s", id->src_ts, id->dst_ts, policy_dir_names,
@@ -3629,6 +3650,10 @@ kernel_netlink_ipsec_t *kernel_netlink_ipsec_create()
 		lib->watcher->add(lib->watcher, this->socket_xfrm_events, WATCHER_READ,
 						  (watcher_cb_t)receive_events, this);
 	}
+
+	netlink_find_offload_feature(lib->settings->get_str(lib->settings,
+					"%s.plugins.kernel-netlink.hw_offload_feature_interface",
+					"lo", lib->ns));
 
 	return &this->public;
 }

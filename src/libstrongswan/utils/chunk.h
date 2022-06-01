@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2013 Tobias Brunner
+ * Copyright (C) 2008-2019 Tobias Brunner
  * Copyright (C) 2005-2008 Martin Willi
  * Copyright (C) 2005 Jan Hutter
  * HSR Hochschule fuer Technik Rapperswil
@@ -292,6 +292,16 @@ static inline chunk_t chunk_skip_zero(chunk_t chunk)
 	return chunk;
 }
 
+/**
+ * Copy the data from src to dst, left-padded with chr if dst is longer,
+ * otherwise data is copied truncated on the left.
+ *
+ * @param dst			data is copied here
+ * @param src			data is copied from here
+ * @param chr			value to use for padding if necessary
+ * @return				the destination chunk
+ */
+chunk_t chunk_copy_pad(chunk_t dst, chunk_t src, u_char chr);
 
 /**
  *  Compare two chunks, returns zero if a equals b
@@ -347,7 +357,7 @@ bool chunk_increment(chunk_t chunk);
  *
  * @param chunk			chunk to check for printability
  * @param sane			pointer where sane version is allocated, or NULL
- * @param replace		character to use for replaceing unprintable characters
+ * @param replace		character to use for replacing unprintable characters
  * @return				TRUE if all characters in chunk are printable
  */
 bool chunk_printable(chunk_t chunk, chunk_t *sane, char replace);

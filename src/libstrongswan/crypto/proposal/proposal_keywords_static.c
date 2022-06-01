@@ -1,5 +1,5 @@
 /* ANSI-C code produced by gperf version 3.1 */
-/* Command-line: /usr/bin/gperf -N proposal_get_token_static -m 10 -C -G -c -t -D  */
+/* Command-line: /usr/bin/gperf -N proposal_get_token_static -m 10 -C -G -c -t -D --output-file=crypto/proposal/proposal_keywords_static.c ./crypto/proposal/proposal_keywords_static.txt  */
 /* Computed positions: -k'1,5-7,10,15,$' */
 
 #if !((' ' == 32) && ('!' == 33) && ('"' == 34) && ('#' == 35) \
@@ -29,6 +29,7 @@
 #error "gperf generated tables don't work with this execution character set. Please report a bug to <bug-gperf@gnu.org>."
 #endif
 
+#line 1 "./crypto/proposal/proposal_keywords_static.txt"
 
 /*
  * Copyright (C) 2009-2013 Andreas Steffen
@@ -52,6 +53,7 @@
 #include <crypto/signers/signer.h>
 #include <crypto/diffie_hellman.h>
 
+#line 25 "./crypto/proposal/proposal_keywords_static.txt"
 struct proposal_token {
 	char             *name;
 	transform_type_t  type;
@@ -59,12 +61,12 @@ struct proposal_token {
 	uint16_t          keysize;
 };
 
-#define TOTAL_KEYWORDS 144
+#define TOTAL_KEYWORDS 146
 #define MIN_WORD_LENGTH 3
 #define MAX_WORD_LENGTH 22
-#define MIN_HASH_VALUE 7
-#define MAX_HASH_VALUE 250
-/* maximum key range = 244, duplicates = 0 */
+#define MIN_HASH_VALUE 11
+#define MAX_HASH_VALUE 243
+/* maximum key range = 233, duplicates = 0 */
 
 #ifdef __GNUC__
 __inline
@@ -78,32 +80,32 @@ hash (register const char *str, register size_t len)
 {
   static const unsigned char asso_values[] =
     {
-      251, 251, 251, 251, 251, 251, 251, 251, 251, 251,
-      251, 251, 251, 251, 251, 251, 251, 251, 251, 251,
-      251, 251, 251, 251, 251, 251, 251, 251, 251, 251,
-      251, 251, 251, 251, 251, 251, 251, 251, 251, 251,
-      251, 251, 251, 251, 251, 251, 251, 251,  73,   2,
-       16,  47,  30,  26,   8,   6,   3,   1, 251, 251,
-      251, 251, 251, 251, 251, 251, 251, 251, 251, 251,
-      251, 251, 251, 251, 251, 251, 251, 251, 251, 251,
-      251, 251, 251, 251, 251, 251, 251, 251, 251, 251,
-      251, 251, 251, 251, 251,  98, 251,   2,   2,  16,
-       46,  75,   1,  78,   6,   4, 251, 251,   1,   4,
-        7,   2, 124,   1,  94, 116,  23,  64, 251, 251,
-        1,   2, 251, 251, 251, 251, 251, 251, 251, 251,
-      251, 251, 251, 251, 251, 251, 251, 251, 251, 251,
-      251, 251, 251, 251, 251, 251, 251, 251, 251, 251,
-      251, 251, 251, 251, 251, 251, 251, 251, 251, 251,
-      251, 251, 251, 251, 251, 251, 251, 251, 251, 251,
-      251, 251, 251, 251, 251, 251, 251, 251, 251, 251,
-      251, 251, 251, 251, 251, 251, 251, 251, 251, 251,
-      251, 251, 251, 251, 251, 251, 251, 251, 251, 251,
-      251, 251, 251, 251, 251, 251, 251, 251, 251, 251,
-      251, 251, 251, 251, 251, 251, 251, 251, 251, 251,
-      251, 251, 251, 251, 251, 251, 251, 251, 251, 251,
-      251, 251, 251, 251, 251, 251, 251, 251, 251, 251,
-      251, 251, 251, 251, 251, 251, 251, 251, 251, 251,
-      251, 251, 251, 251, 251, 251, 251
+      244, 244, 244, 244, 244, 244, 244, 244, 244, 244,
+      244, 244, 244, 244, 244, 244, 244, 244, 244, 244,
+      244, 244, 244, 244, 244, 244, 244, 244, 244, 244,
+      244, 244, 244, 244, 244, 244, 244, 244, 244, 244,
+      244, 244, 244, 244, 244, 244, 244, 244,  61,   3,
+       18,  22,  65,  29,   9,   4,   4,   2, 244, 244,
+      244, 244, 244, 244, 244, 244, 244, 244, 244, 244,
+      244, 244, 244, 244, 244, 244, 244, 244, 244, 244,
+      244, 244, 244, 244, 244, 244, 244, 244, 244, 244,
+      244, 244, 244, 244, 244, 102, 244,   7,   7,  16,
+       53,  15,  28,  74,   7,   4, 244, 244,   2,   6,
+        2,   6,  95,  84,  96,  86,   4,  66, 244, 244,
+        2,   5, 244, 244, 244, 244, 244, 244, 244, 244,
+      244, 244, 244, 244, 244, 244, 244, 244, 244, 244,
+      244, 244, 244, 244, 244, 244, 244, 244, 244, 244,
+      244, 244, 244, 244, 244, 244, 244, 244, 244, 244,
+      244, 244, 244, 244, 244, 244, 244, 244, 244, 244,
+      244, 244, 244, 244, 244, 244, 244, 244, 244, 244,
+      244, 244, 244, 244, 244, 244, 244, 244, 244, 244,
+      244, 244, 244, 244, 244, 244, 244, 244, 244, 244,
+      244, 244, 244, 244, 244, 244, 244, 244, 244, 244,
+      244, 244, 244, 244, 244, 244, 244, 244, 244, 244,
+      244, 244, 244, 244, 244, 244, 244, 244, 244, 244,
+      244, 244, 244, 244, 244, 244, 244, 244, 244, 244,
+      244, 244, 244, 244, 244, 244, 244, 244, 244, 244,
+      244, 244, 244, 244, 244, 244, 244
     };
   register unsigned int hval = len;
 
@@ -142,180 +144,327 @@ hash (register const char *str, register size_t len)
 
 static const struct proposal_token wordlist[] =
   {
-    {"null",             ENCRYPTION_ALGORITHM, ENCR_NULL,                 0},
-    {"esn",              EXTENDED_SEQUENCE_NUMBERS, EXT_SEQ_NUMBERS,      0},
-    {"x25519",           DIFFIE_HELLMAN_GROUP, CURVE_25519,               0},
-    {"prfsha1",          PSEUDO_RANDOM_FUNCTION, PRF_HMAC_SHA1,           0},
-    {"noesn",            EXTENDED_SEQUENCE_NUMBERS, NO_EXT_SEQ_NUMBERS,   0},
-    {"ecp521",           DIFFIE_HELLMAN_GROUP, ECP_521_BIT,               0},
-    {"sha",              INTEGRITY_ALGORITHM,  AUTH_HMAC_SHA1_96,         0},
+#line 122 "./crypto/proposal/proposal_keywords_static.txt"
     {"sha1",             INTEGRITY_ALGORITHM,  AUTH_HMAC_SHA1_96,         0},
-    {"aes128",           ENCRYPTION_ALGORITHM, ENCR_AES_CBC,            128},
-    {"ntru128",          DIFFIE_HELLMAN_GROUP, NTRU_128_BIT,              0},
+#line 32 "./crypto/proposal/proposal_keywords_static.txt"
+    {"null",             ENCRYPTION_ALGORITHM, ENCR_NULL,                 0},
+#line 170 "./crypto/proposal/proposal_keywords_static.txt"
+    {"x448",             DIFFIE_HELLMAN_GROUP, CURVE_448,                 0},
+#line 121 "./crypto/proposal/proposal_keywords_static.txt"
+    {"sha",              INTEGRITY_ALGORITHM,  AUTH_HMAC_SHA1_96,         0},
+#line 176 "./crypto/proposal/proposal_keywords_static.txt"
+    {"noesn",            EXTENDED_SEQUENCE_NUMBERS, NO_EXT_SEQ_NUMBERS,   0},
+#line 168 "./crypto/proposal/proposal_keywords_static.txt"
+    {"x25519",           DIFFIE_HELLMAN_GROUP, CURVE_25519,               0},
+#line 147 "./crypto/proposal/proposal_keywords_static.txt"
     {"modp768",          DIFFIE_HELLMAN_GROUP, MODP_768_BIT,              0},
+#line 177 "./crypto/proposal/proposal_keywords_static.txt"
+    {"esn",              EXTENDED_SEQUENCE_NUMBERS, EXT_SEQ_NUMBERS,      0},
+#line 132 "./crypto/proposal/proposal_keywords_static.txt"
     {"md5",              INTEGRITY_ALGORITHM,  AUTH_HMAC_MD5_96,          0},
-    {"modp8192",         DIFFIE_HELLMAN_GROUP, MODP_8192_BIT,             0},
-    {"md5_128",          INTEGRITY_ALGORITHM,  AUTH_HMAC_MD5_128,         0},
-    {"ecp192",           DIFFIE_HELLMAN_GROUP, ECP_192_BIT,               0},
-    {"aes192",           ENCRYPTION_ALGORITHM, ENCR_AES_CBC,            192},
-    {"prfsha256",        PSEUDO_RANDOM_FUNCTION, PRF_HMAC_SHA2_256,       0},
-    {"ntru192",          DIFFIE_HELLMAN_GROUP, NTRU_192_BIT,              0},
-    {"ntru112",          DIFFIE_HELLMAN_GROUP, NTRU_112_BIT,              0},
-    {"aescmac",          INTEGRITY_ALGORITHM,  AUTH_AES_CMAC_96,          0},
-    {"ecp256",           DIFFIE_HELLMAN_GROUP, ECP_256_BIT,               0},
-    {"aes256",           ENCRYPTION_ALGORITHM, ENCR_AES_CBC,            256},
-    {"aes192ccm8",       ENCRYPTION_ALGORITHM, ENCR_AES_CCM_ICV8,       192},
-    {"aes192ccm128",     ENCRYPTION_ALGORITHM, ENCR_AES_CCM_ICV16,      192},
-    {"aes128ccm8",       ENCRYPTION_ALGORITHM, ENCR_AES_CCM_ICV8,       128},
-    {"aes128ccm128",     ENCRYPTION_ALGORITHM, ENCR_AES_CCM_ICV16,      128},
-    {"aes192ccm96",      ENCRYPTION_ALGORITHM, ENCR_AES_CCM_ICV12,      192},
-    {"aes192ccm16",      ENCRYPTION_ALGORITHM, ENCR_AES_CCM_ICV16,      192},
-    {"aes128ccm96",      ENCRYPTION_ALGORITHM, ENCR_AES_CCM_ICV12,      128},
-    {"aes128ccm16",      ENCRYPTION_ALGORITHM, ENCR_AES_CCM_ICV16,      128},
-    {"aesxcbc",          INTEGRITY_ALGORITHM,  AUTH_AES_XCBC_96,          0},
-    {"prfsha512",        PSEUDO_RANDOM_FUNCTION, PRF_HMAC_SHA2_512,       0},
-    {"camellia",         ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CBC,       128},
-    {"sha512",           INTEGRITY_ALGORITHM,  AUTH_HMAC_SHA2_512_256,    0},
-    {"aes192ccm12",      ENCRYPTION_ALGORITHM, ENCR_AES_CCM_ICV12,      192},
-    {"aes128ccm12",      ENCRYPTION_ALGORITHM, ENCR_AES_CCM_ICV12,      128},
-    {"ntru256",          DIFFIE_HELLMAN_GROUP, NTRU_256_BIT,              0},
-    {"aes256ccm8",       ENCRYPTION_ALGORITHM, ENCR_AES_CCM_ICV8,       256},
-    {"aes256ccm128",     ENCRYPTION_ALGORITHM, ENCR_AES_CCM_ICV16,      256},
-    {"ecp384",           DIFFIE_HELLMAN_GROUP, ECP_384_BIT,               0},
-    {"sha256",           INTEGRITY_ALGORITHM,  AUTH_HMAC_SHA2_256_128,    0},
-    {"aes256ccm96",      ENCRYPTION_ALGORITHM, ENCR_AES_CCM_ICV12,      256},
-    {"aes256ccm16",      ENCRYPTION_ALGORITHM, ENCR_AES_CCM_ICV16,      256},
-    {"camellia192ccm8",  ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CCM_ICV8,  192},
-    {"camellia192ccm128",ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CCM_ICV16, 192},
-    {"cast128",          ENCRYPTION_ALGORITHM, ENCR_CAST,               128},
-    {"camellia192ccm96", ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CCM_ICV12, 192},
-    {"camellia192ccm16", ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CCM_ICV16, 192},
-    {"camellia192",      ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CBC,       192},
-    {"aes256ccm12",      ENCRYPTION_ALGORITHM, ENCR_AES_CCM_ICV12,      256},
-    {"camellia128",      ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CBC,       128},
-    {"ecp224",           DIFFIE_HELLMAN_GROUP, ECP_224_BIT,               0},
-    {"aes192ccm64",      ENCRYPTION_ALGORITHM, ENCR_AES_CCM_ICV8,       192},
-    {"modp6144",         DIFFIE_HELLMAN_GROUP, MODP_6144_BIT,             0},
-    {"aes128ccm64",      ENCRYPTION_ALGORITHM, ENCR_AES_CCM_ICV8,       128},
-    {"camellia192ccm12", ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CCM_ICV12, 192},
-    {"modpnull",         DIFFIE_HELLMAN_GROUP, MODP_NULL,                 0},
-    {"camellia128ccm8",  ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CCM_ICV8,  128},
-    {"camellia128ccm128",ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CCM_ICV16, 128},
-    {"sha384",           INTEGRITY_ALGORITHM,  AUTH_HMAC_SHA2_384_192,    0},
-    {"camellia128ccm96", ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CCM_ICV12, 128},
-    {"camellia128ccm16", ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CCM_ICV16, 128},
-    {"prfsha384",        PSEUDO_RANDOM_FUNCTION, PRF_HMAC_SHA2_384,       0},
-    {"camelliaxcbc",     INTEGRITY_ALGORITHM,  AUTH_CAMELLIA_XCBC_96,     0},
-    {"camellia256",      ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CBC,       256},
-    {"modp1536",         DIFFIE_HELLMAN_GROUP, MODP_1536_BIT,             0},
-    {"camellia256ccm8",  ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CCM_ICV8,  256},
-    {"camellia256ccm128",ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CCM_ICV16, 256},
-    {"aes256ccm64",      ENCRYPTION_ALGORITHM, ENCR_AES_CCM_ICV8,       256},
-    {"camellia128ccm12", ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CCM_ICV12, 128},
-    {"camellia256ccm96", ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CCM_ICV12, 256},
-    {"camellia256ccm16", ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CCM_ICV16, 256},
-    {"prfmd5",           PSEUDO_RANDOM_FUNCTION, PRF_HMAC_MD5,            0},
+#line 145 "./crypto/proposal/proposal_keywords_static.txt"
     {"modpnone",         DIFFIE_HELLMAN_GROUP, MODP_NONE,                 0},
-    {"camellia192ccm64", ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CCM_ICV8,  192},
-    {"camellia256ccm12", ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CCM_ICV12, 256},
-    {"aes192gcm8",       ENCRYPTION_ALGORITHM, ENCR_AES_GCM_ICV8,       192},
-    {"aes192gcm128",     ENCRYPTION_ALGORITHM, ENCR_AES_GCM_ICV16,      192},
-    {"aes128gcm8",       ENCRYPTION_ALGORITHM, ENCR_AES_GCM_ICV8,       128},
-    {"aes128gcm128",     ENCRYPTION_ALGORITHM, ENCR_AES_GCM_ICV16,      128},
-    {"aes192gcm96",      ENCRYPTION_ALGORITHM, ENCR_AES_GCM_ICV12,      192},
-    {"aes192gcm16",      ENCRYPTION_ALGORITHM, ENCR_AES_GCM_ICV16,      192},
-    {"aes128gcm96",      ENCRYPTION_ALGORITHM, ENCR_AES_GCM_ICV12,      128},
-    {"aes128gcm16",      ENCRYPTION_ALGORITHM, ENCR_AES_GCM_ICV16,      128},
-    {"aes",              ENCRYPTION_ALGORITHM, ENCR_AES_CBC,            128},
-    {"camellia128ccm64", ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CCM_ICV8,  128},
-    {"aes192gcm12",      ENCRYPTION_ALGORITHM, ENCR_AES_GCM_ICV12,      192},
-    {"modp4096",         DIFFIE_HELLMAN_GROUP, MODP_4096_BIT,             0},
-    {"aes128gcm12",      ENCRYPTION_ALGORITHM, ENCR_AES_GCM_ICV12,      128},
-    {"aes256gcm8",       ENCRYPTION_ALGORITHM, ENCR_AES_GCM_ICV8,       256},
-    {"aes256gcm128",     ENCRYPTION_ALGORITHM, ENCR_AES_GCM_ICV16,      256},
-    {"camellia256ccm64", ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CCM_ICV8,  256},
-    {"prfcamelliaxcbc",  PSEUDO_RANDOM_FUNCTION, PRF_CAMELLIA128_XCBC,    0},
-    {"aes256gcm96",      ENCRYPTION_ALGORITHM, ENCR_AES_GCM_ICV12,      256},
-    {"aes256gcm16",      ENCRYPTION_ALGORITHM, ENCR_AES_GCM_ICV16,      256},
-    {"modp1024",         DIFFIE_HELLMAN_GROUP, MODP_1024_BIT,             0},
-    {"modp2048",         DIFFIE_HELLMAN_GROUP, MODP_2048_BIT,             0},
-    {"aes192ctr",        ENCRYPTION_ALGORITHM, ENCR_AES_CTR,            192},
-    {"aes192gmac",       ENCRYPTION_ALGORITHM, ENCR_NULL_AUTH_AES_GMAC, 192},
-    {"aes128ctr",        ENCRYPTION_ALGORITHM, ENCR_AES_CTR,            128},
-    {"aes128gmac",       ENCRYPTION_ALGORITHM, ENCR_NULL_AUTH_AES_GMAC, 128},
-    {"aes256gcm12",      ENCRYPTION_ALGORITHM, ENCR_AES_GCM_ICV12,      256},
-    {"serpent128",       ENCRYPTION_ALGORITHM, ENCR_SERPENT_CBC,        128},
-    {"aes192gcm64",      ENCRYPTION_ALGORITHM, ENCR_AES_GCM_ICV8,       192},
-    {"aes128gcm64",      ENCRYPTION_ALGORITHM, ENCR_AES_GCM_ICV8,       128},
-    {"3des",             ENCRYPTION_ALGORITHM, ENCR_3DES,                 0},
-    {"blowfish",         ENCRYPTION_ALGORITHM, ENCR_BLOWFISH,           128},
-    {"ecp512bp",         DIFFIE_HELLMAN_GROUP, ECP_512_BP,                0},
-    {"serpent256",       ENCRYPTION_ALGORITHM, ENCR_SERPENT_CBC,        256},
-    {"aes256ctr",        ENCRYPTION_ALGORITHM, ENCR_AES_CTR,            256},
-    {"aes256gmac",       ENCRYPTION_ALGORITHM, ENCR_NULL_AUTH_AES_GMAC, 256},
-    {"modp3072",         DIFFIE_HELLMAN_GROUP, MODP_3072_BIT,             0},
+#line 113 "./crypto/proposal/proposal_keywords_static.txt"
     {"serpent",          ENCRYPTION_ALGORITHM, ENCR_SERPENT_CBC,        128},
-    {"camellia192ctr",   ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CTR,       192},
-    {"modp2048s256",     DIFFIE_HELLMAN_GROUP, MODP_2048_256,             0},
-    {"aes256gcm64",      ENCRYPTION_ALGORITHM, ENCR_AES_GCM_ICV8,       256},
-    {"blowfish192",      ENCRYPTION_ALGORITHM, ENCR_BLOWFISH,           192},
-    {"blowfish128",      ENCRYPTION_ALGORITHM, ENCR_BLOWFISH,           128},
-    {"ecp384bp",         DIFFIE_HELLMAN_GROUP, ECP_384_BP,                0},
-    {"ecp256bp",         DIFFIE_HELLMAN_GROUP, ECP_256_BP,                0},
+#line 154 "./crypto/proposal/proposal_keywords_static.txt"
+    {"modp8192",         DIFFIE_HELLMAN_GROUP, MODP_8192_BIT,             0},
+#line 133 "./crypto/proposal/proposal_keywords_static.txt"
+    {"md5_128",          INTEGRITY_ALGORITHM,  AUTH_HMAC_MD5_128,         0},
+#line 36 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes128",           ENCRYPTION_ALGORITHM, ENCR_AES_CBC,            128},
+#line 172 "./crypto/proposal/proposal_keywords_static.txt"
+    {"ntru128",          DIFFIE_HELLMAN_GROUP, NTRU_128_BIT,              0},
+#line 114 "./crypto/proposal/proposal_keywords_static.txt"
+    {"serpent128",       ENCRYPTION_ALGORITHM, ENCR_SERPENT_CBC,        128},
+#line 130 "./crypto/proposal/proposal_keywords_static.txt"
+    {"sha512",           INTEGRITY_ALGORITHM,  AUTH_HMAC_SHA2_512_256,    0},
+#line 37 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes192",           ENCRYPTION_ALGORITHM, ENCR_AES_CBC,            192},
+#line 116 "./crypto/proposal/proposal_keywords_static.txt"
+    {"serpent256",       ENCRYPTION_ALGORITHM, ENCR_SERPENT_CBC,        256},
+#line 173 "./crypto/proposal/proposal_keywords_static.txt"
+    {"ntru192",          DIFFIE_HELLMAN_GROUP, NTRU_192_BIT,              0},
+#line 171 "./crypto/proposal/proposal_keywords_static.txt"
+    {"ntru112",          DIFFIE_HELLMAN_GROUP, NTRU_112_BIT,              0},
+#line 124 "./crypto/proposal/proposal_keywords_static.txt"
+    {"sha256",           INTEGRITY_ALGORITHM,  AUTH_HMAC_SHA2_256_128,    0},
+#line 159 "./crypto/proposal/proposal_keywords_static.txt"
+    {"ecp521",           DIFFIE_HELLMAN_GROUP, ECP_521_BIT,               0},
+#line 136 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aescmac",          INTEGRITY_ALGORITHM,  AUTH_AES_CMAC_96,          0},
+#line 38 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes256",           ENCRYPTION_ALGORITHM, ENCR_AES_CBC,            256},
+#line 48 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes192ccm8",       ENCRYPTION_ALGORITHM, ENCR_AES_CCM_ICV8,       192},
+#line 53 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes192ccm128",     ENCRYPTION_ALGORITHM, ENCR_AES_CCM_ICV16,      192},
+#line 42 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes128ccm8",       ENCRYPTION_ALGORITHM, ENCR_AES_CCM_ICV8,       128},
+#line 47 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes128ccm128",     ENCRYPTION_ALGORITHM, ENCR_AES_CCM_ICV16,      128},
+#line 51 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes192ccm96",      ENCRYPTION_ALGORITHM, ENCR_AES_CCM_ICV12,      192},
+#line 52 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes192ccm16",      ENCRYPTION_ALGORITHM, ENCR_AES_CCM_ICV16,      192},
+#line 45 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes128ccm96",      ENCRYPTION_ALGORITHM, ENCR_AES_CCM_ICV12,      128},
+#line 46 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes128ccm16",      ENCRYPTION_ALGORITHM, ENCR_AES_CCM_ICV16,      128},
+#line 134 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aesxcbc",          INTEGRITY_ALGORITHM,  AUTH_AES_XCBC_96,          0},
+#line 115 "./crypto/proposal/proposal_keywords_static.txt"
     {"serpent192",       ENCRYPTION_ALGORITHM, ENCR_SERPENT_CBC,        192},
-    {"sha256_96",        INTEGRITY_ALGORITHM,  AUTH_HMAC_SHA2_256_96,     0},
-    {"sha2_512",         INTEGRITY_ALGORITHM,  AUTH_HMAC_SHA2_512_256,    0},
-    {"curve25519",       DIFFIE_HELLMAN_GROUP, CURVE_25519,               0},
-    {"camellia128ctr",   ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CTR,       128},
-    {"sha2_256",         INTEGRITY_ALGORITHM,  AUTH_HMAC_SHA2_256_128,    0},
-    {"ecp224bp",         DIFFIE_HELLMAN_GROUP, ECP_224_BP,                0},
-    {"blowfish256",      ENCRYPTION_ALGORITHM, ENCR_BLOWFISH,           256},
-    {"sha2_256_96",      INTEGRITY_ALGORITHM,  AUTH_HMAC_SHA2_256_96,     0},
-    {"modp2048s224",     DIFFIE_HELLMAN_GROUP, MODP_2048_224,             0},
-    {"modp1024s160",     DIFFIE_HELLMAN_GROUP, MODP_1024_160,             0},
-    {"camellia256ctr",   ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CTR,       256},
-    {"chacha20poly1305", ENCRYPTION_ALGORITHM, ENCR_CHACHA20_POLY1305,    0},
-    {"chacha20poly1305compat", ENCRYPTION_ALGORITHM, ENCR_CHACHA20_POLY1305, 256},
+#line 155 "./crypto/proposal/proposal_keywords_static.txt"
+    {"ecp192",           DIFFIE_HELLMAN_GROUP, ECP_192_BIT,               0},
+#line 149 "./crypto/proposal/proposal_keywords_static.txt"
+    {"modp1536",         DIFFIE_HELLMAN_GROUP, MODP_1536_BIT,             0},
+#line 50 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes192ccm12",      ENCRYPTION_ALGORITHM, ENCR_AES_CCM_ICV12,      192},
+#line 87 "./crypto/proposal/proposal_keywords_static.txt"
+    {"camellia",         ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CBC,       128},
+#line 44 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes128ccm12",      ENCRYPTION_ALGORITHM, ENCR_AES_CCM_ICV12,      128},
+#line 174 "./crypto/proposal/proposal_keywords_static.txt"
+    {"ntru256",          DIFFIE_HELLMAN_GROUP, NTRU_256_BIT,              0},
+#line 54 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes256ccm8",       ENCRYPTION_ALGORITHM, ENCR_AES_CCM_ICV8,       256},
+#line 59 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes256ccm128",     ENCRYPTION_ALGORITHM, ENCR_AES_CCM_ICV16,      256},
+#line 157 "./crypto/proposal/proposal_keywords_static.txt"
+    {"ecp256",           DIFFIE_HELLMAN_GROUP, ECP_256_BIT,               0},
+#line 146 "./crypto/proposal/proposal_keywords_static.txt"
+    {"modpnull",         DIFFIE_HELLMAN_GROUP, MODP_NULL,                 0},
+#line 57 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes256ccm96",      ENCRYPTION_ALGORITHM, ENCR_AES_CCM_ICV12,      256},
+#line 58 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes256ccm16",      ENCRYPTION_ALGORITHM, ENCR_AES_CCM_ICV16,      256},
+#line 100 "./crypto/proposal/proposal_keywords_static.txt"
+    {"camellia192ccm8",  ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CCM_ICV8,  192},
+#line 105 "./crypto/proposal/proposal_keywords_static.txt"
+    {"camellia192ccm128",ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CCM_ICV16, 192},
+#line 112 "./crypto/proposal/proposal_keywords_static.txt"
+    {"cast128",          ENCRYPTION_ALGORITHM, ENCR_CAST,               128},
+#line 103 "./crypto/proposal/proposal_keywords_static.txt"
+    {"camellia192ccm96", ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CCM_ICV12, 192},
+#line 104 "./crypto/proposal/proposal_keywords_static.txt"
+    {"camellia192ccm16", ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CCM_ICV16, 192},
+#line 89 "./crypto/proposal/proposal_keywords_static.txt"
+    {"camellia192",      ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CBC,       192},
+#line 56 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes256ccm12",      ENCRYPTION_ALGORITHM, ENCR_AES_CCM_ICV12,      256},
+#line 88 "./crypto/proposal/proposal_keywords_static.txt"
+    {"camellia128",      ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CBC,       128},
+#line 35 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes",              ENCRYPTION_ALGORITHM, ENCR_AES_CBC,            128},
+#line 102 "./crypto/proposal/proposal_keywords_static.txt"
+    {"camellia192ccm12", ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CCM_ICV12, 192},
+#line 94 "./crypto/proposal/proposal_keywords_static.txt"
+    {"camellia128ccm8",  ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CCM_ICV8,  128},
+#line 99 "./crypto/proposal/proposal_keywords_static.txt"
+    {"camellia128ccm128",ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CCM_ICV16, 128},
+#line 33 "./crypto/proposal/proposal_keywords_static.txt"
     {"des",              ENCRYPTION_ALGORITHM, ENCR_DES,                  0},
-    {"twofish",          ENCRYPTION_ALGORITHM, ENCR_TWOFISH_CBC,        128},
-    {"twofish128",       ENCRYPTION_ALGORITHM, ENCR_TWOFISH_CBC,        128},
-    {"sha2_384",         INTEGRITY_ALGORITHM,  AUTH_HMAC_SHA2_384_192,    0},
-    {"sha1_160",         INTEGRITY_ALGORITHM,  AUTH_HMAC_SHA1_160,        0},
-    {"twofish256",       ENCRYPTION_ALGORITHM, ENCR_TWOFISH_CBC,        256},
+#line 135 "./crypto/proposal/proposal_keywords_static.txt"
+    {"camelliaxcbc",     INTEGRITY_ALGORITHM,  AUTH_CAMELLIA_XCBC_96,     0},
+#line 97 "./crypto/proposal/proposal_keywords_static.txt"
+    {"camellia128ccm96", ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CCM_ICV12, 128},
+#line 98 "./crypto/proposal/proposal_keywords_static.txt"
+    {"camellia128ccm16", ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CCM_ICV16, 128},
+#line 90 "./crypto/proposal/proposal_keywords_static.txt"
+    {"camellia256",      ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CBC,       256},
+#line 137 "./crypto/proposal/proposal_keywords_static.txt"
+    {"prfsha1",          PSEUDO_RANDOM_FUNCTION, PRF_HMAC_SHA1,           0},
+#line 106 "./crypto/proposal/proposal_keywords_static.txt"
+    {"camellia256ccm8",  ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CCM_ICV8,  256},
+#line 111 "./crypto/proposal/proposal_keywords_static.txt"
+    {"camellia256ccm128",ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CCM_ICV16, 256},
+#line 151 "./crypto/proposal/proposal_keywords_static.txt"
+    {"modp3072",         DIFFIE_HELLMAN_GROUP, MODP_3072_BIT,             0},
+#line 96 "./crypto/proposal/proposal_keywords_static.txt"
+    {"camellia128ccm12", ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CCM_ICV12, 128},
+#line 109 "./crypto/proposal/proposal_keywords_static.txt"
+    {"camellia256ccm96", ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CCM_ICV12, 256},
+#line 110 "./crypto/proposal/proposal_keywords_static.txt"
+    {"camellia256ccm16", ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CCM_ICV16, 256},
+#line 66 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes192gcm8",       ENCRYPTION_ALGORITHM, ENCR_AES_GCM_ICV8,       192},
+#line 71 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes192gcm128",     ENCRYPTION_ALGORITHM, ENCR_AES_GCM_ICV16,      192},
+#line 60 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes128gcm8",       ENCRYPTION_ALGORITHM, ENCR_AES_GCM_ICV8,       128},
+#line 65 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes128gcm128",     ENCRYPTION_ALGORITHM, ENCR_AES_GCM_ICV16,      128},
+#line 69 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes192gcm96",      ENCRYPTION_ALGORITHM, ENCR_AES_GCM_ICV12,      192},
+#line 70 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes192gcm16",      ENCRYPTION_ALGORITHM, ENCR_AES_GCM_ICV16,      192},
+#line 63 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes128gcm96",      ENCRYPTION_ALGORITHM, ENCR_AES_GCM_ICV12,      128},
+#line 64 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes128gcm16",      ENCRYPTION_ALGORITHM, ENCR_AES_GCM_ICV16,      128},
+#line 108 "./crypto/proposal/proposal_keywords_static.txt"
+    {"camellia256ccm12", ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CCM_ICV12, 256},
+#line 49 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes192ccm64",      ENCRYPTION_ALGORITHM, ENCR_AES_CCM_ICV8,       192},
+#line 167 "./crypto/proposal/proposal_keywords_static.txt"
+    {"curve25519",       DIFFIE_HELLMAN_GROUP, CURVE_25519,               0},
+#line 43 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes128ccm64",      ENCRYPTION_ALGORITHM, ENCR_AES_CCM_ICV8,       128},
+#line 68 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes192gcm12",      ENCRYPTION_ALGORITHM, ENCR_AES_GCM_ICV12,      192},
+#line 138 "./crypto/proposal/proposal_keywords_static.txt"
+    {"prfsha256",        PSEUDO_RANDOM_FUNCTION, PRF_HMAC_SHA2_256,       0},
+#line 62 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes128gcm12",      ENCRYPTION_ALGORITHM, ENCR_AES_GCM_ICV12,      128},
+#line 72 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes256gcm8",       ENCRYPTION_ALGORITHM, ENCR_AES_GCM_ICV8,       256},
+#line 77 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes256gcm128",     ENCRYPTION_ALGORITHM, ENCR_AES_GCM_ICV16,      256},
+#line 175 "./crypto/proposal/proposal_keywords_static.txt"
     {"newhope128",       DIFFIE_HELLMAN_GROUP, NH_128_BIT,                0},
+#line 75 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes256gcm96",      ENCRYPTION_ALGORITHM, ENCR_AES_GCM_ICV12,      256},
+#line 76 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes256gcm16",      ENCRYPTION_ALGORITHM, ENCR_AES_GCM_ICV16,      256},
+#line 79 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes192gmac",       ENCRYPTION_ALGORITHM, ENCR_NULL_AUTH_AES_GMAC, 192},
+#line 128 "./crypto/proposal/proposal_keywords_static.txt"
+    {"sha384",           INTEGRITY_ALGORITHM,  AUTH_HMAC_SHA2_384_192,    0},
+#line 78 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes128gmac",       ENCRYPTION_ALGORITHM, ENCR_NULL_AUTH_AES_GMAC, 128},
+#line 55 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes256ccm64",      ENCRYPTION_ALGORITHM, ENCR_AES_CCM_ICV8,       256},
+#line 152 "./crypto/proposal/proposal_keywords_static.txt"
+    {"modp4096",         DIFFIE_HELLMAN_GROUP, MODP_4096_BIT,             0},
+#line 40 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes192ctr",        ENCRYPTION_ALGORITHM, ENCR_AES_CTR,            192},
+#line 83 "./crypto/proposal/proposal_keywords_static.txt"
+    {"blowfish",         ENCRYPTION_ALGORITHM, ENCR_BLOWFISH,           128},
+#line 39 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes128ctr",        ENCRYPTION_ALGORITHM, ENCR_AES_CTR,            128},
+#line 74 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes256gcm12",      ENCRYPTION_ALGORITHM, ENCR_AES_GCM_ICV12,      256},
+#line 153 "./crypto/proposal/proposal_keywords_static.txt"
+    {"modp6144",         DIFFIE_HELLMAN_GROUP, MODP_6144_BIT,             0},
+#line 101 "./crypto/proposal/proposal_keywords_static.txt"
+    {"camellia192ccm64", ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CCM_ICV8,  192},
+#line 140 "./crypto/proposal/proposal_keywords_static.txt"
+    {"prfsha512",        PSEUDO_RANDOM_FUNCTION, PRF_HMAC_SHA2_512,       0},
+#line 34 "./crypto/proposal/proposal_keywords_static.txt"
+    {"3des",             ENCRYPTION_ALGORITHM, ENCR_3DES,                 0},
+#line 148 "./crypto/proposal/proposal_keywords_static.txt"
+    {"modp1024",         DIFFIE_HELLMAN_GROUP, MODP_1024_BIT,             0},
+#line 150 "./crypto/proposal/proposal_keywords_static.txt"
+    {"modp2048",         DIFFIE_HELLMAN_GROUP, MODP_2048_BIT,             0},
+#line 166 "./crypto/proposal/proposal_keywords_static.txt"
+    {"ecp512bp",         DIFFIE_HELLMAN_GROUP, ECP_512_BP,                0},
+#line 160 "./crypto/proposal/proposal_keywords_static.txt"
+    {"modp1024s160",     DIFFIE_HELLMAN_GROUP, MODP_1024_160,             0},
+#line 80 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes256gmac",       ENCRYPTION_ALGORITHM, ENCR_NULL_AUTH_AES_GMAC, 256},
+#line 126 "./crypto/proposal/proposal_keywords_static.txt"
+    {"sha256_96",        INTEGRITY_ALGORITHM,  AUTH_HMAC_SHA2_256_96,     0},
+#line 143 "./crypto/proposal/proposal_keywords_static.txt"
+    {"prfcamelliaxcbc",  PSEUDO_RANDOM_FUNCTION, PRF_CAMELLIA128_XCBC,    0},
+#line 131 "./crypto/proposal/proposal_keywords_static.txt"
+    {"sha2_512",         INTEGRITY_ALGORITHM,  AUTH_HMAC_SHA2_512_256,    0},
+#line 85 "./crypto/proposal/proposal_keywords_static.txt"
+    {"blowfish192",      ENCRYPTION_ALGORITHM, ENCR_BLOWFISH,           192},
+#line 41 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes256ctr",        ENCRYPTION_ALGORITHM, ENCR_AES_CTR,            256},
+#line 84 "./crypto/proposal/proposal_keywords_static.txt"
+    {"blowfish128",      ENCRYPTION_ALGORITHM, ENCR_BLOWFISH,           128},
+#line 158 "./crypto/proposal/proposal_keywords_static.txt"
+    {"ecp384",           DIFFIE_HELLMAN_GROUP, ECP_384_BIT,               0},
+#line 95 "./crypto/proposal/proposal_keywords_static.txt"
+    {"camellia128ccm64", ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CCM_ICV8,  128},
+#line 125 "./crypto/proposal/proposal_keywords_static.txt"
+    {"sha2_256",         INTEGRITY_ALGORITHM,  AUTH_HMAC_SHA2_256_128,    0},
+#line 92 "./crypto/proposal/proposal_keywords_static.txt"
+    {"camellia192ctr",   ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CTR,       192},
+#line 127 "./crypto/proposal/proposal_keywords_static.txt"
+    {"sha2_256_96",      INTEGRITY_ALGORITHM,  AUTH_HMAC_SHA2_256_96,     0},
+#line 164 "./crypto/proposal/proposal_keywords_static.txt"
+    {"ecp256bp",         DIFFIE_HELLMAN_GROUP, ECP_256_BP,                0},
+#line 117 "./crypto/proposal/proposal_keywords_static.txt"
+    {"twofish",          ENCRYPTION_ALGORITHM, ENCR_TWOFISH_CBC,        128},
+#line 82 "./crypto/proposal/proposal_keywords_static.txt"
+    {"chacha20poly1305compat", ENCRYPTION_ALGORITHM, ENCR_CHACHA20_POLY1305, 256},
+#line 107 "./crypto/proposal/proposal_keywords_static.txt"
+    {"camellia256ccm64", ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CCM_ICV8,  256},
+#line 118 "./crypto/proposal/proposal_keywords_static.txt"
+    {"twofish128",       ENCRYPTION_ALGORITHM, ENCR_TWOFISH_CBC,        128},
+#line 156 "./crypto/proposal/proposal_keywords_static.txt"
+    {"ecp224",           DIFFIE_HELLMAN_GROUP, ECP_224_BIT,               0},
+#line 86 "./crypto/proposal/proposal_keywords_static.txt"
+    {"blowfish256",      ENCRYPTION_ALGORITHM, ENCR_BLOWFISH,           256},
+#line 162 "./crypto/proposal/proposal_keywords_static.txt"
+    {"modp2048s256",     DIFFIE_HELLMAN_GROUP, MODP_2048_256,             0},
+#line 67 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes192gcm64",      ENCRYPTION_ALGORITHM, ENCR_AES_GCM_ICV8,       192},
+#line 123 "./crypto/proposal/proposal_keywords_static.txt"
+    {"sha1_160",         INTEGRITY_ALGORITHM,  AUTH_HMAC_SHA1_160,        0},
+#line 61 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes128gcm64",      ENCRYPTION_ALGORITHM, ENCR_AES_GCM_ICV8,       128},
+#line 91 "./crypto/proposal/proposal_keywords_static.txt"
+    {"camellia128ctr",   ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CTR,       128},
+#line 120 "./crypto/proposal/proposal_keywords_static.txt"
+    {"twofish256",       ENCRYPTION_ALGORITHM, ENCR_TWOFISH_CBC,        256},
+#line 139 "./crypto/proposal/proposal_keywords_static.txt"
+    {"prfsha384",        PSEUDO_RANDOM_FUNCTION, PRF_HMAC_SHA2_384,       0},
+#line 81 "./crypto/proposal/proposal_keywords_static.txt"
+    {"chacha20poly1305", ENCRYPTION_ALGORITHM, ENCR_CHACHA20_POLY1305,    0},
+#line 93 "./crypto/proposal/proposal_keywords_static.txt"
+    {"camellia256ctr",   ENCRYPTION_ALGORITHM, ENCR_CAMELLIA_CTR,       256},
+#line 141 "./crypto/proposal/proposal_keywords_static.txt"
+    {"prfmd5",           PSEUDO_RANDOM_FUNCTION, PRF_HMAC_MD5,            0},
+#line 73 "./crypto/proposal/proposal_keywords_static.txt"
+    {"aes256gcm64",      ENCRYPTION_ALGORITHM, ENCR_AES_GCM_ICV8,       256},
+#line 129 "./crypto/proposal/proposal_keywords_static.txt"
+    {"sha2_384",         INTEGRITY_ALGORITHM,  AUTH_HMAC_SHA2_384_192,    0},
+#line 165 "./crypto/proposal/proposal_keywords_static.txt"
+    {"ecp384bp",         DIFFIE_HELLMAN_GROUP, ECP_384_BP,                0},
+#line 119 "./crypto/proposal/proposal_keywords_static.txt"
     {"twofish192",       ENCRYPTION_ALGORITHM, ENCR_TWOFISH_CBC,        192},
+#line 169 "./crypto/proposal/proposal_keywords_static.txt"
+    {"curve448",         DIFFIE_HELLMAN_GROUP, CURVE_448,                 0},
+#line 163 "./crypto/proposal/proposal_keywords_static.txt"
+    {"ecp224bp",         DIFFIE_HELLMAN_GROUP, ECP_224_BP,                0},
+#line 142 "./crypto/proposal/proposal_keywords_static.txt"
     {"prfaesxcbc",       PSEUDO_RANDOM_FUNCTION, PRF_AES128_XCBC,         0},
+#line 161 "./crypto/proposal/proposal_keywords_static.txt"
+    {"modp2048s224",     DIFFIE_HELLMAN_GROUP, MODP_2048_224,             0},
+#line 144 "./crypto/proposal/proposal_keywords_static.txt"
     {"prfaescmac",       PSEUDO_RANDOM_FUNCTION, PRF_AES128_CMAC,         0}
   };
 
 static const short lookup[] =
   {
-     -1,  -1,  -1,  -1,  -1,  -1,  -1,   0,  -1,  -1,
-     -1,   1,   2,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
-      3,   4,  -1,  -1,  -1,  -1,  -1,   5,   6,   7,
-      8,  -1,  -1,   9,  10,  -1,  11,  12,  13,  -1,
-     14,  15,  16,  -1,  17,  18,  -1,  19,  -1,  20,
-     21,  22,  23,  24,  25,  26,  27,  28,  29,  30,
-     31,  -1,  32,  33,  34,  -1,  35,  36,  37,  38,
-     39,  40,  41,  42,  43,  44,  -1,  45,  46,  47,
-     48,  49,  50,  51,  52,  53,  54,  55,  56,  57,
-     58,  -1,  59,  60,  61,  62,  63,  64,  65,  66,
-     67,  68,  69,  70,  71,  72,  73,  74,  -1,  -1,
-     -1,  -1,  75,  76,  77,  78,  79,  80,  81,  82,
-     83,  84,  85,  -1,  -1,  -1,  86,  87,  88,  -1,
-     89,  90,  91,  92,  93,  94,  95,  96,  97,  98,
-     99, 100,  -1, 101, 102,  -1, 103,  -1, 104,  -1,
-    105, 106,  -1, 107, 108, 109, 110, 111, 112,  -1,
-     -1, 113, 114, 115,  -1, 116,  -1, 117, 118, 119,
-    120,  -1, 121, 122,  -1, 123, 124,  -1,  -1, 125,
-     -1, 126, 127, 128, 129, 130, 131, 132,  -1,  -1,
-    133,  -1,  -1,  -1, 134,  -1,  -1,  -1,  -1,  -1,
-     -1,  -1,  -1, 135,  -1,  -1, 136,  -1,  -1, 137,
-     -1,  -1, 138,  -1,  -1,  -1, 139,  -1,  -1, 140,
      -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
-     -1,  -1, 141,  -1,  -1, 142,  -1,  -1,  -1,  -1,
+     -1,   0,   1,   2,   3,   4,  -1,  -1,   5,  -1,
      -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
-    143
+      6,  -1,  -1,   7,   8,   9,  10,  11,  12,  13,
+     -1,  -1,  14,  15,  -1,  -1,  -1,  -1,  -1,  16,
+     -1,  17,  -1,  18,  19,  20,  -1,  21,  22,  23,
+     24,  25,  26,  27,  28,  29,  30,  31,  32,  33,
+     -1,  34,  35,  36,  -1,  37,  38,  39,  40,  41,
+     42,  43,  44,  45,  46,  -1,  47,  48,  -1,  49,
+     50,  51,  52,  53,  54,  -1,  55,  -1,  -1,  -1,
+     56,  -1,  57,  58,  59,  60,  61,  62,  -1,  -1,
+     63,  64,  -1,  65,  66,  67,  68,  69,  70,  71,
+     72,  73,  74,  75,  76,  77,  78,  79,  80,  81,
+     82,  -1,  -1,  83,  84,  85,  -1,  86,  87,  -1,
+     88,  89,  90,  91,  92,  93,  94,  95,  96,  97,
+     98,  99, 100, 101, 102, 103,  -1, 104, 105, 106,
+    107, 108, 109, 110, 111, 112, 113, 114, 115, 116,
+    117,  -1,  -1, 118,  -1, 119, 120, 121, 122,  -1,
+    123, 124, 125, 126,  -1, 127, 128, 129, 130, 131,
+     -1, 132,  -1,  -1, 133,  -1,  -1, 134,  -1,  -1,
+    135, 136,  -1,  -1, 137, 138,  -1, 139,  -1, 140,
+    141,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
+     -1, 142,  -1,  -1,  -1,  -1,  -1,  -1,  -1, 143,
+     -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
+     -1, 144,  -1, 145
   };
 
 const struct proposal_token *

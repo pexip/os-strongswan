@@ -124,8 +124,7 @@ am__installdirs = "$(DESTDIR)$(ipsecdir)"
 PROGRAMS = $(ipsec_PROGRAMS)
 am_starter_OBJECTS = starter.$(OBJEXT) args.$(OBJEXT) \
 	confread.$(OBJEXT) keywords.$(OBJEXT) cmp.$(OBJEXT) \
-	invokecharon.$(OBJEXT) starterstroke.$(OBJEXT) \
-	netkey.$(OBJEXT) klips.$(OBJEXT)
+	invokecharon.$(OBJEXT) starterstroke.$(OBJEXT)
 starter_OBJECTS = $(am_starter_OBJECTS)
 am__DEPENDENCIES_1 =
 starter_DEPENDENCIES =  \
@@ -289,9 +288,11 @@ ECHO_T = @ECHO_T@
 EGREP = @EGREP@
 EXEEXT = @EXEEXT@
 FGREP = @FGREP@
+FUZZING_CFLAGS = @FUZZING_CFLAGS@
 FUZZING_LDFLAGS = @FUZZING_LDFLAGS@
 GEM = @GEM@
 GENHTML = @GENHTML@
+GIT_VERSION = @GIT_VERSION@
 GPERF = @GPERF@
 GPERF_LEN_TYPE = @GPERF_LEN_TYPE@
 GPRBUILD = @GPRBUILD@
@@ -361,6 +362,7 @@ SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 SOCKLIB = @SOCKLIB@
 STRIP = @STRIP@
+TOX = @TOX@
 UNWINDLIB = @UNWINDLIB@
 VERSION = @VERSION@
 YACC = @YACC@
@@ -396,6 +398,8 @@ clearsilver_LIBS = @clearsilver_LIBS@
 cmd_plugins = @cmd_plugins@
 datadir = @datadir@
 datarootdir = @datarootdir@
+dbusdatadir = @dbusdatadir@
+dbuspolicydir = @dbuspolicydir@
 dev_headers = @dev_headers@
 docdir = @docdir@
 dvidir = @dvidir@
@@ -493,14 +497,15 @@ tss2_sys_LIBS = @tss2_sys_LIBS@
 tss2_tabrmd_CFLAGS = @tss2_tabrmd_CFLAGS@
 tss2_tabrmd_LIBS = @tss2_tabrmd_LIBS@
 urandom_device = @urandom_device@
+wolfssl_CFLAGS = @wolfssl_CFLAGS@
+wolfssl_LIBS = @wolfssl_LIBS@
 xml_CFLAGS = @xml_CFLAGS@
 xml_LIBS = @xml_LIBS@
 SUBDIRS = . tests
 starter_SOURCES = \
 starter.c files.h \
 args.c args.h confread.c confread.h keywords.c keywords.h cmp.c cmp.h \
-invokecharon.c invokecharon.h starterstroke.c starterstroke.h \
-netkey.c netkey.h klips.c klips.h
+invokecharon.c invokecharon.h starterstroke.c starterstroke.h
 
 
 # parser is also used by tests
@@ -660,8 +665,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/confread.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/invokecharon.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/keywords.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/klips.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/netkey.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/starter.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/starterstroke.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@parser/$(DEPDIR)/conf_parser.Plo@am__quote@
@@ -1002,11 +1005,12 @@ keywords.h: $(srcdir)/keywords.h.in
 		$(AM_V_GEN) \
 		sed \
 		-e "s:\@GPERF_LEN_TYPE\@:$(GPERF_LEN_TYPE):" \
-		$< > $@
+		$(srcdir)/keywords.h.in > $@
 
 keywords.c:	$(srcdir)/keywords.txt keywords.h
 		$(AM_V_GEN) \
-		$(GPERF) -m 10 -C -G -D -t < $(srcdir)/keywords.txt > $@
+		$(GPERF) -m 10 -C -G -D -t \
+			--output-file=$@ $(srcdir)/keywords.txt
 
 install-exec-local :
 		test -e "$(DESTDIR)${sysconfdir}/ipsec.d" || $(INSTALL) -d "$(DESTDIR)$(sysconfdir)/ipsec.d" || true

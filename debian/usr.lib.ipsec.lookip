@@ -15,6 +15,8 @@
 /usr/lib/ipsec/lookip {
   #include <abstractions/base>
 
+  /usr/lib/ipsec/lookip     rmix,
+
   /run/charon.lkp           rw,
 
   # Site-specific additions and overrides. See local/README for details.

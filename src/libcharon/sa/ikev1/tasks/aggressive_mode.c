@@ -374,8 +374,8 @@ METHOD(task_t, process_r, status_t,
 			id_payload_t *id_payload;
 			identification_t *id;
 			linked_list_t *list;
+			proposal_selection_flag_t flags = PROPOSAL_SKIP_PRIVATE;
 			uint16_t group;
-			bool prefer_configured;
 
 			this->ike_cfg = this->ike_sa->get_ike_cfg(this->ike_sa);
 			DBG0(DBG_IKE, "%H is initiating a Aggressive Mode IKE_SA",
@@ -399,10 +399,13 @@ METHOD(task_t, process_r, status_t,
 			}
 
 			list = sa_payload->get_proposals(sa_payload);
-			prefer_configured = lib->settings->get_bool(lib->settings,
-							"%s.prefer_configured_proposals", TRUE, lib->ns);
-			this->proposal = this->ike_cfg->select_proposal(this->ike_cfg,
-												list, FALSE, prefer_configured);
+			if (!lib->settings->get_bool(lib->settings,
+						"%s.prefer_configured_proposals", TRUE, lib->ns))
+			{
+				flags = PROPOSAL_PREFER_SUPPLIED;
+			}
+			this->proposal = this->ike_cfg->select_proposal(this->ike_cfg, list,
+															flags);
 			list->destroy_offset(list, offsetof(proposal_t, destroy));
 			if (!this->proposal)
 			{
@@ -412,7 +415,8 @@ METHOD(task_t, process_r, status_t,
 			this->ike_sa->set_proposal(this->ike_sa, this->proposal);
 
 			this->method = sa_payload->get_auth_method(sa_payload);
-			this->lifetime = sa_payload->get_lifetime(sa_payload);
+			this->lifetime = sa_payload->get_lifetime(sa_payload,
+													  this->proposal);
 
 			switch (this->method)
 			{
@@ -641,8 +645,7 @@ METHOD(task_t, process_i, status_t,
 			return send_notify(this, INVALID_PAYLOAD_TYPE);
 		}
 		list = sa_payload->get_proposals(sa_payload);
-		this->proposal = this->ike_cfg->select_proposal(this->ike_cfg,
-														list, FALSE, TRUE);
+		this->proposal = this->ike_cfg->select_proposal(this->ike_cfg, list, 0);
 		list->destroy_offset(list, offsetof(proposal_t, destroy));
 		if (!this->proposal)
 		{
@@ -651,7 +654,7 @@ METHOD(task_t, process_i, status_t,
 		}
 		this->ike_sa->set_proposal(this->ike_sa, this->proposal);
 
-		lifetime = sa_payload->get_lifetime(sa_payload);
+		lifetime = sa_payload->get_lifetime(sa_payload, this->proposal);
 		if (lifetime != this->lifetime)
 		{
 			DBG1(DBG_IKE, "received lifetime %us does not match configured "

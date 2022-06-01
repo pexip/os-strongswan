@@ -330,7 +330,9 @@ static bool load_cfg_candidates(private_ike_auth_t *this)
 	my_id = this->ike_sa->get_my_id(this->ike_sa);
 	other_id = this->ike_sa->get_other_id(this->ike_sa);
 	ike_proposal = this->ike_sa->get_proposal(this->ike_sa);
-	private = this->ike_sa->supports_extension(this->ike_sa, EXT_STRONGSWAN);
+	private = this->ike_sa->supports_extension(this->ike_sa, EXT_STRONGSWAN) ||
+			  lib->settings->get_bool(lib->settings, "%s.accept_private_algs",
+									  FALSE, lib->ns);
 
 	DBG1(DBG_CFG, "looking for peer configs matching %H[%Y]...%H[%Y]",
 		 me, my_id, other, other_id);
@@ -1007,9 +1009,19 @@ METHOD(task_t, build_r, status_t,
 			if (!this->ike_sa->supports_extension(this->ike_sa,
 												  EXT_EAP_ONLY_AUTHENTICATION))
 			{
-				DBG1(DBG_IKE, "configured EAP-only authentication, but peer "
-					 "does not support it");
-				goto peer_auth_failed;
+				if (lib->settings->get_bool(lib->settings,
+							"%s.force_eap_only_authentication", FALSE, lib->ns))
+				{
+					DBG1(DBG_IKE, "ignore missing %N notify and use EAP-only "
+						 "authentication", notify_type_names,
+						 EAP_ONLY_AUTHENTICATION);
+				}
+				else
+				{
+					DBG1(DBG_IKE, "configured EAP-only authentication, but "
+						 "peer does not support it");
+					goto peer_auth_failed;
+				}
 			}
 		}
 		else
@@ -1174,7 +1186,7 @@ static void send_auth_failed_informational(private_ike_auth_t *this,
 }
 
 /**
- * Check if strict constraint fullfillment required to continue current auth
+ * Check if strict constraint fulfillment required to continue current auth
  */
 static bool require_strict(private_ike_auth_t *this, bool mutual_eap)
 {

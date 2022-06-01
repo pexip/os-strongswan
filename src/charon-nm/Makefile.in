@@ -109,8 +109,7 @@ mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
-am__installdirs = "$(DESTDIR)$(ipsecdir)" \
-	"$(DESTDIR)$(dbusservicedir)"
+am__installdirs = "$(DESTDIR)$(ipsecdir)" "$(DESTDIR)$(dbuspolicydir)"
 PROGRAMS = $(ipsec_PROGRAMS)
 am__dirstamp = $(am__leading_dot)dirstamp
 am_charon_nm_OBJECTS = charon-nm.$(OBJEXT) nm/nm_backend.$(OBJEXT) \
@@ -195,7 +194,7 @@ am__uninstall_files_from_dir = { \
     || { echo " ( cd '$$dir' && rm -f" $$files ")"; \
          $(am__cd) "$$dir" && rm -f $$files; }; \
   }
-DATA = $(dbusservice_DATA)
+DATA = $(dbuspolicy_DATA)
 am__tagged_files = $(HEADERS) $(SOURCES) $(TAGS_FILES) $(LISP)
 # Read a list of newline-separated strings from the standard input,
 # and print each of them once, without duplicates.  Input order is
@@ -250,9 +249,11 @@ ECHO_T = @ECHO_T@
 EGREP = @EGREP@
 EXEEXT = @EXEEXT@
 FGREP = @FGREP@
+FUZZING_CFLAGS = @FUZZING_CFLAGS@
 FUZZING_LDFLAGS = @FUZZING_LDFLAGS@
 GEM = @GEM@
 GENHTML = @GENHTML@
+GIT_VERSION = @GIT_VERSION@
 GPERF = @GPERF@
 GPERF_LEN_TYPE = @GPERF_LEN_TYPE@
 GPRBUILD = @GPRBUILD@
@@ -322,6 +323,7 @@ SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 SOCKLIB = @SOCKLIB@
 STRIP = @STRIP@
+TOX = @TOX@
 UNWINDLIB = @UNWINDLIB@
 VERSION = @VERSION@
 YACC = @YACC@
@@ -357,6 +359,8 @@ clearsilver_LIBS = @clearsilver_LIBS@
 cmd_plugins = @cmd_plugins@
 datadir = @datadir@
 datarootdir = @datarootdir@
+dbusdatadir = @dbusdatadir@
+dbuspolicydir = @dbuspolicydir@
 dev_headers = @dev_headers@
 docdir = @docdir@
 dvidir = @dvidir@
@@ -454,6 +458,8 @@ tss2_sys_LIBS = @tss2_sys_LIBS@
 tss2_tabrmd_CFLAGS = @tss2_tabrmd_CFLAGS@
 tss2_tabrmd_LIBS = @tss2_tabrmd_LIBS@
 urandom_device = @urandom_device@
+wolfssl_CFLAGS = @wolfssl_CFLAGS@
+wolfssl_LIBS = @wolfssl_LIBS@
 xml_CFLAGS = @xml_CFLAGS@
 xml_LIBS = @xml_LIBS@
 charon_nm_SOURCES = \
@@ -479,9 +485,8 @@ charon_nm_LDADD = \
 	$(top_builddir)/src/libcharon/libcharon.la \
 	-lm $(PTHREADLIB) $(ATOMICLIB) $(DLLIB) ${nm_LIBS}
 
-dbusservicedir = $(sysconfdir)/dbus-1/system.d
-dbusservice_DATA = nm-strongswan-service.conf
-EXTRA_DIST = $(dbusservice_DATA)
+dbuspolicy_DATA = nm-strongswan-service.conf
+EXTRA_DIST = $(dbuspolicy_DATA)
 all: all-am
 
 .SUFFIXES:
@@ -624,27 +629,27 @@ mostlyclean-libtool:
 
 clean-libtool:
 	-rm -rf .libs _libs
-install-dbusserviceDATA: $(dbusservice_DATA)
+install-dbuspolicyDATA: $(dbuspolicy_DATA)
 	@$(NORMAL_INSTALL)
-	@list='$(dbusservice_DATA)'; test -n "$(dbusservicedir)" || list=; \
+	@list='$(dbuspolicy_DATA)'; test -n "$(dbuspolicydir)" || list=; \
 	if test -n "$$list"; then \
-	  echo " $(MKDIR_P) '$(DESTDIR)$(dbusservicedir)'"; \
-	  $(MKDIR_P) "$(DESTDIR)$(dbusservicedir)" || exit 1; \
+	  echo " $(MKDIR_P) '$(DESTDIR)$(dbuspolicydir)'"; \
+	  $(MKDIR_P) "$(DESTDIR)$(dbuspolicydir)" || exit 1; \
 	fi; \
 	for p in $$list; do \
 	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
 	  echo "$$d$$p"; \
 	done | $(am__base_list) | \
 	while read files; do \
-	  echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(dbusservicedir)'"; \
-	  $(INSTALL_DATA) $$files "$(DESTDIR)$(dbusservicedir)" || exit $$?; \
+	  echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(dbuspolicydir)'"; \
+	  $(INSTALL_DATA) $$files "$(DESTDIR)$(dbuspolicydir)" || exit $$?; \
 	done
 
-uninstall-dbusserviceDATA:
+uninstall-dbuspolicyDATA:
 	@$(NORMAL_UNINSTALL)
-	@list='$(dbusservice_DATA)'; test -n "$(dbusservicedir)" || list=; \
+	@list='$(dbuspolicy_DATA)'; test -n "$(dbuspolicydir)" || list=; \
 	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
-	dir='$(DESTDIR)$(dbusservicedir)'; $(am__uninstall_files_from_dir)
+	dir='$(DESTDIR)$(dbuspolicydir)'; $(am__uninstall_files_from_dir)
 
 ID: $(am__tagged_files)
 	$(am__define_uniq_tagged_files); mkid -fID $$unique
@@ -732,7 +737,7 @@ check-am: all-am
 check: check-am
 all-am: Makefile $(PROGRAMS) $(DATA)
 installdirs:
-	for dir in "$(DESTDIR)$(ipsecdir)" "$(DESTDIR)$(dbusservicedir)"; do \
+	for dir in "$(DESTDIR)$(ipsecdir)" "$(DESTDIR)$(dbuspolicydir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
 install: install-am
@@ -790,7 +795,7 @@ info: info-am
 
 info-am:
 
-install-data-am: install-dbusserviceDATA install-ipsecPROGRAMS
+install-data-am: install-dbuspolicyDATA install-ipsecPROGRAMS
 
 install-dvi: install-dvi-am
 
@@ -836,7 +841,7 @@ ps: ps-am
 
 ps-am:
 
-uninstall-am: uninstall-dbusserviceDATA uninstall-ipsecPROGRAMS
+uninstall-am: uninstall-dbuspolicyDATA uninstall-ipsecPROGRAMS
 
 .MAKE: install-am install-strip
 
@@ -845,7 +850,7 @@ uninstall-am: uninstall-dbusserviceDATA uninstall-ipsecPROGRAMS
 	distclean distclean-compile distclean-generic \
 	distclean-libtool distclean-tags distdir dvi dvi-am html \
 	html-am info info-am install install-am install-data \
-	install-data-am install-dbusserviceDATA install-dvi \
+	install-data-am install-dbuspolicyDATA install-dvi \
 	install-dvi-am install-exec install-exec-am install-html \
 	install-html-am install-info install-info-am \
 	install-ipsecPROGRAMS install-man install-pdf install-pdf-am \
@@ -853,7 +858,7 @@ uninstall-am: uninstall-dbusserviceDATA uninstall-ipsecPROGRAMS
 	installcheck-am installdirs maintainer-clean \
 	maintainer-clean-generic mostlyclean mostlyclean-compile \
 	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
-	tags tags-am uninstall uninstall-am uninstall-dbusserviceDATA \
+	tags tags-am uninstall uninstall-am uninstall-dbuspolicyDATA \
 	uninstall-ipsecPROGRAMS
 
 .PRECIOUS: Makefile

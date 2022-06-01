@@ -42,6 +42,9 @@
 /* have binutils bfd.h */
 #undef HAVE_BFD_H
 
+/* Define to 1 if you have the `chown' function. */
+#undef HAVE_CHOWN
+
 /* Define to 1 if you have the `clock_gettime' function. */
 #undef HAVE_CLOCK_GETTIME
 
@@ -63,6 +66,9 @@
 
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #undef HAVE_DLFCN_H
+
+/* Define to 1 if you have the `explicit_bzero' function. */
+#undef HAVE_EXPLICIT_BZERO
 
 /* Define to 1 if you have the `fmemopen' function. */
 #undef HAVE_FMEMOPEN
@@ -331,7 +337,7 @@
 /* use TCTI Sockets */
 #undef TSS2_TCTI_SOCKET
 
-/* use TCTI Access Broker and Resource Mamager */
+/* use TCTI Access Broker and Resource Manager */
 #undef TSS2_TCTI_TABRMD
 
 /* use TrouSerS library libtspi */

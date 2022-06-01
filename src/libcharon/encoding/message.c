@@ -78,9 +78,9 @@ typedef struct {
 	/* Payload type */
 	 payload_type_t type;
 	/* Minimal occurrence of this payload. */
-	size_t min_occurence;
+	size_t min_occurrence;
 	/* Max occurrence of this payload. */
-	size_t max_occurence;
+	size_t max_occurrence;
 	/* TRUE if payload must be encrypted */
 	bool encrypted;
 	/* If payload occurs, the message rule is fulfilled */
@@ -1653,7 +1653,7 @@ static ike_header_t *create_header(private_message_t *this)
 /**
  * Generates the message, if needed, wraps the payloads in an encrypted payload.
  *
- * The generator and the possible enrypted payload are returned.  The latter
+ * The generator and the possible encrypted payload are returned.  The latter
  * is not yet encrypted (but the transform is set).  It is also not added to
  * the payload list (so unless there are unencrypted payloads that list will
  * be empty afterwards).
@@ -1744,12 +1744,25 @@ static status_t generate_message(private_message_t *this, keymat_t *keymat,
 	{
 		aead = keymat->get_aead(keymat, FALSE);
 	}
-	if (aead && encrypting)
+	if (encrypting)
 	{
-		*encrypted = wrap_payloads(this);
-		(*encrypted)->set_transform(*encrypted, aead);
+		if (aead)
+		{
+			*encrypted = wrap_payloads(this);
+			(*encrypted)->set_transform(*encrypted, aead);
+		}
+		else if (this->exchange_type == INFORMATIONAL ||
+				 this->exchange_type == INFORMATIONAL_V1)
+		{	/* allow sending unencrypted INFORMATIONALs */
+			encrypting = FALSE;
+		}
+		else
+		{
+			DBG1(DBG_ENC, "unable to encrypt payloads without AEAD transform");
+			return FAILED;
+		}
 	}
-	else
+	if (!encrypting)
 	{
 		DBG2(DBG_ENC, "not encrypting payloads");
 		this->is_encrypted = FALSE;
@@ -2587,11 +2600,11 @@ static status_t verify(private_message_t *this)
 				found++;
 				DBG2(DBG_ENC, "found payload of type %N",
 					 payload_type_names, type);
-				if (found > rule->max_occurence)
+				if (found > rule->max_occurrence)
 				{
 					DBG1(DBG_ENC, "payload of type %N more than %d times (%d) "
 						 "occurred in current message", payload_type_names,
-						 type, rule->max_occurence, found);
+						 type, rule->max_occurrence, found);
 					enumerator->destroy(enumerator);
 					return VERIFY_ERROR;
 				}
@@ -2599,10 +2612,10 @@ static status_t verify(private_message_t *this)
 		}
 		enumerator->destroy(enumerator);
 
-		if (!complete && found < rule->min_occurence)
+		if (!complete && found < rule->min_occurrence)
 		{
 			DBG1(DBG_ENC, "payload of type %N not occurred %d times (%d)",
-				 payload_type_names, rule->type, rule->min_occurence, found);
+				 payload_type_names, rule->type, rule->min_occurrence, found);
 			return VERIFY_ERROR;
 		}
 		if (found && rule->sufficient)

@@ -117,6 +117,7 @@ am_exchange_tests_OBJECTS =  \
 	suites/exchange_tests-test_ike_delete.$(OBJEXT) \
 	suites/exchange_tests-test_ike_mid_sync.$(OBJEXT) \
 	suites/exchange_tests-test_ike_rekey.$(OBJEXT) \
+	suites/exchange_tests-test_childless.$(OBJEXT) \
 	utils/exchange_tests-exchange_test_asserts.$(OBJEXT) \
 	utils/exchange_tests-exchange_test_helper.$(OBJEXT) \
 	utils/exchange_tests-mock_dh.$(OBJEXT) \
@@ -270,9 +271,11 @@ ECHO_T = @ECHO_T@
 EGREP = @EGREP@
 EXEEXT = @EXEEXT@
 FGREP = @FGREP@
+FUZZING_CFLAGS = @FUZZING_CFLAGS@
 FUZZING_LDFLAGS = @FUZZING_LDFLAGS@
 GEM = @GEM@
 GENHTML = @GENHTML@
+GIT_VERSION = @GIT_VERSION@
 GPERF = @GPERF@
 GPERF_LEN_TYPE = @GPERF_LEN_TYPE@
 GPRBUILD = @GPRBUILD@
@@ -342,6 +345,7 @@ SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 SOCKLIB = @SOCKLIB@
 STRIP = @STRIP@
+TOX = @TOX@
 UNWINDLIB = @UNWINDLIB@
 VERSION = @VERSION@
 YACC = @YACC@
@@ -377,6 +381,8 @@ clearsilver_LIBS = @clearsilver_LIBS@
 cmd_plugins = @cmd_plugins@
 datadir = @datadir@
 datarootdir = @datarootdir@
+dbusdatadir = @dbusdatadir@
+dbuspolicydir = @dbuspolicydir@
 dev_headers = @dev_headers@
 docdir = @docdir@
 dvidir = @dvidir@
@@ -474,6 +480,8 @@ tss2_sys_LIBS = @tss2_sys_LIBS@
 tss2_tabrmd_CFLAGS = @tss2_tabrmd_CFLAGS@
 tss2_tabrmd_LIBS = @tss2_tabrmd_LIBS@
 urandom_device = @urandom_device@
+wolfssl_CFLAGS = @wolfssl_CFLAGS@
+wolfssl_LIBS = @wolfssl_LIBS@
 xml_CFLAGS = @xml_CFLAGS@
 xml_LIBS = @xml_LIBS@
 libcharon_tests_SOURCES = \
@@ -504,6 +512,7 @@ exchange_tests_SOURCES = \
   suites/test_ike_delete.c \
   suites/test_ike_mid_sync.c \
   suites/test_ike_rekey.c \
+  suites/test_childless.c \
   utils/exchange_test_asserts.h utils/exchange_test_asserts.c \
   utils/exchange_test_helper.h utils/exchange_test_helper.c \
   utils/job_asserts.h \
@@ -589,6 +598,8 @@ suites/exchange_tests-test_ike_mid_sync.$(OBJEXT):  \
 	suites/$(am__dirstamp) suites/$(DEPDIR)/$(am__dirstamp)
 suites/exchange_tests-test_ike_rekey.$(OBJEXT):  \
 	suites/$(am__dirstamp) suites/$(DEPDIR)/$(am__dirstamp)
+suites/exchange_tests-test_childless.$(OBJEXT):  \
+	suites/$(am__dirstamp) suites/$(DEPDIR)/$(am__dirstamp)
 utils/$(am__dirstamp):
 	@$(MKDIR_P) utils
 	@: > utils/$(am__dirstamp)
@@ -639,6 +650,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@suites/$(DEPDIR)/exchange_tests-test_child_create.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@suites/$(DEPDIR)/exchange_tests-test_child_delete.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@suites/$(DEPDIR)/exchange_tests-test_child_rekey.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@suites/$(DEPDIR)/exchange_tests-test_childless.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@suites/$(DEPDIR)/exchange_tests-test_ike_delete.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@suites/$(DEPDIR)/exchange_tests-test_ike_mid_sync.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@suites/$(DEPDIR)/exchange_tests-test_ike_rekey.Po@am__quote@
@@ -761,6 +773,20 @@ suites/exchange_tests-test_ike_rekey.obj: suites/test_ike_rekey.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='suites/test_ike_rekey.c' object='suites/exchange_tests-test_ike_rekey.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(exchange_tests_CFLAGS) $(CFLAGS) -c -o suites/exchange_tests-test_ike_rekey.obj `if test -f 'suites/test_ike_rekey.c'; then $(CYGPATH_W) 'suites/test_ike_rekey.c'; else $(CYGPATH_W) '$(srcdir)/suites/test_ike_rekey.c'; fi`
+
+suites/exchange_tests-test_childless.o: suites/test_childless.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(exchange_tests_CFLAGS) $(CFLAGS) -MT suites/exchange_tests-test_childless.o -MD -MP -MF suites/$(DEPDIR)/exchange_tests-test_childless.Tpo -c -o suites/exchange_tests-test_childless.o `test -f 'suites/test_childless.c' || echo '$(srcdir)/'`suites/test_childless.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) suites/$(DEPDIR)/exchange_tests-test_childless.Tpo suites/$(DEPDIR)/exchange_tests-test_childless.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='suites/test_childless.c' object='suites/exchange_tests-test_childless.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(exchange_tests_CFLAGS) $(CFLAGS) -c -o suites/exchange_tests-test_childless.o `test -f 'suites/test_childless.c' || echo '$(srcdir)/'`suites/test_childless.c
+
+suites/exchange_tests-test_childless.obj: suites/test_childless.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(exchange_tests_CFLAGS) $(CFLAGS) -MT suites/exchange_tests-test_childless.obj -MD -MP -MF suites/$(DEPDIR)/exchange_tests-test_childless.Tpo -c -o suites/exchange_tests-test_childless.obj `if test -f 'suites/test_childless.c'; then $(CYGPATH_W) 'suites/test_childless.c'; else $(CYGPATH_W) '$(srcdir)/suites/test_childless.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) suites/$(DEPDIR)/exchange_tests-test_childless.Tpo suites/$(DEPDIR)/exchange_tests-test_childless.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='suites/test_childless.c' object='suites/exchange_tests-test_childless.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(exchange_tests_CFLAGS) $(CFLAGS) -c -o suites/exchange_tests-test_childless.obj `if test -f 'suites/test_childless.c'; then $(CYGPATH_W) 'suites/test_childless.c'; else $(CYGPATH_W) '$(srcdir)/suites/test_childless.c'; fi`
 
 utils/exchange_tests-exchange_test_asserts.o: utils/exchange_test_asserts.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(exchange_tests_CFLAGS) $(CFLAGS) -MT utils/exchange_tests-exchange_test_asserts.o -MD -MP -MF utils/$(DEPDIR)/exchange_tests-exchange_test_asserts.Tpo -c -o utils/exchange_tests-exchange_test_asserts.o `test -f 'utils/exchange_test_asserts.c' || echo '$(srcdir)/'`utils/exchange_test_asserts.c

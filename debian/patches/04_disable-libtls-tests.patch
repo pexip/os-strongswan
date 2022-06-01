@@ -8,10 +8,10 @@ They're too intensive for the buildd network and cause FTBFS
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/src/libtls/Makefile.am b/src/libtls/Makefile.am
-index b649636..635be38 100644
+index 7319bd7..16f4492 100644
 --- a/src/libtls/Makefile.am
 +++ b/src/libtls/Makefile.am
-@@ -26,4 +26,4 @@ nobase_tls_include_HEADERS = \
+@@ -29,4 +29,4 @@ nobase_tls_include_HEADERS = \
  	tls_server.h tls_handshake.h tls_application.h tls_aead.h tls.h
  endif
  

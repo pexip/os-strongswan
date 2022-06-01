@@ -3,6 +3,7 @@ usr/lib/ipsec/libstrongswan.so*
 usr/lib/ipsec/plugins/libstrongswan-aes.so
 usr/lib/ipsec/plugins/libstrongswan-constraints.so
 usr/lib/ipsec/plugins/libstrongswan-dnskey.so
+usr/lib/ipsec/plugins/libstrongswan-drbg.so
 usr/lib/ipsec/plugins/libstrongswan-fips-prf.so
 usr/lib/ipsec/plugins/libstrongswan-gmp.so
 usr/lib/ipsec/plugins/libstrongswan-hmac.so
@@ -28,6 +29,7 @@ usr/lib/ipsec/plugins/libstrongswan-xcbc.so
 usr/share/strongswan/templates/config/plugins/aes.conf
 usr/share/strongswan/templates/config/plugins/constraints.conf
 usr/share/strongswan/templates/config/plugins/dnskey.conf
+usr/share/strongswan/templates/config/plugins/drbg.conf
 usr/share/strongswan/templates/config/plugins/fips-prf.conf
 usr/share/strongswan/templates/config/plugins/gmp.conf
 usr/share/strongswan/templates/config/plugins/hmac.conf
@@ -52,6 +54,7 @@ usr/share/strongswan/templates/config/plugins/xcbc.conf
 etc/strongswan.d/charon/aes.conf
 etc/strongswan.d/charon/constraints.conf
 etc/strongswan.d/charon/dnskey.conf
+etc/strongswan.d/charon/drbg.conf
 etc/strongswan.d/charon/fips-prf.conf
 etc/strongswan.d/charon/gmp.conf
 etc/strongswan.d/charon/hmac.conf
