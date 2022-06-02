@@ -1,3 +1,9 @@
+strongswan (5.9.1-1+deb11u2pexip1) pexip; urgency=medium
+
+  * Initial bullseye build
+
+ -- Mark Hymers <mark.hymers@pexip.com>  Thu, 02 Jun 2022 14:42:58 +0100
+
 strongswan (5.9.1-1+deb11u2) bullseye-security; urgency=medium
 
   * gbp: revert upstream branch name change
