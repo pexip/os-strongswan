@@ -1,3 +1,9 @@
+strongswan (5.9.1-1+deb11u2pexip3) pexip-bullseye; urgency=medium
+
+  * Bullseye rebuild for ARM64 inclusion
+
+ -- Mark Hymers <mark.hymers@pexip.com>  Mon, 05 Sep 2022 10:36:03 +0100
+
 strongswan (5.9.1-1+deb11u2pexip2) pexip-bullseye; urgency=medium
 
   * Main bullseye build
