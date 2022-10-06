@@ -1,3 +1,12 @@
+strongswan (5.9.1-1+deb11u3) bullseye-security; urgency=medium
+
+  * d/p/0009-credential-manager-Do-online-revocation-checks-only- added.
+    Fix CVE-2022-40617, denial of service due to revocation plugin
+    potentially using untrusted OCSP URIs and CRL distribution in
+    certificates (Closes: #1021271)
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Thu, 06 Oct 2022 09:36:12 +0200
+
 strongswan (5.9.1-1+deb11u2) bullseye-security; urgency=medium
 
   * gbp: revert upstream branch name change
