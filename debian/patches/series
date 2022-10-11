@@ -6,5 +6,6 @@ dont-load-kernel-libipsec-plugin-by-default.patch
 0006-cert-cache-Prevent-crash-due-to-integer-overflow-sig.patch
 0007-Reject-RSASSA-PSS-params-with-negative-salt-length.patch
 0008-eap-authenticator-Enforce-failure-if-MSK-generation-.patch
+0009-credential-manager-Do-online-revocation-checks-only-.patch
 pexip/01-ipsec-stop-with-old-pidfile.patch
 pexip/02_service_file_update.patch
