@@ -1,3 +1,9 @@
+strongswan (5.9.1-1+deb11u3pexip1) pexip; urgency=medium
+
+  * New upstream release.
+
+ -- Mark Hymers <mark.hymers@pexip.com>  Tue, 11 Oct 2022 11:18:40 +0100
+
 strongswan (5.9.1-1+deb11u3) bullseye-security; urgency=medium
 
   * d/p/0009-credential-manager-Do-online-revocation-checks-only- added.
