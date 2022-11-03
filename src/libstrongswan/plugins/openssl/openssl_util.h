@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2008 Tobias Brunner
- * HSR Hochschule fuer Technik Rapperswil
+ *
+ * Copyright (C) secunet Security Networks AG
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -35,6 +36,26 @@
  * Returns the length in bytes of a field element
  */
 #define EC_FIELD_ELEMENT_LEN(group) ((EC_GROUP_get_degree(group) + 7) / 8)
+
+/**
+ * Derives a shared DH secret from the given keys.
+ *
+ * @param priv		private key
+ * @param pub		public key
+ * @param shared	shared secret
+ * @return			TRUE on success, FALSE otherwise
+ */
+bool openssl_compute_shared_key(EVP_PKEY *priv, EVP_PKEY *pub, chunk_t *shared);
+
+/**
+ * Calculate a fingerprint from the given key (cached under it).
+ *
+ * @param key		key object
+ * @param type		encoding type
+ * @param fp		allocated fingerprint
+ * @return			TRUE on success, FALSE otherwise
+ */
+bool openssl_fingerprint(EVP_PKEY *key, cred_encoding_type_t type, chunk_t *fp);
 
 /**
  * Creates a hash of a given type of a chunk of data.
@@ -91,9 +112,14 @@ bool openssl_bn2chunk(const BIGNUM *bn, chunk_t *chunk);
  * @returns			allocated chunk of the object, or chunk_empty
  */
 #define openssl_i2chunk(type, obj) ({ \
-					unsigned char *ptr = NULL; \
-					int len = i2d_##type(obj, &ptr); \
-					len < 0 ? chunk_empty : chunk_create(ptr, len);})
+					chunk_t chunk = chunk_empty; \
+					int len = i2d_##type(obj, NULL); \
+					if (len >= 0) { \
+						chunk = chunk_alloc(len); \
+						u_char *p = chunk.ptr; \
+						i2d_##type(obj, &p); \
+					} \
+					chunk; })
 
 /**
  * Convert an OpenSSL ASN1_OBJECT to a chunk.
@@ -138,8 +164,13 @@ time_t openssl_asn1_to_time(const ASN1_TIME *time);
 /**
  * Compatibility macros
  */
-#ifdef OPENSSL_IS_BORINGSSL
+#if defined(OPENSSL_IS_BORINGSSL) && \
+	(!defined(BORINGSSL_API_VERSION) || BORINGSSL_API_VERSION < 10)
 #define EVP_PKEY_base_id(p) EVP_PKEY_type(p->type)
+#endif
+
+#ifndef OPENSSL_INIT_ENGINE_ALL_BUILTIN
+#define OPENSSL_INIT_ENGINE_ALL_BUILTIN 0
 #endif
 
 /**

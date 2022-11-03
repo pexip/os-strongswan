@@ -10,6 +10,7 @@ usr/lib/ipsec/plugins/libstrongswan-eap-tls.so
 usr/lib/ipsec/plugins/libstrongswan-eap-tnc.so
 usr/lib/ipsec/plugins/libstrongswan-eap-ttls.so
 usr/lib/ipsec/plugins/libstrongswan-error-notify.so
+usr/lib/ipsec/plugins/libstrongswan-forecast.so
 usr/lib/ipsec/plugins/libstrongswan-ha.so
 usr/lib/ipsec/plugins/libstrongswan-kernel-libipsec.so
 usr/lib/ipsec/plugins/libstrongswan-led.so
@@ -32,6 +33,7 @@ usr/share/strongswan/templates/config/plugins/eap-tls.conf
 usr/share/strongswan/templates/config/plugins/eap-tnc.conf
 usr/share/strongswan/templates/config/plugins/eap-ttls.conf
 usr/share/strongswan/templates/config/plugins/error-notify.conf
+usr/share/strongswan/templates/config/plugins/forecast.conf
 usr/share/strongswan/templates/config/plugins/ha.conf
 usr/share/strongswan/templates/config/plugins/kernel-libipsec.conf
 usr/share/strongswan/templates/config/plugins/led.conf
@@ -55,6 +57,7 @@ etc/strongswan.d/charon/eap-tls.conf
 etc/strongswan.d/charon/eap-tnc.conf
 etc/strongswan.d/charon/eap-ttls.conf
 etc/strongswan.d/charon/error-notify.conf
+etc/strongswan.d/charon/forecast.conf
 etc/strongswan.d/charon/ha.conf
 etc/strongswan.d/charon/kernel-libipsec.conf
 etc/strongswan.d/charon/led.conf

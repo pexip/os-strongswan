@@ -23,6 +23,7 @@ CONFIGUREARGS := --libdir=/usr/lib --libexecdir=/usr/lib \
 		--enable-eap-tnc \
 		--enable-eap-ttls \
 		--enable-error-notify \
+		--enable-forecast \
 		--enable-gcm \
 		--enable-gcrypt \
 		--enable-ha \
@@ -35,6 +36,7 @@ CONFIGUREARGS := --libdir=/usr/lib --libexecdir=/usr/lib \
 		--enable-pkcs11 \
 		--enable-test-vectors \
 		--enable-tpm \
+		--enable-tss-tss2 \
 		--enable-unity \
 		--enable-xauth-eap \
 		--enable-xauth-pam \

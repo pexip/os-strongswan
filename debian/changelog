@@ -1,29 +1,69 @@
-strongswan (5.9.1-1+deb11u3) bullseye-security; urgency=medium
+strongswan (5.9.8-3) unstable; urgency=medium
 
-  * d/p/0009-credential-manager-Do-online-revocation-checks-only- added.
-    Fix CVE-2022-40617, denial of service due to revocation plugin
-    potentially using untrusted OCSP URIs and CRL distribution in
-    certificates (Closes: #1021271)
+  * d/tests: also drop _copyright test since the util is gone as well
 
- -- Yves-Alexis Perez <corsac@debian.org>  Thu, 06 Oct 2022 09:36:12 +0200
+ -- Yves-Alexis Perez <corsac@debian.org>  Thu, 03 Nov 2022 18:17:42 +0100
 
-strongswan (5.9.1-1+deb11u2) bullseye-security; urgency=medium
+strongswan (5.9.8-2) unstable; urgency=medium
 
-  * gbp: revert upstream branch name change
-  * eap-authenticator: Enforce failure if MSK generation fails
-    - Fix incorrect handling of Early EAP-Success Messages (CVE-2021-45079)
+  * d/tests: remove scepclient tests since it's gone (Closes: #1023224)
 
- -- Yves-Alexis Perez <corsac@debian.org>  Fri, 21 Jan 2022 15:55:38 +0100
+ -- Yves-Alexis Perez <corsac@debian.org>  Thu, 03 Nov 2022 13:05:27 +0100
 
-strongswan (5.9.1-1+deb11u1) bullseye-security; urgency=medium
+strongswan (5.9.8-1) unstable; urgency=medium
 
-  * Reject RSASSA-PSS params with negative salt length
-    - fix remote denial of service (CVE-2021-41990)
-  * Prevent crash due to integer overflow / sign change
-    - fix remote denial of service (CVE-2021-41991)
-  * d/gpp.conf: track bullseye branches
+  * New upstream version 5.9.8
+    - Includes fix for  CVE-2022-40617, denial of service due to the
+    revocation plugin potentially using untrusted OCSP URIs and CRL
+    distribution points in CRLs. (closes: #1021271)
+  * Remove strongswan-scepclient package, replaced by a pki(1) command
+  * d/p/0006-fix-format-string-issue-in-enum_flags_to_string dropped, included
+    upstream
+  * remove dropped _copyright utility
+  * d/strongswan-pki.install: install est/estca manpages (RFC 7070)
+  * d/s-{started,swanctl}.lintian-overrides updated for new lintian
+  * d/copyright updated for new upstream release
 
- -- Yves-Alexis Perez <corsac@debian.org>  Thu, 14 Oct 2021 22:36:24 +0200
+ -- Yves-Alexis Perez <corsac@debian.org>  Wed, 05 Oct 2022 15:25:18 +0200
+
+strongswan (5.9.6-1) unstable; urgency=medium
+
+  * New upstream version 5.9.6
+  * d/p/0006-fix-format-string-issue-in-enum_flags_to_string added
+  * d/libstrongswan.install: install kdf plugin in libstrongswan
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Sat, 07 May 2022 20:19:18 +0200
+
+strongswan (5.9.5-2) unstable; urgency=medium
+
+  * actually fix lintian overrides
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Wed, 26 Jan 2022 16:29:17 +0100
+
+strongswan (5.9.5-1) unstable; urgency=medium
+
+  * New upstream version 5.9.5
+    - eap-authenticator: Enforce failure if MSK generation fails
+      Fix incorrect handling of Early EAP-Success Messages (CVE-2021-45079)
+  * update lintian overrides to match RUNPATH
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Wed, 26 Jan 2022 14:38:54 +0100
+
+strongswan (5.9.4-1) unstable; urgency=medium
+
+  [ Paride Legovini ]
+  * tpm plugin: compile against the tpm2 software stack (tss2)
+    (Closes: #994396, Ubuntu#1940079)
+
+  [ Yves-Alexis Perez ]
+  * New upstream version 5.9.4
+  * d/patches rebased against new upstream
+  * Enable forecast plugin (Closes: #943457)
+  * update lintian overrides for new lintian
+  * d/control: update standards version to 4.6.0
+  * d/s-starter.postrm: use which to check for command existence
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Tue, 19 Oct 2021 22:34:40 +0200
 
 strongswan (5.9.1-1) unstable; urgency=medium
 

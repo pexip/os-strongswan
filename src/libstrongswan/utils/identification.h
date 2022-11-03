@@ -2,7 +2,8 @@
  * Copyright (C) 2009-2015 Tobias Brunner
  * Copyright (C) 2005-2009 Martin Willi
  * Copyright (C) 2005 Jan Hutter
- * HSR Hochschule fuer Technik Rapperswil
+ *
+ * Copyright (C) secunet Security Networks AG
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -183,9 +184,9 @@ enum id_part_t {
 	/** OrganizationUnit RDN of a DN */
 	ID_PART_RDN_OU,
 	/** Surname RDN of a DN */
-	ID_PART_RDN_S,
-	/** SerialNumber RDN of a DN */
 	ID_PART_RDN_SN,
+	/** SerialNumber RDN of a DN */
+	ID_PART_RDN_SERIAL_NUMBER,
 	/** StateOrProvince RDN of a DN */
 	ID_PART_RDN_ST,
 	/** Title RDN of a DN */
@@ -299,7 +300,7 @@ struct identification_t {
  * - ID_RFC822_ADDR:	alice@wonderland.org
  * - ID_DER_ASN1_DN:	C=CH, O=Linux strongSwan, CN=bob
  *
- * In favour of pluto, domainnames are prepended with an @, since
+ * In favor of pluto, domainnames are prepended with an @, since
  * pluto resolves domainnames without an @ to IPv4 addresses. Since
  * we use a separate host_t class for addresses, this doesn't
  * make sense for us.

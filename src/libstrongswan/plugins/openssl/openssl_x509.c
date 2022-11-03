@@ -1,9 +1,8 @@
 /*
  * Copyright (C) 2011-2017 Tobias Brunner
- * HSR Hochschule fuer Technik Rapperswil
- *
  * Copyright (C) 2010 Martin Willi
- * Copyright (C) 2010 revosec AG
+ *
+ * Copyright (C) secunet Security Networks AG
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -20,7 +19,6 @@
  * Copyright (C) 2013 Michael Rossberg
  * Copyright (C) 2013 Technische Universität Ilmenau
  *
- * Copyright (C) 2010 secunet Security Networks AG
  * Copyright (C) 2010 Thomas Egerer
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -391,6 +389,7 @@ METHOD(certificate_t, issued_by, bool,
 	public_key_t *key;
 	bool valid;
 	x509_t *x509 = (x509_t*)issuer;
+	chunk_t keyid = chunk_empty;
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
 	const ASN1_BIT_STRING *sig;
 #else
@@ -417,10 +416,24 @@ METHOD(certificate_t, issued_by, bool,
 			return FALSE;
 		}
 	}
-	if (!this->issuer->equals(this->issuer, issuer->get_subject(issuer)))
+
+	/* compare keyIdentifiers if available, otherwise use DNs */
+	if (this->authKeyIdentifier.ptr)
 	{
-		return FALSE;
+		keyid = x509->get_subjectKeyIdentifier(x509);
+		if (keyid.len && !chunk_equals(keyid, this->authKeyIdentifier))
+		{
+			return FALSE;
+		}
 	}
+	if (!keyid.len)
+	{
+		if (!this->issuer->equals(this->issuer, issuer->get_subject(issuer)))
+		{
+			return FALSE;
+		}
+	}
+
 	key = issuer->get_public_key(issuer);
 	if (!key)
 	{

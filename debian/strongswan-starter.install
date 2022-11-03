@@ -2,7 +2,6 @@
 usr/lib/ipsec/starter
 usr/share/strongswan/templates/config/strongswan.d/starter.conf
 etc/strongswan.d/starter.conf
-usr/lib/ipsec/_copyright
 usr/sbin/ipsec
 etc/ipsec.d
 etc/ipsec.conf

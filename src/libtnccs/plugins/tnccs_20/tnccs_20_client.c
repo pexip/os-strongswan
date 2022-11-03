@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2015 Andreas Steffen
- * HSR Hochschule fuer Technik Rapperswil
+ *
+ * Copyright (C) secunet Security Networks AG
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -209,7 +210,7 @@ static void change_batch_type(private_tnccs_20_client_t *this,
 	{
 		if (this->batch_type != PB_BATCH_NONE)
 		{
-			DBG1(DBG_TNC, "cancelling PB-TNC %N batch",
+			DBG1(DBG_TNC, "canceling PB-TNC %N batch",
 				 pb_tnc_batch_type_names, this->batch_type);
 
 			while (this->messages->remove_last(this->messages,

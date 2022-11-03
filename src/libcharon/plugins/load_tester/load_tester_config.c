@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2008 Martin Willi
- * HSR Hochschule fuer Technik Rapperswil
+ *
+ * Copyright (C) secunet Security Networks AG
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -624,7 +625,7 @@ static void add_ts(private_load_tester_config_t *this,
 /**
  * Allocate and install a dynamic external address to use
  */
-static host_t *allocate_addr(private_load_tester_config_t *this, uint num)
+static host_t *allocate_addr(private_load_tester_config_t *this, u_int num)
 {
 	enumerator_t *enumerator;
 	mem_pool_t *pool;
@@ -682,7 +683,7 @@ static host_t *allocate_addr(private_load_tester_config_t *this, uint num)
 /**
  * Generate a new initiator config, num = 0 for responder config
  */
-static peer_cfg_t* generate_config(private_load_tester_config_t *this, uint num)
+static peer_cfg_t* generate_config(private_load_tester_config_t *this, u_int num)
 {
 	ike_cfg_t *ike_cfg;
 	child_cfg_t *child_cfg;

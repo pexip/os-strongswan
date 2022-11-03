@@ -1,9 +1,8 @@
 /*
  * Copyright (C) 2011-2015 Tobias Brunner
- * HSR Hochschule fuer Technik Rapperswil
- *
  * Copyright (C) 2010 Martin Willi
- * Copyright (C) 2010 revosec AG
+ *
+ * Copyright (C) secunet Security Networks AG
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -307,7 +306,7 @@ METHOD(public_key_t, verify, bool,
 
 METHOD(public_key_t, encrypt, bool,
 	private_pkcs11_public_key_t *this, encryption_scheme_t scheme,
-	chunk_t plain, chunk_t *crypt)
+	void *params, chunk_t plain, chunk_t *crypt)
 {
 	CK_MECHANISM_PTR mechanism;
 	CK_SESSION_HANDLE session;
@@ -431,7 +430,7 @@ static bool fingerprint_ecdsa(private_pkcs11_public_key_t *this,
 	}
 	hasher->destroy(hasher);
 	chunk_clear(&asn1);
-	lib->encoding->cache(lib->encoding, type, this, *fp);
+	lib->encoding->cache(lib->encoding, type, this, fp);
 	return TRUE;
 }
 
@@ -888,7 +887,8 @@ static private_pkcs11_public_key_t *find_key_by_keyid(pkcs11_library_t *p11,
 
 	enumerator = p11->create_object_enumerator(p11, session, tmpl, count, attr,
 											   countof(attr));
-	if (enumerator->enumerate(enumerator, &object))
+	if (enumerator->enumerate(enumerator, &object) &&
+		attr[0].ulValueLen != CK_UNAVAILABLE_INFORMATION)
 	{
 		switch (type)
 		{

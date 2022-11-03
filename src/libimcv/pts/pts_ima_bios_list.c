@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2011-2020 Andreas Steffen
- * HSR Hochschule fuer Technik Rapperswil
+ *
+ * Copyright (C) secunet Security Networks AG
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -297,7 +298,7 @@ pts_ima_bios_list_t* pts_ima_bios_list_create(tpm_tss_t *tpm, char *file,
 			case EV_S_CRTM_CONTENTS:
 			case EV_IPL:
 				if (event_type == EV_NO_ACTION && event_len == 17 &&
-					streq(event_buf, "StartupLocality"))
+					strpfx(event_buf, "StartupLocality"))
 				{
 					DBG2(DBG_PTS, "        'StartupLocality' %x", event_buf[16]);
 				}

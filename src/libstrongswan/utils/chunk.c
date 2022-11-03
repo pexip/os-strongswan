@@ -2,7 +2,8 @@
  * Copyright (C) 2008-2019 Tobias Brunner
  * Copyright (C) 2005-2006 Martin Willi
  * Copyright (C) 2005 Jan Hutter
- * HSR Hochschule fuer Technik Rapperswil
+ *
+ * Copyright (C) secunet Security Networks AG
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -396,9 +397,9 @@ chunk_t *chunk_map(char *path, bool wr)
 }
 
 /**
- * See header.
+ * Unmap the given chunk and optionally clear it
  */
-bool chunk_unmap(chunk_t *public)
+static bool chunk_unmap_internal(chunk_t *public, bool clear)
 {
 	mmaped_chunk_t *chunk;
 	bool ret = FALSE;
@@ -408,6 +409,10 @@ bool chunk_unmap(chunk_t *public)
 #ifdef HAVE_MMAP
 	if (chunk->map && chunk->map != MAP_FAILED)
 	{
+		if (!chunk->wr && clear)
+		{
+			memwipe(chunk->map, chunk->len);
+		}
 		ret = munmap(chunk->map, chunk->len) == 0;
 		tmp = errno;
 	}
@@ -436,6 +441,10 @@ bool chunk_unmap(chunk_t *public)
 	{
 		ret = TRUE;
 	}
+	if (clear)
+	{
+		memwipe(chunk->map, chunk->len);
+	}
 	free(chunk->map);
 #endif /* !HAVE_MMAP */
 	close(chunk->fd);
@@ -443,6 +452,22 @@ bool chunk_unmap(chunk_t *public)
 	errno = tmp;
 
 	return ret;
+}
+
+/*
+ * Described in header
+ */
+bool chunk_unmap(chunk_t *public)
+{
+	return chunk_unmap_internal(public, FALSE);
+}
+
+/*
+ * Described in header
+ */
+bool chunk_unmap_clear(chunk_t *public)
+{
+	return chunk_unmap_internal(public, TRUE);
 }
 
 /** hex conversion digits */

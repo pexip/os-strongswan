@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2013 Martin Willi
- * Copyright (C) 2013 revosec AG
+ *
+ * Copyright (C) secunet Security Networks AG
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -133,16 +134,6 @@ const char WINAPI *inet_ntop(int af, const void *src, char *dst, socklen_t size)
 #ifndef InetPton
 int WINAPI inet_pton(int af, const char *src, void *dst);
 #endif
-
-/**
- * Provided by printf hook backend
- */
-int asprintf(char **strp, const char *fmt, ...);
-
-/**
- * Provided by printf hook backend
- */
-int vasprintf(char **strp, const char *fmt, va_list ap);
 
 /**
  * timeradd(3) from <sys/time.h>
