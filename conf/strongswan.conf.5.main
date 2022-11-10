@@ -52,7 +52,8 @@ SonicWall boxes).
 
 .TP
 .BR charon.block_threshold " [5]"
-Maximum number of half\-open IKE_SAs for a single peer IP.
+Maximum number of half\-open IKE_SAs (including unprocessed IKE_SA_INITs) for a
+single peer IP.
 
 .TP
 .BR charon.cache_crls " [no]"
@@ -97,8 +98,14 @@ Send Cisco Unity vendor ID payload (IKEv1 only).
 Close the IKE_SA if setup of the CHILD_SA along with IKE_AUTH failed.
 
 .TP
-.BR charon.cookie_threshold " [10]"
-Number of half\-open IKE_SAs that activate the cookie mechanism.
+.BR charon.cookie_threshold " [30]"
+Number of half\-open IKE_SAs (including unprocessed IKE_SA_INITs) that activate
+the cookie mechanism.
+
+.TP
+.BR charon.cookie_threshold_ip " [3]"
+Number of half\-open IKE_SAs (including unprocessed IKE_SA_INITs) for a single
+peer IP that activate the cookie  mechanism.
 
 .TP
 .BR charon.crypto_test.bench " [no]"
@@ -167,10 +174,6 @@ DNS server assigned to peer via configuration payload (CP).
 .TP
 .BR charon.dos_protection " [yes]"
 Enable Denial of Service protection using cookies and aggressiveness checks.
-
-.TP
-.BR charon.ecp_x_coordinate_only " [yes]"
-Compliance with the errata for RFC 4753.
 
 .TP
 .B charon.filelog
@@ -454,12 +457,17 @@ WINS servers assigned to peer via configuration payload (CP).
 WINS servers assigned to peer via configuration payload (CP).
 
 .TP
-.BR charon.plugin.ha.buflen " [2048]"
-Buffer size for received HA messages. For IKEv1 the public DH factors are also
-transmitted so depending on the DH group the HA messages can get quite big (the
-default should be fine up to
-.RI "" "modp4096" ")."
+.BR charon.plugins.addrblock.depth " [-1]"
+RFC3779 requires that all addrblocks claimed by a certificate must be contained
+in the addrblock extension of the issuer certificate, up to the root CA. The
+default depth setting of \-1 enforces this.
 
+In practice, third party (root) CAs may not contain the extension, making the
+addrblock extension unusable under such CAs. By limiting the validation depth,
+only a certain level of issuer certificates are validated for proper addrblock
+extensions: A depth of 0 does not check any issuer certificate extensions, a
+depth of 1 only the direct issuer of the end entity certificate is checkend, and
+so on.
 
 .TP
 .BR charon.plugins.addrblock.strict " [yes]"
@@ -512,6 +520,12 @@ Enable logging of SQL IP pool leases.
 .TP
 .BR charon.plugins.bliss.use_bliss_b " [yes]"
 Use the enhanced BLISS\-B key generation and signature algorithm.
+
+.TP
+.BR charon.plugins.botan.internal_rng_only " [no]"
+If enabled, only Botan's internal RNG will be used throughout the plugin.
+Otherwise, and if supported by Botan, rng_t implementations provided by other
+loaded plugins will be used as RNG.
 
 .TP
 .BR charon.plugins.bypass-lan.interfaces_ignore " []"
@@ -1008,6 +1022,14 @@ Interval in seconds to automatically balance handled segments between nodes. Set
 to 0 to disable.
 
 .TP
+.BR charon.plugins.ha.buflen " [2048]"
+Buffer size for received HA messages. For IKEv1 the public DH factors are also
+transmitted so depending on the DH group the HA messages can get quite big (the
+default should be fine up to
+.RI "" "modp4096" ")."
+
+
+.TP
 .BR charon.plugins.ha.fifo_interface " [yes]"
 .TP
 .BR charon.plugins.ha.heartbeat_delay " [1000]"
@@ -1194,6 +1216,10 @@ traffic selector is located, the external interface is the one over which the
 destination address of the IPsec tunnel can be reached. This is not relevant if
 virtual IPs are used, for which a TUN device is created that's used in the
 routes.
+
+.TP
+.BR charon.plugins.kernel-pfroute.mtu " [1400]"
+MTU to set on TUN devices created for virtual IPs.
 
 .TP
 .BR charon.plugins.kernel-pfroute.vip_wait " [1000]"
@@ -1407,7 +1433,19 @@ ENGINE ID to use in the OpenSSL plugin.
 
 .TP
 .BR charon.plugins.openssl.fips_mode " [0]"
-Set OpenSSL FIPS mode: disabled(0), enabled(1), Suite B enabled(2).
+Set OpenSSL FIPS mode.  With OpenSSL before 3.0, the supported values are
+disabled(0), enabled(1) and Suite B enabled(2).  With OpenSSL 3+, any value
+other than 0 will explicitly load the fips and base providers 
+.RI "(" "load_legacy" ""
+will be ignored). The latter still requires the config in fipsmodule.cnf (e.g.
+for the module's MAC), but allows explicitly loading the provider if it's not
+activated in that config.
+
+.TP
+.BR charon.plugins.openssl.load_legacy " [yes]"
+Load the legacy provider in OpenSSL 3+ for algorithms like MD4, DES, or Blowfish
+(the first two are required for EAP\-MSCHAPv2). If disabled, the default provider
+is loaded, or those configured in the OpenSSL config (e.g. the fips provider).
 
 .TP
 .BR charon.plugins.osx-attr.append " [yes]"
@@ -1734,6 +1772,11 @@ Send an unsupported PB\-TNC message type with the NOSKIP flag set.
 Send a PB\-TNC batch with a modified PB\-TNC version.
 
 .TP
+.BR charon.plugins.tpm.ek_handle " []"
+Handle of the RSA or ECC Endorsement Key (EK) to be used to set up an
+authenticated session with a TPM 2.0 (e.g. 0x81010001).
+
+.TP
 .BR charon.plugins.tpm.fips_186_4 " [no]"
 Is the TPM 2.0 FIPS\-186\-4 compliant, forcing e.g. the use of the default salt
 length instead of maximum salt length with RSAPSS padding.
@@ -1766,7 +1809,10 @@ and no options otherwise.
 
 .TP
 .BR charon.plugins.tpm.use_rng " [no]"
-Whether the TPM should be used as RNG.
+Whether the TPM should be used as RNG. For security reasons enable only if an
+authenticated session can be set up (see
+.RI "" "ek_handle" ""
+option).
 
 .TP
 .BR charon.plugins.unbound.dlv_anchors " []"
@@ -2071,6 +2117,15 @@ for each IKE_SA.
 Add the log level of each message after the subsystem (e.g. [IKE2]).
 
 .TP
+.BR charon.syslog.<facility>.map_level " [-1]"
+The default setting of \-1 passes all messages to syslog using a log level of
+LOG_INFO. A non\-negative value maps the strongSwan specific loglevels (0..4) to
+the syslog level starting at the specified number. For example, a value of 5
+(LOG_NOTICE) maps strongSwan loglevel 0 to LOG_NOTICE, level 1 to LOG_INFO, and
+levels 2, 3 and 4 to LOG_DEBUG. This allows (additional) filtering of log
+messages on the syslog server.
+
+.TP
 .BR charon.syslog.identifier " []"
 Global identifier used for an
 .RB "" "openlog" "(3)"
@@ -2093,6 +2148,10 @@ might be used as indicator on the number of reserved threads.
 List of TLS encryption ciphers.
 
 .TP
+.BR charon.tls.ke_group " []"
+List of TLS key exchange groups.
+
+.TP
 .BR charon.tls.key_exchange " []"
 List of TLS key exchange methods.
 
@@ -2101,8 +2160,25 @@ List of TLS key exchange methods.
 List of TLS MAC algorithms.
 
 .TP
+.BR charon.tls.send_certreq_authorities " [yes]"
+Whether to include CAs in a server's CertificateRequest message. May be disabled
+if clients can't handle a long list of CAs.
+
+.TP
+.BR charon.tls.signature " []"
+List of TLS signature schemes.
+
+.TP
 .BR charon.tls.suites " []"
 List of TLS cipher suites.
+
+.TP
+.BR charon.tls.version_max " [1.2]"
+Maximum TLS version to negotiate.
+
+.TP
+.BR charon.tls.version_min " [1.2]"
+Minimum TLS version to negotiate.
 
 .TP
 .BR charon.tnc.tnc_config " [/etc/tnc_config]"
@@ -2222,6 +2298,10 @@ Dummy measurement value extended into PCR17 if the TBOOT log is not available.
 .TP
 .BR libimcv.plugins.imc-attestation.pcr_info " [no]"
 Whether to send pcr_before and pcr_after info.
+
+.TP
+.BR libimcv.plugins.imc-attestation.pcr_padding " [no]"
+Whether to pad IMA SHA1 measurements values when extending into SHA256 PCR bank.
 
 .TP
 .BR libimcv.plugins.imc-attestation.use_quote2 " [yes]"

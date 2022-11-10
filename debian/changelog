@@ -1,3 +1,42 @@
+strongswan (5.9.6-1) unstable; urgency=medium
+
+  * New upstream version 5.9.6
+  * d/p/0006-fix-format-string-issue-in-enum_flags_to_string added
+  * d/libstrongswan.install: install kdf plugin in libstrongswan
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Sat, 07 May 2022 20:19:18 +0200
+
+strongswan (5.9.5-2) unstable; urgency=medium
+
+  * actually fix lintian overrides
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Wed, 26 Jan 2022 16:29:17 +0100
+
+strongswan (5.9.5-1) unstable; urgency=medium
+
+  * New upstream version 5.9.5
+    - eap-authenticator: Enforce failure if MSK generation fails
+      Fix incorrect handling of Early EAP-Success Messages (CVE-2021-45079)
+  * update lintian overrides to match RUNPATH
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Wed, 26 Jan 2022 14:38:54 +0100
+
+strongswan (5.9.4-1) unstable; urgency=medium
+
+  [ Paride Legovini ]
+  * tpm plugin: compile against the tpm2 software stack (tss2)
+    (Closes: #994396, Ubuntu#1940079)
+
+  [ Yves-Alexis Perez ]
+  * New upstream version 5.9.4
+  * d/patches rebased against new upstream
+  * Enable forecast plugin (Closes: #943457)
+  * update lintian overrides for new lintian
+  * d/control: update standards version to 4.6.0
+  * d/s-starter.postrm: use which to check for command existence
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Tue, 19 Oct 2021 22:34:40 +0200
+
 strongswan (5.9.1-1+deb11u3pexip1) pexip; urgency=medium
 
   * New upstream release.

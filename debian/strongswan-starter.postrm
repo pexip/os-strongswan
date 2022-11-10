@@ -32,7 +32,7 @@ esac
 
 if [ "$1" = "purge" ] ; then
         if getent passwd strongswan>/dev/null; then
-                if [ -x /usr/sbin/deluser ]; then
+                if which deluser > /dev/null; then
                         deluser --system strongswan
                 fi
         fi

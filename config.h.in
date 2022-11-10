@@ -42,6 +42,9 @@
 /* have binutils bfd.h */
 #undef HAVE_BFD_H
 
+/* Define to 1 if you have the `botan_rng_init_custom' function. */
+#undef HAVE_BOTAN_RNG_INIT_CUSTOM
+
 /* Define to 1 if you have the `chown' function. */
 #undef HAVE_CHOWN
 
@@ -53,6 +56,30 @@
 
 /* pthread_condattr_setclock supports CLOCK_MONOTONIC */
 #undef HAVE_CONDATTR_CLOCK_MONOTONIC
+
+/* Define to 1 if you have the declaration of `bfd_get_section_flags', and to
+   0 if you don't. */
+#undef HAVE_DECL_BFD_GET_SECTION_FLAGS
+
+/* Define to 1 if you have the declaration of `bfd_get_section_size', and to 0
+   if you don't. */
+#undef HAVE_DECL_BFD_GET_SECTION_SIZE
+
+/* Define to 1 if you have the declaration of `bfd_get_section_vma', and to 0
+   if you don't. */
+#undef HAVE_DECL_BFD_GET_SECTION_VMA
+
+/* Define to 1 if you have the declaration of `bfd_section_flags', and to 0 if
+   you don't. */
+#undef HAVE_DECL_BFD_SECTION_FLAGS
+
+/* Define to 1 if you have the declaration of `bfd_section_size', and to 0 if
+   you don't. */
+#undef HAVE_DECL_BFD_SECTION_SIZE
+
+/* Define to 1 if you have the declaration of `bfd_section_vma', and to 0 if
+   you don't. */
+#undef HAVE_DECL_BFD_SECTION_VMA
 
 /* Define to 1 if you have the declaration of `strerror_r', and to 0 if you
    don't. */
@@ -132,6 +159,9 @@
 
 /* Define to 1 if you have the `mallinfo' function. */
 #undef HAVE_MALLINFO
+
+/* Define to 1 if you have the `mallinfo2' function. */
+#undef HAVE_MALLINFO2
 
 /* Define to 1 if you have the <memory.h> header file. */
 #undef HAVE_MEMORY_H
@@ -363,6 +393,9 @@
 
 /* build code for JSON */
 #undef USE_JSON
+
+/* build with support for SELinux */
+#undef USE_SELINUX
 
 /* use thread ID for thread identification, if available */
 #undef USE_THREAD_IDS

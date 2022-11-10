@@ -4,7 +4,7 @@ Priority: optional
 Maintainer: Pexip AS <packaging@pexip.com>
 XSBC-Pexip-Original-Maintainer: strongSwan Maintainers <pkg-swan-devel@lists.alioth.debian.org>
 XSBC-Pexip-Original-Uploaders: Yves-Alexis Perez <corsac@debian.org>
-Standards-Version: 4.5.0
+Standards-Version: 4.6.0
 Vcs-Browser: https://salsa.debian.org/debian/strongswan
 Vcs-Git: https://salsa.debian.org/debian/strongswan.git
 Build-Depends: bison,
@@ -27,6 +27,7 @@ Build-Depends: bison,
                libssl-dev (>= 3),
                libsystemd-dev [linux-any],
                libtool,
+               libtss2-dev,
                libxml2-dev,
                pkg-config,
                po-debconf,
