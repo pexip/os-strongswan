@@ -1,4 +1,4 @@
-strongswan (5.9.6-1pexip1) pexip; urgency=medium
+strongswan (5.9.6-1pexip1) pexip-bullseye-openssl3; urgency=medium
 
   * New upstream release
 
