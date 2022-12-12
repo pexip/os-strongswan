@@ -1,3 +1,9 @@
+strongswan (5.9.6-1pexip2) pexip-bullseye-openssl3; urgency=medium
+
+  * Disable TPM plugin
+
+ -- John-Mark Bell <jmb@pexip.com>  Mon, 12 Dec 2022 19:00:19 +0000
+
 strongswan (5.9.6-1pexip1) pexip-bullseye-openssl3; urgency=medium
 
   * New upstream release
