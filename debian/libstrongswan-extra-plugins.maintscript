@@ -1,0 +1,1 @@
+rm_conffile /etc/strongswan.d/charon/tpm.conf 5.9.6-1pexip4~ libstrongswan-extra-plugins
