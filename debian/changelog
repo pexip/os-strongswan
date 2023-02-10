@@ -1,3 +1,9 @@
+strongswan (5.9.6-1pexip4) pexip; urgency=medium
+
+  * libstrongswan-extra-plugins.maintscript: remove tpm.conf on upgrade
+
+ -- John-Mark Bell <jmb@pexip.com>  Fri, 10 Feb 2023 12:00:19 +0000
+
 strongswan (5.9.6-1pexip3) pexip; urgency=medium
 
   * Merge openssl3 changes to bullseye
