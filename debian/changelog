@@ -1,3 +1,18 @@
+strongswan (5.9.8-5) unstable; urgency=medium
+
+  * No-change upload for source-only upload.
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Fri, 03 Mar 2023 18:56:58 +0100
+
+strongswan (5.9.8-4) unstable; urgency=medium
+
+  * d/patches: libtls-Fix-authentication-bypass-and-expired-pointer added.
+    Fix authentication bypass and use-after-free in libtls (CVE-2023-26463)
+  * d/control: replace lsb-base dependency by sysvinit-utils
+  * d/control: update standards version to 4.6.2
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Sun, 26 Feb 2023 09:40:09 +0100
+
 strongswan (5.9.8-3) unstable; urgency=medium
 
   * d/tests: also drop _copyright test since the util is gone as well
