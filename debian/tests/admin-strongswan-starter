@@ -4,8 +4,6 @@
 #---------------------------
 CMDS="
 /usr/bin/pki
-/usr/lib/ipsec/_copyright
-/usr/lib/ipsec/scepclient
 /usr/lib/ipsec/stroke
 /usr/sbin/ipsec
 "

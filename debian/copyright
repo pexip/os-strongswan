@@ -65,12 +65,6 @@ Copyright: 2013, revosec aG
   2013, Martin Willi
 License: GPL-2+
 
-Files: src/_copyright/*
-Copyright: 2001, Henry Spencer
-  , reporter
-  , 1999-2013"
-License: GPL-2+
-
 Files: src/aikgen/*
 Copyright: 2014, Andreas Steffen
   2008, Hal Finney
@@ -1390,14 +1384,6 @@ Copyright: 2010-2015, revosec AG
   2006-2015, Martin Willi
 License: GPL-2+
 
-Files: src/libstrongswan/crypto/diffie_hellman.c
-  src/libstrongswan/crypto/diffie_hellman.h
-  src/libstrongswan/crypto/mac.h
-Copyright: 2007-2015, Tobias Brunner
-  2005-2011, Martin Willi
-  2005, Jan Hutter
-License: GPL-2+
-
 Files: src/libstrongswan/crypto/hashers/*
 Copyright: 2007-2015, Tobias Brunner
   2005, Jan Hutter
@@ -2427,11 +2413,6 @@ License: GPL-2+
 Files: src/pt-tls-client/*
 Copyright: 2013-2015, Andreas Steffen
   2010-2013, Martin Willi, revosec AG
-License: GPL-2+
-
-Files: src/scepclient/*
-Copyright: 2012, Tobias Brunner
-  2005, Jan Hutter, Martin Willi
 License: GPL-2+
 
 Files: src/starter/*

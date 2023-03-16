@@ -1,8 +1,8 @@
-/* A Bison parser, made by GNU Bison 3.5.1.  */
+/* A Bison parser, made by GNU Bison 3.8.2.  */
 
 /* Bison interface for Yacc-like parsers in C
 
-   Copyright (C) 1984, 1989-1990, 2000-2015, 2018-2020 Free Software Foundation,
+   Copyright (C) 1984, 1989-1990, 2000-2015, 2018-2021 Free Software Foundation,
    Inc.
 
    This program is free software: you can redistribute it and/or modify
@@ -16,7 +16,7 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
+   along with this program.  If not, see <https://www.gnu.org/licenses/>.  */
 
 /* As a special exception, you may create a larger work that contains
    part or all of the Bison parser skeleton and distribute that work
@@ -31,8 +31,9 @@
    This special exception was added by the Free Software Foundation in
    version 2.2 of Bison.  */
 
-/* Undocumented macros, especially those whose name start with YY_,
-   are private implementation details.  Do not rely on them.  */
+/* DO NOT RELY ON FEATURES THAT ARE NOT DOCUMENTED in the manual,
+   especially those whose name start with YY_ or yy_.  They are
+   private implementation details that can be changed or removed.  */
 
 #ifndef YY_SETTINGS_PARSER_SETTINGS_SETTINGS_PARSER_H_INCLUDED
 # define YY_SETTINGS_PARSER_SETTINGS_SETTINGS_PARSER_H_INCLUDED
@@ -52,21 +53,30 @@
 extern int settings_parser_debug;
 #endif
 
-/* Token type.  */
+/* Token kinds.  */
 #ifndef SETTINGS_PARSER_TOKENTYPE
 # define SETTINGS_PARSER_TOKENTYPE
   enum settings_parser_tokentype
   {
-    NAME = 258,
-    STRING = 259,
-    DOT = 260,
-    COMMA = 261,
-    COLON = 262,
-    NEWLINE = 263,
-    STRING_ERROR = 264
+    SETTINGS_PARSER_EMPTY = -2,
+    SETTINGS_PARSER_EOF = 0,       /* "end of file"  */
+    SETTINGS_PARSER_error = 256,   /* error  */
+    SETTINGS_PARSER_UNDEF = 257,   /* "invalid token"  */
+    NAME = 258,                    /* NAME  */
+    STRING = 259,                  /* STRING  */
+    DOT = 260,                     /* "."  */
+    COMMA = 261,                   /* ","  */
+    COLON = 262,                   /* ":"  */
+    NEWLINE = 263,                 /* NEWLINE  */
+    STRING_ERROR = 264             /* STRING_ERROR  */
   };
+  typedef enum settings_parser_tokentype settings_parser_token_kind_t;
 #endif
-/* Tokens.  */
+/* Token kinds.  */
+#define SETTINGS_PARSER_EMPTY -2
+#define SETTINGS_PARSER_EOF 0
+#define SETTINGS_PARSER_error 256
+#define SETTINGS_PARSER_UNDEF 257
 #define NAME 258
 #define STRING 259
 #define DOT 260
@@ -79,14 +89,14 @@ extern int settings_parser_debug;
 #if ! defined SETTINGS_PARSER_STYPE && ! defined SETTINGS_PARSER_STYPE_IS_DECLARED
 union SETTINGS_PARSER_STYPE
 {
-#line 85 "settings/settings_parser.y"
+#line 86 "settings/settings_parser.y"
 
 	char *s;
 	struct section_t *sec;
 	struct kv_t *kv;
 	array_t *refs;
 
-#line 90 "settings/settings_parser.h"
+#line 100 "settings/settings_parser.h"
 
 };
 typedef union SETTINGS_PARSER_STYPE SETTINGS_PARSER_STYPE;
@@ -96,14 +106,16 @@ typedef union SETTINGS_PARSER_STYPE SETTINGS_PARSER_STYPE;
 
 
 
+
 int settings_parser_parse (parser_helper_t *ctx);
+
 /* "%code provides" blocks.  */
-#line 74 "settings/settings_parser.y"
+#line 75 "settings/settings_parser.y"
 
 	#define YY_DECL \
 		int settings_parser_lex(SETTINGS_PARSER_STYPE *yylval, void *yyscanner)
 	YY_DECL;
 
-#line 108 "settings/settings_parser.h"
+#line 120 "settings/settings_parser.h"
 
 #endif /* !YY_SETTINGS_PARSER_SETTINGS_SETTINGS_PARSER_H_INCLUDED  */

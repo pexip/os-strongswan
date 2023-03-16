@@ -33,7 +33,8 @@
 
 /*
  * Copyright (C) 2006 Andreas Steffen
- * HSR Hochschule fuer Technik Rapperswil
+ *
+ * Copyright (C) secunet Security Networks AG
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -50,7 +51,7 @@
 
 #include "stroke_keywords.h"
 
-#line 22 "./stroke_keywords.txt"
+#line 23 "./stroke_keywords.txt"
 struct stroke_token {
     char *name;
     stroke_keyword_t kw;
@@ -125,101 +126,101 @@ hash (register const char *str, register size_t len)
 
 static const struct stroke_token wordlist[] =
   {
-#line 27 "./stroke_keywords.txt"
-    {"add",             STROKE_ADD},
 #line 28 "./stroke_keywords.txt"
-    {"del",             STROKE_DEL},
-#line 34 "./stroke_keywords.txt"
-    {"down",            STROKE_DOWN},
-#line 55 "./stroke_keywords.txt"
-    {"listall",         STROKE_LIST_ALL},
-#line 51 "./stroke_keywords.txt"
-    {"listcrls",        STROKE_LIST_CRLS},
-#line 32 "./stroke_keywords.txt"
-    {"up",              STROKE_UP},
-#line 47 "./stroke_keywords.txt"
-    {"listaacerts",     STROKE_LIST_AACERTS},
-#line 45 "./stroke_keywords.txt"
-    {"listcacerts",     STROKE_LIST_CACERTS},
-#line 37 "./stroke_keywords.txt"
-    {"rekey",           STROKE_REKEY},
-#line 62 "./stroke_keywords.txt"
-    {"rereadall",       STROKE_REREAD_ALL},
-#line 44 "./stroke_keywords.txt"
-    {"listcerts",       STROKE_LIST_CERTS},
-#line 61 "./stroke_keywords.txt"
-    {"rereadcrls",      STROKE_REREAD_CRLS},
-#line 60 "./stroke_keywords.txt"
-    {"rereadacerts",    STROKE_REREAD_ACERTS},
-#line 59 "./stroke_keywords.txt"
-    {"rereadaacerts",   STROKE_REREAD_AACERTS},
-#line 57 "./stroke_keywords.txt"
-    {"rereadcacerts",   STROKE_REREAD_CACERTS},
-#line 70 "./stroke_keywords.txt"
-    {"leases",          STROKE_LEASES},
-#line 73 "./stroke_keywords.txt"
-    {"listcounters",    STROKE_COUNTERS},
+    {"add",             STROKE_ADD},
 #line 29 "./stroke_keywords.txt"
-    {"delete",          STROKE_DELETE},
-#line 39 "./stroke_keywords.txt"
-    {"status",          STROKE_STATUS},
-#line 48 "./stroke_keywords.txt"
-    {"listacerts",      STROKE_LIST_ACERTS},
-#line 30 "./stroke_keywords.txt"
-    {"route",           STROKE_ROUTE},
-#line 40 "./stroke_keywords.txt"
-    {"statusall",       STROKE_STATUSALL},
-#line 56 "./stroke_keywords.txt"
-    {"rereadsecrets",   STROKE_REREAD_SECRETS},
-#line 41 "./stroke_keywords.txt"
-    {"statusallnb",     STROKE_STATUSALL_NOBLK},
-#line 42 "./stroke_keywords.txt"
-    {"statusall-nb",    STROKE_STATUSALL_NOBLK},
-#line 53 "./stroke_keywords.txt"
-    {"listalgs",        STROKE_LIST_ALGS},
-#line 33 "./stroke_keywords.txt"
-    {"up-nb",           STROKE_UP_NOBLK},
-#line 67 "./stroke_keywords.txt"
-    {"exportx509",      STROKE_EXPORT_X509},
-#line 54 "./stroke_keywords.txt"
-    {"listplugins",     STROKE_LIST_PLUGINS},
-#line 50 "./stroke_keywords.txt"
-    {"listcainfos",     STROKE_LIST_CAINFOS},
-#line 68 "./stroke_keywords.txt"
-    {"exportconncert",  STROKE_EXPORT_CONN_CERT},
-#line 69 "./stroke_keywords.txt"
-    {"exportconnchain", STROKE_EXPORT_CONN_CHAIN},
-#line 38 "./stroke_keywords.txt"
-    {"loglevel",        STROKE_LOGLEVEL},
-#line 63 "./stroke_keywords.txt"
-    {"purgeocsp",       STROKE_PURGE_OCSP},
-#line 31 "./stroke_keywords.txt"
-    {"unroute",         STROKE_UNROUTE},
-#line 52 "./stroke_keywords.txt"
-    {"listocsp",        STROKE_LIST_OCSP},
-#line 36 "./stroke_keywords.txt"
-    {"down-srcip",      STROKE_DOWN_SRCIP},
-#line 43 "./stroke_keywords.txt"
-    {"listpubkeys",     STROKE_LIST_PUBKEYS},
-#line 64 "./stroke_keywords.txt"
-    {"purgecrls",       STROKE_PURGE_CRLS},
-#line 58 "./stroke_keywords.txt"
-    {"rereadocspcerts", STROKE_REREAD_OCSPCERTS},
-#line 46 "./stroke_keywords.txt"
-    {"listocspcerts",   STROKE_LIST_OCSPCERTS},
-#line 71 "./stroke_keywords.txt"
-    {"memusage",        STROKE_MEMUSAGE},
-#line 66 "./stroke_keywords.txt"
-    {"purgeike",        STROKE_PURGE_IKE},
-#line 72 "./stroke_keywords.txt"
-    {"user-creds",      STROKE_USER_CREDS},
+    {"del",             STROKE_DEL},
 #line 35 "./stroke_keywords.txt"
-    {"down-nb",         STROKE_DOWN_NOBLK},
-#line 65 "./stroke_keywords.txt"
-    {"purgecerts",      STROKE_PURGE_CERTS},
-#line 49 "./stroke_keywords.txt"
-    {"listgroups",      STROKE_LIST_GROUPS},
+    {"down",            STROKE_DOWN},
+#line 56 "./stroke_keywords.txt"
+    {"listall",         STROKE_LIST_ALL},
+#line 52 "./stroke_keywords.txt"
+    {"listcrls",        STROKE_LIST_CRLS},
+#line 33 "./stroke_keywords.txt"
+    {"up",              STROKE_UP},
+#line 48 "./stroke_keywords.txt"
+    {"listaacerts",     STROKE_LIST_AACERTS},
+#line 46 "./stroke_keywords.txt"
+    {"listcacerts",     STROKE_LIST_CACERTS},
+#line 38 "./stroke_keywords.txt"
+    {"rekey",           STROKE_REKEY},
+#line 63 "./stroke_keywords.txt"
+    {"rereadall",       STROKE_REREAD_ALL},
+#line 45 "./stroke_keywords.txt"
+    {"listcerts",       STROKE_LIST_CERTS},
+#line 62 "./stroke_keywords.txt"
+    {"rereadcrls",      STROKE_REREAD_CRLS},
+#line 61 "./stroke_keywords.txt"
+    {"rereadacerts",    STROKE_REREAD_ACERTS},
+#line 60 "./stroke_keywords.txt"
+    {"rereadaacerts",   STROKE_REREAD_AACERTS},
+#line 58 "./stroke_keywords.txt"
+    {"rereadcacerts",   STROKE_REREAD_CACERTS},
+#line 71 "./stroke_keywords.txt"
+    {"leases",          STROKE_LEASES},
 #line 74 "./stroke_keywords.txt"
+    {"listcounters",    STROKE_COUNTERS},
+#line 30 "./stroke_keywords.txt"
+    {"delete",          STROKE_DELETE},
+#line 40 "./stroke_keywords.txt"
+    {"status",          STROKE_STATUS},
+#line 49 "./stroke_keywords.txt"
+    {"listacerts",      STROKE_LIST_ACERTS},
+#line 31 "./stroke_keywords.txt"
+    {"route",           STROKE_ROUTE},
+#line 41 "./stroke_keywords.txt"
+    {"statusall",       STROKE_STATUSALL},
+#line 57 "./stroke_keywords.txt"
+    {"rereadsecrets",   STROKE_REREAD_SECRETS},
+#line 42 "./stroke_keywords.txt"
+    {"statusallnb",     STROKE_STATUSALL_NOBLK},
+#line 43 "./stroke_keywords.txt"
+    {"statusall-nb",    STROKE_STATUSALL_NOBLK},
+#line 54 "./stroke_keywords.txt"
+    {"listalgs",        STROKE_LIST_ALGS},
+#line 34 "./stroke_keywords.txt"
+    {"up-nb",           STROKE_UP_NOBLK},
+#line 68 "./stroke_keywords.txt"
+    {"exportx509",      STROKE_EXPORT_X509},
+#line 55 "./stroke_keywords.txt"
+    {"listplugins",     STROKE_LIST_PLUGINS},
+#line 51 "./stroke_keywords.txt"
+    {"listcainfos",     STROKE_LIST_CAINFOS},
+#line 69 "./stroke_keywords.txt"
+    {"exportconncert",  STROKE_EXPORT_CONN_CERT},
+#line 70 "./stroke_keywords.txt"
+    {"exportconnchain", STROKE_EXPORT_CONN_CHAIN},
+#line 39 "./stroke_keywords.txt"
+    {"loglevel",        STROKE_LOGLEVEL},
+#line 64 "./stroke_keywords.txt"
+    {"purgeocsp",       STROKE_PURGE_OCSP},
+#line 32 "./stroke_keywords.txt"
+    {"unroute",         STROKE_UNROUTE},
+#line 53 "./stroke_keywords.txt"
+    {"listocsp",        STROKE_LIST_OCSP},
+#line 37 "./stroke_keywords.txt"
+    {"down-srcip",      STROKE_DOWN_SRCIP},
+#line 44 "./stroke_keywords.txt"
+    {"listpubkeys",     STROKE_LIST_PUBKEYS},
+#line 65 "./stroke_keywords.txt"
+    {"purgecrls",       STROKE_PURGE_CRLS},
+#line 59 "./stroke_keywords.txt"
+    {"rereadocspcerts", STROKE_REREAD_OCSPCERTS},
+#line 47 "./stroke_keywords.txt"
+    {"listocspcerts",   STROKE_LIST_OCSPCERTS},
+#line 72 "./stroke_keywords.txt"
+    {"memusage",        STROKE_MEMUSAGE},
+#line 67 "./stroke_keywords.txt"
+    {"purgeike",        STROKE_PURGE_IKE},
+#line 73 "./stroke_keywords.txt"
+    {"user-creds",      STROKE_USER_CREDS},
+#line 36 "./stroke_keywords.txt"
+    {"down-nb",         STROKE_DOWN_NOBLK},
+#line 66 "./stroke_keywords.txt"
+    {"purgecerts",      STROKE_PURGE_CERTS},
+#line 50 "./stroke_keywords.txt"
+    {"listgroups",      STROKE_LIST_GROUPS},
+#line 75 "./stroke_keywords.txt"
     {"resetcounters",   STROKE_COUNTERS_RESET}
   };
 

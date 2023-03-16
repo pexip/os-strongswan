@@ -836,10 +836,10 @@ static const flex_int32_t yy_rule_can_match_eol[40] =
 
 static const flex_int16_t yy_rule_linenum[39] =
     {   0,
-       71,   72,   73,   75,   76,   78,   79,   81,   86,   91,
-       96,  101,  107,  108,  109,  111,  113,  118,  125,  126,
-      128,  149,  155,  162,  165,  185,  188,  191,  194,  200,
-      201,  203,  223,  224,  225,  226,  227,  228
+       72,   73,   74,   76,   77,   79,   80,   82,   87,   92,
+       97,  102,  108,  109,  110,  112,  114,  119,  126,  127,
+      129,  150,  156,  163,  166,  186,  189,  192,  195,  201,
+      202,  204,  224,  225,  226,  227,  228,  229
     } ;
 
 /* The intent behind this definition is that it'll catch
@@ -853,7 +853,8 @@ static const flex_int16_t yy_rule_linenum[39] =
 #line 2 "settings/settings_lexer.l"
 /*
  * Copyright (C) 2014-2018 Tobias Brunner
- * HSR Hochschule fuer Technik Rapperswil
+ *
+ * Copyright (C) secunet Security Networks AG
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -874,7 +875,7 @@ bool settings_parser_open_next_file(parser_helper_t *ctx);
 
 static void include_files(parser_helper_t *ctx);
 
-#line 878 "settings/settings_lexer.c"
+#line 879 "settings/settings_lexer.c"
 /* use start conditions stack */
 /* do not declare unneeded functions */
 #define YY_NO_INPUT 1
@@ -896,7 +897,7 @@ static void include_files(parser_helper_t *ctx);
 /* state used to scan quoted strings */
 
 /* pattern for section/key names */
-#line 900 "settings/settings_lexer.c"
+#line 901 "settings/settings_lexer.c"
 
 #define INITIAL 0
 #define ref 1
@@ -1231,10 +1232,10 @@ YY_DECL
 
 	{
 /* %% [7.0] user's declarations go here */
-#line 69 "settings/settings_lexer.l"
+#line 70 "settings/settings_lexer.l"
 
 
-#line 1238 "settings/settings_lexer.c"
+#line 1239 "settings/settings_lexer.c"
 
 	while ( /*CONSTCOND*/1 )		/* loops until end-of-file is reached */
 		{
@@ -1324,40 +1325,40 @@ do_action:	/* This label is used only to access EOF actions. */
 
 case 1:
 YY_RULE_SETUP
-#line 71 "settings/settings_lexer.l"
+#line 72 "settings/settings_lexer.l"
 /* eat comments */
 	YY_BREAK
 case 2:
 YY_RULE_SETUP
-#line 72 "settings/settings_lexer.l"
+#line 73 "settings/settings_lexer.l"
 /* eat whitespace */
 	YY_BREAK
 case 3:
 /* rule 3 can match eol */
 YY_RULE_SETUP
-#line 73 "settings/settings_lexer.l"
+#line 74 "settings/settings_lexer.l"
 /* eat newlines and comments at the end of a line */
 	YY_BREAK
 case 4:
-#line 76 "settings/settings_lexer.l"
+#line 77 "settings/settings_lexer.l"
 case 5:
 YY_RULE_SETUP
-#line 76 "settings/settings_lexer.l"
+#line 77 "settings/settings_lexer.l"
 return yytext[0];
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 78 "settings/settings_lexer.l"
+#line 79 "settings/settings_lexer.l"
 return DOT;
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 79 "settings/settings_lexer.l"
+#line 80 "settings/settings_lexer.l"
 return COMMA;
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 81 "settings/settings_lexer.l"
+#line 82 "settings/settings_lexer.l"
 {
 	yy_push_state(ref, yyscanner);
 	return COLON;
@@ -1365,7 +1366,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
-#line 86 "settings/settings_lexer.l"
+#line 87 "settings/settings_lexer.l"
 {
 	yy_push_state(val, yyscanner);
 	return yytext[0];
@@ -1378,7 +1379,7 @@ YY_LINENO_REWIND_TO(yy_cp - 1);
 yyg->yy_c_buf_p = yy_cp -= 1;
 YY_DO_BEFORE_ACTION; /* set up yytext again */
 YY_RULE_SETUP
-#line 91 "settings/settings_lexer.l"
+#line 92 "settings/settings_lexer.l"
 {
 	yyextra->string_init(yyextra);
 	yy_push_state(inc, yyscanner);
@@ -1386,7 +1387,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 96 "settings/settings_lexer.l"
+#line 97 "settings/settings_lexer.l"
 {
 	PARSER_DBG1(yyextra, "unexpected string detected");
 	return STRING_ERROR;
@@ -1394,7 +1395,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 101 "settings/settings_lexer.l"
+#line 102 "settings/settings_lexer.l"
 {
 	yylval->s = strdup(yytext);
 	return NAME;
@@ -1403,28 +1404,28 @@ YY_RULE_SETUP
 
 case 13:
 YY_RULE_SETUP
-#line 107 "settings/settings_lexer.l"
+#line 108 "settings/settings_lexer.l"
 /* eat comments */
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-#line 108 "settings/settings_lexer.l"
+#line 109 "settings/settings_lexer.l"
 /* eat whitespace */
 	YY_BREAK
 case 15:
 /* rule 15 can match eol */
 YY_RULE_SETUP
-#line 109 "settings/settings_lexer.l"
+#line 110 "settings/settings_lexer.l"
 /* eat newlines and comments at the end of a line */
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 111 "settings/settings_lexer.l"
+#line 112 "settings/settings_lexer.l"
 return COMMA;
 	YY_BREAK
 case 17:
 YY_RULE_SETUP
-#line 113 "settings/settings_lexer.l"
+#line 114 "settings/settings_lexer.l"
 {
 		yylval->s = strdup(yytext);
 		return NAME;
@@ -1432,7 +1433,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 18:
 YY_RULE_SETUP
-#line 118 "settings/settings_lexer.l"
+#line 119 "settings/settings_lexer.l"
 {
 		unput(yytext[0]);
 		yy_pop_state(yyscanner);
@@ -1442,20 +1443,20 @@ YY_RULE_SETUP
 
 case 19:
 YY_RULE_SETUP
-#line 125 "settings/settings_lexer.l"
+#line 126 "settings/settings_lexer.l"
 /* just ignore these */
 	YY_BREAK
 case 20:
 YY_RULE_SETUP
-#line 126 "settings/settings_lexer.l"
+#line 127 "settings/settings_lexer.l"
 
 	YY_BREAK
 case YY_STATE_EOF(val):
-#line 127 "settings/settings_lexer.l"
+#line 128 "settings/settings_lexer.l"
 case 21:
 /* rule 21 can match eol */
 YY_RULE_SETUP
-#line 128 "settings/settings_lexer.l"
+#line 129 "settings/settings_lexer.l"
 {
 		if (*yytext)
 		{
@@ -1479,7 +1480,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 22:
 YY_RULE_SETUP
-#line 149 "settings/settings_lexer.l"
+#line 150 "settings/settings_lexer.l"
 {
 		yyextra->string_init(yyextra);
 		yy_push_state(str, yyscanner);
@@ -1488,7 +1489,7 @@ YY_RULE_SETUP
 /* same as above, but allow more characters */
 case 23:
 YY_RULE_SETUP
-#line 155 "settings/settings_lexer.l"
+#line 156 "settings/settings_lexer.l"
 {
 		yylval->s = strdup(yytext);
 		return NAME;
@@ -1498,16 +1499,16 @@ YY_RULE_SETUP
 
 case 24:
 YY_RULE_SETUP
-#line 162 "settings/settings_lexer.l"
+#line 163 "settings/settings_lexer.l"
 /* just ignore these */
 	YY_BREAK
 /* we allow all characters except #, } and spaces, they can be escaped */
 case YY_STATE_EOF(inc):
-#line 164 "settings/settings_lexer.l"
+#line 165 "settings/settings_lexer.l"
 case 25:
 /* rule 25 can match eol */
 YY_RULE_SETUP
-#line 165 "settings/settings_lexer.l"
+#line 166 "settings/settings_lexer.l"
 {
 		if (*yytext)
 		{
@@ -1531,28 +1532,28 @@ YY_RULE_SETUP
 	YY_BREAK
 case 26:
 YY_RULE_SETUP
-#line 185 "settings/settings_lexer.l"
+#line 186 "settings/settings_lexer.l"
 {	/* string include */
 		yy_push_state(str, yyscanner);
 	}
 	YY_BREAK
 case 27:
 YY_RULE_SETUP
-#line 188 "settings/settings_lexer.l"
+#line 189 "settings/settings_lexer.l"
 {
 		yyextra->string_add(yyextra, yytext);
 	}
 	YY_BREAK
 case 28:
 YY_RULE_SETUP
-#line 191 "settings/settings_lexer.l"
+#line 192 "settings/settings_lexer.l"
 {
 		yyextra->string_add(yyextra, yytext+1);
 	}
 	YY_BREAK
 case 29:
 YY_RULE_SETUP
-#line 194 "settings/settings_lexer.l"
+#line 195 "settings/settings_lexer.l"
 {
 		yyextra->string_add(yyextra, yytext);
 	}
@@ -1561,17 +1562,17 @@ YY_RULE_SETUP
 
 case 30:
 YY_RULE_SETUP
-#line 200 "settings/settings_lexer.l"
+#line 201 "settings/settings_lexer.l"
 /* just ignore these */
 	YY_BREAK
 case 31:
-#line 202 "settings/settings_lexer.l"
+#line 203 "settings/settings_lexer.l"
 YY_RULE_SETUP
 case YY_STATE_EOF(str):
-#line 202 "settings/settings_lexer.l"
+#line 203 "settings/settings_lexer.l"
 case 32:
 YY_RULE_SETUP
-#line 203 "settings/settings_lexer.l"
+#line 204 "settings/settings_lexer.l"
 {
 		if (!streq(yytext, "\""))
 		{
@@ -1594,34 +1595,34 @@ YY_RULE_SETUP
 	YY_BREAK
 case 33:
 YY_RULE_SETUP
-#line 223 "settings/settings_lexer.l"
+#line 224 "settings/settings_lexer.l"
 yyextra->string_add(yyextra, "\n");
 	YY_BREAK
 case 34:
 YY_RULE_SETUP
-#line 224 "settings/settings_lexer.l"
+#line 225 "settings/settings_lexer.l"
 yyextra->string_add(yyextra, "\r");
 	YY_BREAK
 case 35:
 YY_RULE_SETUP
-#line 225 "settings/settings_lexer.l"
+#line 226 "settings/settings_lexer.l"
 yyextra->string_add(yyextra, "\t");
 	YY_BREAK
 case 36:
 /* rule 36 can match eol */
 YY_RULE_SETUP
-#line 226 "settings/settings_lexer.l"
+#line 227 "settings/settings_lexer.l"
 /* merge lines that end with escaped EOL characters */
 	YY_BREAK
 case 37:
 YY_RULE_SETUP
-#line 227 "settings/settings_lexer.l"
+#line 228 "settings/settings_lexer.l"
 yyextra->string_add(yyextra, yytext+1);
 	YY_BREAK
 case 38:
 /* rule 38 can match eol */
 YY_RULE_SETUP
-#line 228 "settings/settings_lexer.l"
+#line 229 "settings/settings_lexer.l"
 {
 		yyextra->string_add(yyextra, yytext);
 	}
@@ -1629,7 +1630,7 @@ YY_RULE_SETUP
 
 case YY_STATE_EOF(INITIAL):
 case YY_STATE_EOF(ref):
-#line 233 "settings/settings_lexer.l"
+#line 234 "settings/settings_lexer.l"
 {
 	settings_parser_pop_buffer_state(yyscanner);
 	if (!settings_parser_open_next_file(yyextra) && !YY_CURRENT_BUFFER)
@@ -1640,10 +1641,10 @@ case YY_STATE_EOF(ref):
 	YY_BREAK
 case 39:
 YY_RULE_SETUP
-#line 241 "settings/settings_lexer.l"
+#line 242 "settings/settings_lexer.l"
 YY_FATAL_ERROR( "flex scanner jammed" );
 	YY_BREAK
-#line 1647 "settings/settings_lexer.c"
+#line 1648 "settings/settings_lexer.c"
 
 	case YY_END_OF_BUFFER:
 		{
@@ -3021,7 +3022,7 @@ void yyfree (void * ptr , yyscan_t yyscanner)
 
 /* %ok-for-header */
 
-#line 241 "settings/settings_lexer.l"
+#line 242 "settings/settings_lexer.l"
 
 
 /**

@@ -1,8 +1,8 @@
-/* A Bison parser, made by GNU Bison 3.5.1.  */
+/* A Bison parser, made by GNU Bison 3.8.2.  */
 
 /* Bison interface for Yacc-like parsers in C
 
-   Copyright (C) 1984, 1989-1990, 2000-2015, 2018-2020 Free Software Foundation,
+   Copyright (C) 1984, 1989-1990, 2000-2015, 2018-2021 Free Software Foundation,
    Inc.
 
    This program is free software: you can redistribute it and/or modify
@@ -16,7 +16,7 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
+   along with this program.  If not, see <https://www.gnu.org/licenses/>.  */
 
 /* As a special exception, you may create a larger work that contains
    part or all of the Bison parser skeleton and distribute that work
@@ -31,8 +31,9 @@
    This special exception was added by the Free Software Foundation in
    version 2.2 of Bison.  */
 
-/* Undocumented macros, especially those whose name start with YY_,
-   are private implementation details.  Do not rely on them.  */
+/* DO NOT RELY ON FEATURES THAT ARE NOT DOCUMENTED in the manual,
+   especially those whose name start with YY_ or yy_.  They are
+   private implementation details that can be changed or removed.  */
 
 #ifndef YY_CONF_PARSER_PARSER_PARSER_H_INCLUDED
 # define YY_CONF_PARSER_PARSER_PARSER_H_INCLUDED
@@ -52,22 +53,31 @@
 extern int conf_parser_debug;
 #endif
 
-/* Token type.  */
+/* Token kinds.  */
 #ifndef CONF_PARSER_TOKENTYPE
 # define CONF_PARSER_TOKENTYPE
   enum conf_parser_tokentype
   {
-    STRING = 258,
-    EQ = 259,
-    SPACES = 260,
-    NEWLINE = 261,
-    CONFIG_SETUP = 262,
-    CONN = 263,
-    CA = 264,
-    STRING_ERROR = 265
+    CONF_PARSER_EMPTY = -2,
+    CONF_PARSER_EOF = 0,           /* "end of file"  */
+    CONF_PARSER_error = 256,       /* error  */
+    CONF_PARSER_UNDEF = 257,       /* "invalid token"  */
+    STRING = 258,                  /* STRING  */
+    EQ = 259,                      /* EQ  */
+    SPACES = 260,                  /* SPACES  */
+    NEWLINE = 261,                 /* NEWLINE  */
+    CONFIG_SETUP = 262,            /* CONFIG_SETUP  */
+    CONN = 263,                    /* CONN  */
+    CA = 264,                      /* CA  */
+    STRING_ERROR = 265             /* STRING_ERROR  */
   };
+  typedef enum conf_parser_tokentype conf_parser_token_kind_t;
 #endif
-/* Tokens.  */
+/* Token kinds.  */
+#define CONF_PARSER_EMPTY -2
+#define CONF_PARSER_EOF 0
+#define CONF_PARSER_error 256
+#define CONF_PARSER_UNDEF 257
 #define STRING 258
 #define EQ 259
 #define SPACES 260
@@ -81,12 +91,12 @@ extern int conf_parser_debug;
 #if ! defined CONF_PARSER_STYPE && ! defined CONF_PARSER_STYPE_IS_DECLARED
 union CONF_PARSER_STYPE
 {
-#line 78 "parser/parser.y"
+#line 77 "parser/parser.y"
 
 	char *s;
 	conf_parser_section_t t;
 
-#line 90 "parser/parser.h"
+#line 100 "parser/parser.h"
 
 };
 typedef union CONF_PARSER_STYPE CONF_PARSER_STYPE;
@@ -96,14 +106,16 @@ typedef union CONF_PARSER_STYPE CONF_PARSER_STYPE;
 
 
 
+
 int conf_parser_parse (parser_helper_t *ctx);
+
 /* "%code provides" blocks.  */
-#line 67 "parser/parser.y"
+#line 66 "parser/parser.y"
 
 	#define YY_DECL \
 		int conf_parser_lex(CONF_PARSER_STYPE *yylval, void *yyscanner)
 	YY_DECL;
 
-#line 108 "parser/parser.h"
+#line 120 "parser/parser.h"
 
 #endif /* !YY_CONF_PARSER_PARSER_PARSER_H_INCLUDED  */

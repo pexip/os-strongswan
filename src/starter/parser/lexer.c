@@ -798,9 +798,9 @@ static const flex_int32_t yy_rule_can_match_eol[27] =
 
 static const flex_int16_t yy_rule_linenum[26] =
     {   0,
-       65,   66,   67,   68,   70,   72,   73,   74,   75,   77,
-       82,   87,   95,  114,  117,  120,  123,  129,  131,  150,
-      151,  152,  153,  154,  155
+       64,   65,   66,   67,   69,   71,   72,   73,   74,   76,
+       81,   86,   94,  113,  116,  119,  122,  128,  130,  149,
+      150,  151,  152,  153,  154
     } ;
 
 /* The intent behind this definition is that it'll catch
@@ -814,7 +814,6 @@ static const flex_int16_t yy_rule_linenum[26] =
 #line 2 "parser/lexer.l"
 /*
  * Copyright (C) 2013-2014 Tobias Brunner
- * HSR Hochschule fuer Technik Rapperswil
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -836,7 +835,7 @@ bool conf_parser_open_next_file(parser_helper_t *ctx);
 
 static void include_files(parser_helper_t *ctx);
 
-#line 840 "parser/lexer.c"
+#line 839 "parser/lexer.c"
 /* use start conditions stack */
 /* do not declare unneeded functions */
 #define YY_NO_INPUT 1
@@ -853,7 +852,7 @@ static void include_files(parser_helper_t *ctx);
 
 /* state used to scan quoted strings */
 
-#line 857 "parser/lexer.c"
+#line 856 "parser/lexer.c"
 
 #define INITIAL 0
 #define inc 1
@@ -1189,10 +1188,10 @@ YY_DECL
 
 	{
 /* %% [7.0] user's declarations go here */
-#line 63 "parser/lexer.l"
+#line 62 "parser/lexer.l"
 
 
-#line 1196 "parser/lexer.c"
+#line 1195 "parser/lexer.c"
 
 	while ( /*CONSTCOND*/1 )		/* loops until end-of-file is reached */
 		{
@@ -1286,48 +1285,48 @@ case 1:
 yyg->yy_c_buf_p = yy_cp -= 1;
 YY_DO_BEFORE_ACTION; /* set up yytext again */
 YY_RULE_SETUP
-#line 65 "parser/lexer.l"
+#line 64 "parser/lexer.l"
 /* eat legacy version declaration */
 	YY_BREAK
 case 2:
 YY_RULE_SETUP
-#line 66 "parser/lexer.l"
+#line 65 "parser/lexer.l"
 return SPACES;
 	YY_BREAK
 case 3:
 YY_RULE_SETUP
-#line 67 "parser/lexer.l"
+#line 66 "parser/lexer.l"
 /* eat other whitespace */
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 68 "parser/lexer.l"
+#line 67 "parser/lexer.l"
 /* eat comments */
 	YY_BREAK
 case 5:
 /* rule 5 can match eol */
 YY_RULE_SETUP
-#line 70 "parser/lexer.l"
+#line 69 "parser/lexer.l"
 return NEWLINE;
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 72 "parser/lexer.l"
+#line 71 "parser/lexer.l"
 return EQ;
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 73 "parser/lexer.l"
+#line 72 "parser/lexer.l"
 return CONFIG_SETUP;
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 74 "parser/lexer.l"
+#line 73 "parser/lexer.l"
 return CONN;
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
-#line 75 "parser/lexer.l"
+#line 74 "parser/lexer.l"
 return CA;
 	YY_BREAK
 case 10:
@@ -1337,7 +1336,7 @@ YY_LINENO_REWIND_TO(yy_cp - 1);
 yyg->yy_c_buf_p = yy_cp -= 1;
 YY_DO_BEFORE_ACTION; /* set up yytext again */
 YY_RULE_SETUP
-#line 77 "parser/lexer.l"
+#line 76 "parser/lexer.l"
 {
 	yyextra->string_init(yyextra);
 	yy_push_state(inc, yyscanner);
@@ -1345,7 +1344,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 82 "parser/lexer.l"
+#line 81 "parser/lexer.l"
 {
 	yyextra->string_init(yyextra);
 	yy_push_state(str, yyscanner);
@@ -1353,7 +1352,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 87 "parser/lexer.l"
+#line 86 "parser/lexer.l"
 {
 	yylval->s = strdup(yytext);
 	return STRING;
@@ -1362,11 +1361,11 @@ YY_RULE_SETUP
 
 /* we allow all characters except # and spaces, they can be escaped */
 case YY_STATE_EOF(inc):
-#line 94 "parser/lexer.l"
+#line 93 "parser/lexer.l"
 case 13:
 /* rule 13 can match eol */
 YY_RULE_SETUP
-#line 95 "parser/lexer.l"
+#line 94 "parser/lexer.l"
 {
 		if (*yytext)
 		{
@@ -1389,28 +1388,28 @@ YY_RULE_SETUP
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-#line 114 "parser/lexer.l"
+#line 113 "parser/lexer.l"
 {	/* string include */
 		yy_push_state(str, yyscanner);
 	}
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 117 "parser/lexer.l"
+#line 116 "parser/lexer.l"
 {
 		yyextra->string_add(yyextra, yytext);
 	}
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 120 "parser/lexer.l"
+#line 119 "parser/lexer.l"
 {
 		yyextra->string_add(yyextra, yytext+1);
 	}
 	YY_BREAK
 case 17:
 YY_RULE_SETUP
-#line 123 "parser/lexer.l"
+#line 122 "parser/lexer.l"
 {
 		yyextra->string_add(yyextra, yytext);
 	}
@@ -1418,13 +1417,13 @@ YY_RULE_SETUP
 
 
 case 18:
-#line 130 "parser/lexer.l"
+#line 129 "parser/lexer.l"
 YY_RULE_SETUP
 case YY_STATE_EOF(str):
-#line 130 "parser/lexer.l"
+#line 129 "parser/lexer.l"
 case 19:
 YY_RULE_SETUP
-#line 131 "parser/lexer.l"
+#line 130 "parser/lexer.l"
 {
 		if (!streq(yytext, "\""))
 		{
@@ -1447,41 +1446,41 @@ YY_RULE_SETUP
 	YY_BREAK
 case 20:
 YY_RULE_SETUP
-#line 150 "parser/lexer.l"
+#line 149 "parser/lexer.l"
 yyextra->string_add(yyextra, "\n");
 	YY_BREAK
 case 21:
 YY_RULE_SETUP
-#line 151 "parser/lexer.l"
+#line 150 "parser/lexer.l"
 yyextra->string_add(yyextra, "\r");
 	YY_BREAK
 case 22:
 YY_RULE_SETUP
-#line 152 "parser/lexer.l"
+#line 151 "parser/lexer.l"
 yyextra->string_add(yyextra, "\t");
 	YY_BREAK
 case 23:
 /* rule 23 can match eol */
 YY_RULE_SETUP
-#line 153 "parser/lexer.l"
+#line 152 "parser/lexer.l"
 /* merge lines that end with EOL characters */
 	YY_BREAK
 case 24:
 YY_RULE_SETUP
-#line 154 "parser/lexer.l"
+#line 153 "parser/lexer.l"
 yyextra->string_add(yyextra, yytext+1);
 	YY_BREAK
 case 25:
 /* rule 25 can match eol */
 YY_RULE_SETUP
-#line 155 "parser/lexer.l"
+#line 154 "parser/lexer.l"
 {
 		yyextra->string_add(yyextra, yytext);
 	}
 	YY_BREAK
 
 case YY_STATE_EOF(INITIAL):
-#line 160 "parser/lexer.l"
+#line 159 "parser/lexer.l"
 {
 	conf_parser_pop_buffer_state(yyscanner);
 	if (!conf_parser_open_next_file(yyextra) && !YY_CURRENT_BUFFER)
@@ -1492,10 +1491,10 @@ case YY_STATE_EOF(INITIAL):
 	YY_BREAK
 case 26:
 YY_RULE_SETUP
-#line 168 "parser/lexer.l"
+#line 167 "parser/lexer.l"
 YY_FATAL_ERROR( "flex scanner jammed" );
 	YY_BREAK
-#line 1499 "parser/lexer.c"
+#line 1498 "parser/lexer.c"
 
 	case YY_END_OF_BUFFER:
 		{
@@ -2875,7 +2874,7 @@ void yyfree (void * ptr , yyscan_t yyscanner)
 
 /* %ok-for-header */
 
-#line 168 "parser/lexer.l"
+#line 167 "parser/lexer.l"
 
 
 /**

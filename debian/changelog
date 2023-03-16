@@ -1,3 +1,31 @@
+strongswan (5.9.8-3) unstable; urgency=medium
+
+  * d/tests: also drop _copyright test since the util is gone as well
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Thu, 03 Nov 2022 18:17:42 +0100
+
+strongswan (5.9.8-2) unstable; urgency=medium
+
+  * d/tests: remove scepclient tests since it's gone (Closes: #1023224)
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Thu, 03 Nov 2022 13:05:27 +0100
+
+strongswan (5.9.8-1) unstable; urgency=medium
+
+  * New upstream version 5.9.8
+    - Includes fix for  CVE-2022-40617, denial of service due to the
+    revocation plugin potentially using untrusted OCSP URIs and CRL
+    distribution points in CRLs. (closes: #1021271)
+  * Remove strongswan-scepclient package, replaced by a pki(1) command
+  * d/p/0006-fix-format-string-issue-in-enum_flags_to_string dropped, included
+    upstream
+  * remove dropped _copyright utility
+  * d/strongswan-pki.install: install est/estca manpages (RFC 7070)
+  * d/s-{started,swanctl}.lintian-overrides updated for new lintian
+  * d/copyright updated for new upstream release
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Wed, 05 Oct 2022 15:25:18 +0200
+
 strongswan (5.9.6-1pexip4) pexip; urgency=medium
 
   * libstrongswan-extra-plugins.maintscript: remove tpm.conf on upgrade
@@ -67,15 +95,6 @@ strongswan (5.9.1-1+deb11u3pexip1) pexip; urgency=medium
 
  -- Mark Hymers <mark.hymers@pexip.com>  Tue, 11 Oct 2022 11:18:40 +0100
 
-strongswan (5.9.1-1+deb11u3) bullseye-security; urgency=medium
-
-  * d/p/0009-credential-manager-Do-online-revocation-checks-only- added.
-    Fix CVE-2022-40617, denial of service due to revocation plugin
-    potentially using untrusted OCSP URIs and CRL distribution in
-    certificates (Closes: #1021271)
-
- -- Yves-Alexis Perez <corsac@debian.org>  Thu, 06 Oct 2022 09:36:12 +0200
-
 strongswan (5.9.1-1+deb11u2pexip3) pexip-bullseye; urgency=medium
 
   * Bullseye rebuild for ARM64 inclusion
@@ -93,24 +112,6 @@ strongswan (5.9.1-1+deb11u2pexip1) pexip; urgency=medium
   * Initial bullseye build
 
  -- Mark Hymers <mark.hymers@pexip.com>  Thu, 02 Jun 2022 14:42:58 +0100
-
-strongswan (5.9.1-1+deb11u2) bullseye-security; urgency=medium
-
-  * gbp: revert upstream branch name change
-  * eap-authenticator: Enforce failure if MSK generation fails
-    - Fix incorrect handling of Early EAP-Success Messages (CVE-2021-45079)
-
- -- Yves-Alexis Perez <corsac@debian.org>  Fri, 21 Jan 2022 15:55:38 +0100
-
-strongswan (5.9.1-1+deb11u1) bullseye-security; urgency=medium
-
-  * Reject RSASSA-PSS params with negative salt length
-    - fix remote denial of service (CVE-2021-41990)
-  * Prevent crash due to integer overflow / sign change
-    - fix remote denial of service (CVE-2021-41991)
-  * d/gpp.conf: track bullseye branches
-
- -- Yves-Alexis Perez <corsac@debian.org>  Thu, 14 Oct 2021 22:36:24 +0200
 
 strongswan (5.9.1-1) unstable; urgency=medium
 
