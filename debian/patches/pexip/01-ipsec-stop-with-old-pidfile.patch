@@ -10,7 +10,7 @@ index a002614f..8aab2ec9 100644
  IPSEC_STARTER_PID="${IPSEC_PIDDIR}/starter.${DAEMON_NAME}.pid"
  IPSEC_CHARON_PID="${IPSEC_PIDDIR}/${DAEMON_NAME}.pid"
  
-@@ -249,10 +250,16 @@ status|statusall)
+@@ -247,10 +248,16 @@ status|statusall)
  	;;
  stop)
  	# stopping a not-running service is considered as success
@@ -29,7 +29,7 @@ index a002614f..8aab2ec9 100644
  		if [ -n "$spid" ]
  		then
  			kill $spid 2>/dev/null
-@@ -270,7 +277,7 @@ stop)
+@@ -268,7 +275,7 @@ stop)
  			if [ $loop -le 0 ]
  			then
  				kill -KILL $spid 2>/dev/null
