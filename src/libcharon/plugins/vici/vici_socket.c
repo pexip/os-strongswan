@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2014 Martin Willi
- * Copyright (C) 2014 revosec AG
+ *
+ * Copyright (C) secunet Security Networks AG
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -191,6 +192,7 @@ static entry_t* find_entry(private_vici_socket_t *this, stream_t *stream,
 			}
 			if (entry->disconnecting)
 			{
+				entry->cond->signal(entry->cond);
 				continue;
 			}
 			candidate = TRUE;
@@ -244,6 +246,7 @@ static entry_t* remove_entry(private_vici_socket_t *this, u_int id)
 					break;
 				}
 				this->connections->remove_at(this->connections, enumerator);
+				entry->cond->broadcast(entry->cond);
 				found = entry;
 				break;
 			}
@@ -504,7 +507,7 @@ CALLBACK(process_queue, job_requeue_t,
 			break;
 		}
 
-		thread_cleanup_push(free, chunk.ptr);
+		thread_cleanup_push((void*)chunk_clear, &chunk);
 		sel->this->inbound(sel->this->user, id, chunk);
 		thread_cleanup_pop(TRUE);
 	}

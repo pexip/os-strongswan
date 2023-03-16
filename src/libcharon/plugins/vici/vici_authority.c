@@ -1,7 +1,8 @@
 /*
  * Copyright (C) 2016-2020 Tobias Brunner
  * Copyright (C) 2015 Andreas Steffen
- * HSR Hochschule fuer Technik Rapperswil
+ *
+ * Copyright (C) secunet Security Networks AG
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -547,6 +548,8 @@ CALLBACK(authority_sn, bool,
 		{
 			/* remove the old authority definition */
 			authorities->remove_at(authorities, enumerator);
+			request->this->certs->remove(request->this->certs, authority->cert,
+										 remove_cert);
 			authority_destroy(authority);
 			break;
 		}

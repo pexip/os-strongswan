@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2019 Sean Parkinson, wolfSSL Inc.
+ * Copyright (C) 2021 Andreas Steffen, strongSec GmbH
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -35,11 +36,13 @@
 #include "wolfssl_ed_public_key.h"
 #include "wolfssl_hasher.h"
 #include "wolfssl_hmac.h"
+#include "wolfssl_kdf.h"
 #include "wolfssl_rsa_private_key.h"
 #include "wolfssl_rsa_public_key.h"
 #include "wolfssl_rng.h"
 #include "wolfssl_sha1_prf.h"
 #include "wolfssl_x_diffie_hellman.h"
+#include "wolfssl_xof.h"
 
 #ifndef FIPS_MODE
 #define FIPS_MODE 0
@@ -80,6 +83,16 @@ METHOD(plugin_t, get_features, int,
 			PLUGIN_PROVIDE(CRYPTER, ENCR_AES_CBC, 24),
 			PLUGIN_PROVIDE(CRYPTER, ENCR_AES_CBC, 32),
 #endif
+#if !defined(NO_AES) && defined(HAVE_AES_ECB)
+			PLUGIN_PROVIDE(CRYPTER, ENCR_AES_ECB, 16),
+			PLUGIN_PROVIDE(CRYPTER, ENCR_AES_ECB, 24),
+			PLUGIN_PROVIDE(CRYPTER, ENCR_AES_ECB, 32),
+#endif
+#if !defined(NO_AES) && defined(WOLFSSL_AES_CFB)
+			PLUGIN_PROVIDE(CRYPTER, ENCR_AES_CFB, 16),
+			PLUGIN_PROVIDE(CRYPTER, ENCR_AES_CFB, 24),
+			PLUGIN_PROVIDE(CRYPTER, ENCR_AES_CFB, 32),
+#endif
 #ifdef HAVE_CAMELLIA
 			PLUGIN_PROVIDE(CRYPTER, ENCR_CAMELLIA_CBC, 16),
 			PLUGIN_PROVIDE(CRYPTER, ENCR_CAMELLIA_CBC, 24),
@@ -112,6 +125,22 @@ METHOD(plugin_t, get_features, int,
 #endif
 #ifdef WOLFSSL_SHA512
 			PLUGIN_PROVIDE(HASHER, HASH_SHA512),
+#endif
+#if defined(WOLFSSL_SHA3) && !defined(WOLFSSL_NOSHA3_224)
+			PLUGIN_PROVIDE(HASHER, HASH_SHA3_224),
+#endif
+#if defined(WOLFSSL_SHA3) && !defined(WOLFSSL_NOSHA3_256)
+			PLUGIN_PROVIDE(HASHER, HASH_SHA3_256),
+#endif
+#if defined(WOLFSSL_SHA3) && !defined(WOLFSSL_NOSHA3_384)
+			PLUGIN_PROVIDE(HASHER, HASH_SHA3_384),
+#endif
+#if defined(WOLFSSL_SHA3) && !defined(WOLFSSL_NOSHA3_512)
+			PLUGIN_PROVIDE(HASHER, HASH_SHA3_512),
+#endif
+#if defined(WOLFSSL_SHAKE256) && LIBWOLFSSL_VERSION_HEX >= 0x04007001
+		PLUGIN_REGISTER(XOF, wolfssl_xof_create),
+			PLUGIN_PROVIDE(XOF, XOF_SHAKE_256),
 #endif
 #ifndef NO_SHA
 		/* keyed sha1 hasher (aka prf) */
@@ -157,6 +186,11 @@ METHOD(plugin_t, get_features, int,
 			PLUGIN_PROVIDE(SIGNER, AUTH_HMAC_SHA2_512_256),
 			PLUGIN_PROVIDE(SIGNER, AUTH_HMAC_SHA2_512_512),
 #endif
+#ifdef HAVE_HKDF
+		PLUGIN_REGISTER(KDF, wolfssl_kdf_create),
+			PLUGIN_PROVIDE(KDF, KDF_PRF),
+			PLUGIN_PROVIDE(KDF, KDF_PRF_PLUS),
+#endif
 #endif /* NO_HMAC */
 #if (!defined(NO_AES) && (defined(HAVE_AESGCM) || defined(HAVE_AESCCM))) || \
 								(defined(HAVE_CHACHA) && defined(HAVE_POLY1305))
@@ -193,68 +227,93 @@ METHOD(plugin_t, get_features, int,
 #endif
 #ifdef HAVE_ECC_DHE
 		/* EC DH groups */
-		PLUGIN_REGISTER(DH, wolfssl_ec_diffie_hellman_create),
-	#if !defined(NO_ECC256) || defined(HAVE_ALL_CURVES)
-			PLUGIN_PROVIDE(DH, ECP_256_BIT),
+		PLUGIN_REGISTER(KE, wolfssl_ec_diffie_hellman_create),
+	#if (!defined(NO_ECC256) || defined(HAVE_ALL_CURVES)) && \
+		(!defined(ECC_MIN_KEY_SZ) || ECC_MIN_KEY_SZ <= 256)
+			PLUGIN_PROVIDE(KE, ECP_256_BIT),
 	#endif
-	#if defined(HAVE_ECC384) || defined(HAVE_ALL_CURVES)
-			PLUGIN_PROVIDE(DH, ECP_384_BIT),
+	#if (defined(HAVE_ECC384) || defined(HAVE_ALL_CURVES)) && \
+		(!defined(ECC_MIN_KEY_SZ) || ECC_MIN_KEY_SZ <= 384)
+			PLUGIN_PROVIDE(KE, ECP_384_BIT),
 	#endif
-	#if defined(HAVE_ECC521) || defined(HAVE_ALL_CURVES)
-			PLUGIN_PROVIDE(DH, ECP_521_BIT),
+	#if (defined(HAVE_ECC521) || defined(HAVE_ALL_CURVES)) && \
+		(!defined(ECC_MIN_KEY_SZ) || ECC_MIN_KEY_SZ <= 521)
+			PLUGIN_PROVIDE(KE, ECP_521_BIT),
 	#endif
-	#if defined(HAVE_ECC224) || defined(HAVE_ALL_CURVES)
-			PLUGIN_PROVIDE(DH, ECP_224_BIT),
+	#if (defined(HAVE_ECC224) || defined(HAVE_ALL_CURVES)) && \
+		 (!defined(ECC_MIN_KEY_SZ) || ECC_MIN_KEY_SZ <= 224)
+			PLUGIN_PROVIDE(KE, ECP_224_BIT),
 	#endif
-	#if defined(HAVE_ECC192) || defined(HAVE_ALL_CURVES)
-			PLUGIN_PROVIDE(DH, ECP_192_BIT),
+	#if (defined(HAVE_ECC192) || defined(HAVE_ALL_CURVES)) && \
+		 (!defined(ECC_MIN_KEY_SZ) || ECC_MIN_KEY_SZ <= 192)
+			PLUGIN_PROVIDE(KE, ECP_192_BIT),
 	#endif
-	#ifdef HAVE_BRAINPOOL
-		#if !define(NO_ECC256) || defined(HAVE_ALL_CURVES)
-			PLUGIN_PROVIDE(DH, ECP_256_BP),
+	#ifdef HAVE_ECC_BRAINPOOL
+		#if (!defined(NO_ECC256) || defined(HAVE_ALL_CURVES)) && \
+			(!defined(ECC_MIN_KEY_SZ) || ECC_MIN_KEY_SZ <= 256)
+			PLUGIN_PROVIDE(KE, ECP_256_BP),
 		#endif
-		#if defined(HAVE_ECC384) || defined(HAVE_ALL_CURVES)
-			PLUGIN_PROVIDE(DH, ECP_384_BP),
+		#if (defined(HAVE_ECC384) || defined(HAVE_ALL_CURVES))  && \
+			(!defined(ECC_MIN_KEY_SZ) || ECC_MIN_KEY_SZ <= 384)
+			PLUGIN_PROVIDE(KE, ECP_384_BP),
 		#endif
-		#if defined(HAVE_ECC512) || defined(HAVE_ALL_CURVES)
-			PLUGIN_PROVIDE(DH, ECP_512_BP),
+		#if (defined(HAVE_ECC512) || defined(HAVE_ALL_CURVES)) && \
+			(!defined(ECC_MIN_KEY_SZ) || ECC_MIN_KEY_SZ <= 512)
+			PLUGIN_PROVIDE(KE, ECP_512_BP),
 		#endif
-		#if defined(HAVE_ECC224) || defined(HAVE_ALL_CURVES)
-			PLUGIN_PROVIDE(DH, ECP_224_BP),
+		#if (defined(HAVE_ECC224) || defined(HAVE_ALL_CURVES)) && \
+			(!defined(ECC_MIN_KEY_SZ) || ECC_MIN_KEY_SZ <= 224)
+			PLUGIN_PROVIDE(KE, ECP_224_BP),
 		#endif
 	#endif
 #endif /* HAVE_ECC_DHE */
 #ifndef NO_DH
 		/* MODP DH groups */
-		PLUGIN_REGISTER(DH, wolfssl_diffie_hellman_create),
-	#if !defined(USE_FAST_MATH) || FP_MAX_BITS >= (3072 * 2)
-			PLUGIN_PROVIDE(DH, MODP_3072_BIT),
+		PLUGIN_REGISTER(KE, wolfssl_diffie_hellman_create),
+	#if (defined(USE_FAST_MATH) && FP_MAX_BITS >= (3072 * 2)) || \
+		(defined(WOLFSSL_SP_MATH_ALL) && SP_INT_BITS >= 3072) || \
+		defined(USE_INTEGER_HEAP_MATH)
+			PLUGIN_PROVIDE(KE, MODP_3072_BIT),
 	#endif
-	#if !defined(USE_FAST_MATH) || FP_MAX_BITS >= (4096 * 2)
-			PLUGIN_PROVIDE(DH, MODP_4096_BIT),
+	#if (defined(USE_FAST_MATH) && FP_MAX_BITS >= (4096 * 2)) || \
+		(defined(WOLFSSL_SP_MATH_ALL) && SP_INT_BITS >= 4096) || \
+		defined(USE_INTEGER_HEAP_MATH)
+			PLUGIN_PROVIDE(KE, MODP_4096_BIT),
 	#endif
-	#if !defined(USE_FAST_MATH) || FP_MAX_BITS >= (6144 * 2)
-			PLUGIN_PROVIDE(DH, MODP_6144_BIT),
+	#if (defined(USE_FAST_MATH) && FP_MAX_BITS >= (6144 * 2)) || \
+		(defined(WOLFSSL_SP_MATH_ALL) && SP_INT_BITS >= 6144) || \
+		defined(USE_INTEGER_HEAP_MATH)
+			PLUGIN_PROVIDE(KE, MODP_6144_BIT),
 	#endif
-	#if !defined(USE_FAST_MATH) || FP_MAX_BITS >= (8192 * 2)
-			PLUGIN_PROVIDE(DH, MODP_8192_BIT),
+	#if (defined(USE_FAST_MATH) && FP_MAX_BITS >= (8192 * 2)) || \
+		(defined(WOLFSSL_SP_MATH_ALL) && SP_INT_BITS >= 8192) || \
+		defined(USE_INTEGER_HEAP_MATH)
+			PLUGIN_PROVIDE(KE, MODP_8192_BIT),
 	#endif
-	#if !defined(USE_FAST_MATH) || FP_MAX_BITS >= (2048 * 2)
-			PLUGIN_PROVIDE(DH, MODP_2048_BIT),
-			PLUGIN_PROVIDE(DH, MODP_2048_224),
-			PLUGIN_PROVIDE(DH, MODP_2048_256),
+	#if (defined(USE_FAST_MATH) && FP_MAX_BITS >= (2048 * 2)) || \
+		(defined(WOLFSSL_SP_MATH_ALL) && SP_INT_BITS >= 2048) || \
+		defined(USE_INTEGER_HEAP_MATH)
+			PLUGIN_PROVIDE(KE, MODP_2048_BIT),
+			PLUGIN_PROVIDE(KE, MODP_2048_224),
+			PLUGIN_PROVIDE(KE, MODP_2048_256),
 	#endif
-	#if !defined(USE_FAST_MATH) || FP_MAX_BITS >= (1536 * 2)
-			PLUGIN_PROVIDE(DH, MODP_1536_BIT),
+	#if (defined(USE_FAST_MATH) && FP_MAX_BITS >= (1536 * 2)) || \
+		(defined(WOLFSSL_SP_MATH_ALL) && SP_INT_BITS >= 1536) || \
+		defined(USE_INTEGER_HEAP_MATH)
+			PLUGIN_PROVIDE(KE, MODP_1536_BIT),
 	#endif
-	#if !defined(USE_FAST_MATH) || FP_MAX_BITS >= (1024 * 2)
-			PLUGIN_PROVIDE(DH, MODP_1024_BIT),
-			PLUGIN_PROVIDE(DH, MODP_1024_160),
+	#if (defined(USE_FAST_MATH) && FP_MAX_BITS >= (1024 * 2)) || \
+		(defined(WOLFSSL_SP_MATH_ALL) && SP_INT_BITS >= 1024) || \
+		defined(USE_INTEGER_HEAP_MATH)
+			PLUGIN_PROVIDE(KE, MODP_1024_BIT),
+			PLUGIN_PROVIDE(KE, MODP_1024_160),
 	#endif
-	#if !defined(USE_FAST_MATH) || FP_MAX_BITS >= (768 * 2)
-			PLUGIN_PROVIDE(DH, MODP_768_BIT),
+	#if (defined(USE_FAST_MATH) && FP_MAX_BITS >= (768 * 2)) || \
+		(defined(WOLFSSL_SP_MATH_ALL) && SP_INT_BITS >= 768) || \
+		defined(USE_INTEGER_HEAP_MATH)
+			PLUGIN_PROVIDE(KE, MODP_768_BIT),
 	#endif
-			PLUGIN_PROVIDE(DH, MODP_CUSTOM),
+			PLUGIN_PROVIDE(KE, MODP_CUSTOM),
 #endif /* NO_DH */
 #ifndef NO_RSA
 		/* RSA private/public key loading */
@@ -270,37 +329,55 @@ METHOD(plugin_t, get_features, int,
 		/* signature/encryption schemes */
 		PLUGIN_PROVIDE(PRIVKEY_SIGN, SIGN_RSA_EMSA_PKCS1_NULL),
 		PLUGIN_PROVIDE(PUBKEY_VERIFY, SIGN_RSA_EMSA_PKCS1_NULL),
-#ifdef WC_RSA_PSS
+	#ifdef WC_RSA_PSS
 		PLUGIN_PROVIDE(PRIVKEY_SIGN, SIGN_RSA_EMSA_PSS),
 		PLUGIN_PROVIDE(PUBKEY_VERIFY, SIGN_RSA_EMSA_PSS),
-#endif
-#ifndef NO_SHA
+	#endif
+	#ifndef NO_SHA
 		PLUGIN_PROVIDE(PRIVKEY_SIGN, SIGN_RSA_EMSA_PKCS1_SHA1),
 		PLUGIN_PROVIDE(PUBKEY_VERIFY, SIGN_RSA_EMSA_PKCS1_SHA1),
-#endif
-#ifdef WOLFSSL_SHA224
+	#endif
+	#ifdef WOLFSSL_SHA224
 		PLUGIN_PROVIDE(PRIVKEY_SIGN, SIGN_RSA_EMSA_PKCS1_SHA2_224),
 		PLUGIN_PROVIDE(PUBKEY_VERIFY, SIGN_RSA_EMSA_PKCS1_SHA2_224),
-#endif
-#ifndef NO_SHA256
+	#endif
+	#ifndef NO_SHA256
 		PLUGIN_PROVIDE(PRIVKEY_SIGN, SIGN_RSA_EMSA_PKCS1_SHA2_256),
 		PLUGIN_PROVIDE(PUBKEY_VERIFY, SIGN_RSA_EMSA_PKCS1_SHA2_256),
-#endif
-#ifdef WOLFSSL_SHA384
+	#endif
+	#ifdef WOLFSSL_SHA384
 		PLUGIN_PROVIDE(PRIVKEY_SIGN, SIGN_RSA_EMSA_PKCS1_SHA2_384),
 		PLUGIN_PROVIDE(PUBKEY_VERIFY, SIGN_RSA_EMSA_PKCS1_SHA2_384),
-#endif
-#ifdef WOLFSSL_SHA512
+	#endif
+	#ifdef WOLFSSL_SHA512
 		PLUGIN_PROVIDE(PRIVKEY_SIGN, SIGN_RSA_EMSA_PKCS1_SHA2_512),
 		PLUGIN_PROVIDE(PUBKEY_VERIFY, SIGN_RSA_EMSA_PKCS1_SHA2_512),
-#endif
-#ifndef NO_MD5
-		PLUGIN_PROVIDE(PRIVKEY_SIGN, SIGN_RSA_EMSA_PKCS1_MD5),
-		PLUGIN_PROVIDE(PUBKEY_VERIFY, SIGN_RSA_EMSA_PKCS1_MD5),
-#endif
+	#endif
+	#if defined(WOLFSSL_SHA3) && LIBWOLFSSL_VERSION_HEX >= 0x04007001
+	#ifndef WOLFSSL_NOSHA3_224
+		PLUGIN_PROVIDE(PRIVKEY_SIGN, SIGN_RSA_EMSA_PKCS1_SHA3_224),
+		PLUGIN_PROVIDE(PUBKEY_VERIFY, SIGN_RSA_EMSA_PKCS1_SHA3_224),
+	#endif
+	#ifndef WOLFSSL_NOSHA3_256
+		PLUGIN_PROVIDE(PRIVKEY_SIGN, SIGN_RSA_EMSA_PKCS1_SHA3_256),
+		PLUGIN_PROVIDE(PUBKEY_VERIFY, SIGN_RSA_EMSA_PKCS1_SHA3_256),
+	#endif
+	#ifndef WOLFSSL_NOSHA3_384
+		PLUGIN_PROVIDE(PRIVKEY_SIGN, SIGN_RSA_EMSA_PKCS1_SHA3_384),
+		PLUGIN_PROVIDE(PUBKEY_VERIFY, SIGN_RSA_EMSA_PKCS1_SHA3_384),
+	#endif
+	#ifndef WOLFSSL_NOSHA3_512
+		PLUGIN_PROVIDE(PRIVKEY_SIGN, SIGN_RSA_EMSA_PKCS1_SHA3_512),
+		PLUGIN_PROVIDE(PUBKEY_VERIFY, SIGN_RSA_EMSA_PKCS1_SHA3_512),
+	#endif
+	#endif /* WOLFSSL_SHA3 */
 		PLUGIN_PROVIDE(PRIVKEY_DECRYPT, ENCRYPT_RSA_PKCS1),
 		PLUGIN_PROVIDE(PUBKEY_ENCRYPT, ENCRYPT_RSA_PKCS1),
-#ifndef WC_NO_RSA_OAEP
+	#ifndef NO_MD5
+		PLUGIN_PROVIDE(PRIVKEY_SIGN, SIGN_RSA_EMSA_PKCS1_MD5),
+		PLUGIN_PROVIDE(PUBKEY_VERIFY, SIGN_RSA_EMSA_PKCS1_MD5),
+	#endif
+	#ifndef WC_NO_RSA_OAEP
 	#ifndef NO_SHA
 		PLUGIN_PROVIDE(PUBKEY_ENCRYPT, ENCRYPT_RSA_OAEP_SHA1),
 		PLUGIN_PROVIDE(PRIVKEY_DECRYPT, ENCRYPT_RSA_OAEP_SHA1),
@@ -321,7 +398,7 @@ METHOD(plugin_t, get_features, int,
 		PLUGIN_PROVIDE(PUBKEY_ENCRYPT, ENCRYPT_RSA_OAEP_SHA512),
 		PLUGIN_PROVIDE(PRIVKEY_DECRYPT, ENCRYPT_RSA_OAEP_SHA512),
 	#endif
-#endif /* !WC_NO_RSA_OAEP */
+	#endif /* !WC_NO_RSA_OAEP */
 #endif /* !NO_RSA */
 #ifdef HAVE_ECC
 	#ifdef HAVE_ECC_KEY_IMPORT
@@ -378,12 +455,12 @@ METHOD(plugin_t, get_features, int,
 	#endif /* HAVE_ECC_VERIFY */
 #endif /* HAVE_ECC */
 #if defined (HAVE_CURVE25519) || defined(HAVE_CURVE448)
-		PLUGIN_REGISTER(DH, wolfssl_x_diffie_hellman_create),
+		PLUGIN_REGISTER(KE, wolfssl_x_diffie_hellman_create),
 	#ifdef HAVE_CURVE25519
-			PLUGIN_PROVIDE(DH, CURVE_25519),
+			PLUGIN_PROVIDE(KE, CURVE_25519),
 	#endif
 	#ifdef HAVE_CURVE448
-			PLUGIN_PROVIDE(DH, CURVE_448),
+			PLUGIN_PROVIDE(KE, CURVE_448),
 	#endif
 #endif /* HAVE_CURVE25519 || HAVE_CURVE448 */
 #if defined(HAVE_ED25519) || defined(HAVE_ED448)

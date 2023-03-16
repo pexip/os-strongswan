@@ -2,7 +2,8 @@
  * Copyright (C) 2008-2019 Tobias Brunner
  * Copyright (C) 2005-2008 Martin Willi
  * Copyright (C) 2005 Jan Hutter
- * HSR Hochschule fuer Technik Rapperswil
+ *
+ * Copyright (C) secunet Security Networks AG
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -114,7 +115,7 @@ bool chunk_write(chunk_t chunk, char *path, mode_t mask, bool force);
 bool chunk_from_fd(int fd, chunk_t *chunk);
 
 /**
- * mmap() a file to a chunk
+ * mmap() a file to a chunk.
  *
  * The returned chunk structure is allocated from heap, but it must be freed
  * through chunk_unmap(). A user may alter the chunk ptr or len, but must pass
@@ -129,15 +130,28 @@ bool chunk_from_fd(int fd, chunk_t *chunk);
 chunk_t *chunk_map(char *path, bool wr);
 
 /**
- * munmap() a chunk previously mapped with chunk_map()
+ * munmap() a chunk previously mapped with chunk_map().
  *
  * When unmapping a writeable map, the return value should be checked to
  * ensure changes landed on disk.
  *
  * @param chunk			pointer returned from chunk_map()
- * @return				TRUE of changes written back to file
+ * @return				TRUE if changes written back to file
  */
 bool chunk_unmap(chunk_t *chunk);
+
+/**
+ * munmap() a chunk previously mapped with chunk_map() after clearing it.
+ *
+ * @note Writable maps (i.e. created with wr = TRUE) are NOT cleared.
+ *
+ * When unmapping a writeable map, the return value should be checked to
+ * ensure changes landed on disk.
+ *
+ * @param chunk         pointer returned from chunk_map()
+ * @return              TRUE if changes written back to file
+ */
+bool chunk_unmap_clear(chunk_t *chunk);
 
 /**
  * Convert a chunk of data to hex encoding.

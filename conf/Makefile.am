@@ -20,7 +20,6 @@ options = \
 	options/medsrv.opt \
 	options/pki.opt \
 	options/pool.opt \
-	options/scepclient.opt \
 	options/starter.opt \
 	options/swanctl.opt \
 	options/tnc.opt \
@@ -33,6 +32,7 @@ plugins = \
 	plugins/attr.opt \
 	plugins/attr-sql.opt \
 	plugins/bliss.opt \
+	plugins/botan.opt \
 	plugins/bypass-lan.opt \
 	plugins/certexpire.opt \
 	plugins/coupling.opt \

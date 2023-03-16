@@ -1,8 +1,8 @@
 /*
  * Copyright (C) 2011-2019 Tobias Brunner
  * Copyright (C) 2007-2011 Martin Willi
- * Copyright (C) 2011 revosec AG
- * HSR Hochschule fuer Technik Rapperswil
+ *
+ * Copyright (C) secunet Security Networks AG
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -417,10 +417,10 @@ METHOD(job_t, initiate_execute, job_requeue_t,
 
 	ike_sa = charon->ike_sa_manager->checkout_by_config(charon->ike_sa_manager,
 														peer_cfg);
+	peer_cfg->destroy(peer_cfg);
 	if (!ike_sa)
 	{
 		DESTROY_IF(listener->child_cfg);
-		peer_cfg->destroy(peer_cfg);
 		listener->status = FAILED;
 		listener_done(listener);
 		return JOB_REQUEUE_NONE;
@@ -429,11 +429,6 @@ METHOD(job_t, initiate_execute, job_requeue_t,
 	listener->ike_sa = ike_sa;
 	listener->lock->unlock(listener->lock);
 
-	if (ike_sa->get_peer_cfg(ike_sa) == NULL)
-	{
-		ike_sa->set_peer_cfg(ike_sa, peer_cfg);
-	}
-	peer_cfg->destroy(peer_cfg);
 
 	if (listener->options.limits && ike_sa->get_state(ike_sa) == IKE_CREATED)
 	{	/* only check if we are not reusing an IKE_SA */
@@ -478,7 +473,7 @@ METHOD(job_t, initiate_execute, job_requeue_t,
 		}
 	}
 
-	if (ike_sa->initiate(ike_sa, listener->child_cfg, 0, NULL, NULL) == SUCCESS)
+	if (ike_sa->initiate(ike_sa, listener->child_cfg, NULL) == SUCCESS)
 	{
 		if (!listener->logger.callback)
 		{

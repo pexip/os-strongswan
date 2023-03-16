@@ -1106,11 +1106,13 @@ closes
 the CHILD_SA and does not take further action.
 .RI "" "trap" ""
 installs a trap policy,
-which will catch matching traffic and tries to re\-negotiate the tunnel
-on\-demand.
+which will catch matching traffic and tries to re\-negotiate the tunnel on\-demand
+(note that this is redundant if
+.RB "" "start_action" ""
+includes
+.RI "" "trap" ")."
 .RI "" "restart" ""
-immediately tries to re\-negotiate the CHILD_SA under a
-fresh IKE_SA.
+immediately tries to re\-negotiate the CHILD_SA under a fresh IKE_SA.
 
 .TP
 .BR connections.<conn>.children.<child>.ipcomp " [no]"
@@ -1263,6 +1265,49 @@ CHILD_SA direction (in/out).
 The daemon will not install routes for CHILD_SAs that have this option set.
 
 .TP
+.BR connections.<conn>.children.<child>.label " []"
+Optional security label (e.g. SELinux context), IKEv2 only. Refer to
+.RB "" "label_mode" ""
+for details on how labels are processed.
+
+.TP
+.BR connections.<conn>.children.<child>.label_mode " [system]"
+Defines the mode in which the configured security label is used. The default
+value of
+.RI "" "system" ""
+selects
+.RI "" "selinux" ""
+if strongSwan was built with SELinux support
+and SELinux is enabled by the kernel, otherwise,
+.RI "" "simple" ""
+will be selected.
+
+If set to
+.RI "" "simple" ","
+the label will be used as is as an additional
+identifier/selector on the IKEv2 level when negotiating CHILD_SAs and selecting
+configs, labels are not installed in the kernel and received labels have to
+match exactly.
+
+If set to
+.RI "" "selinux" ","
+which is only allowed if SELinux is usable on the system,
+the configured label is expected to be a generic context (e.g.
+.RI "" "system_u:object_r:ipsec_spd_t:s0" ")"
+for which flows, whose context match it via
+association:polmatch, will trigger an acquire if no SA exists yet for the flow's
+specific context.  The configured label is installed on (trap) policies, so this
+should generally be combined with
+.RI "" "trap" ""
+in
+.RB "" "start_action" "."
+However, if the
+connection is initiated directly, without acquire, a childless IKE_SA is
+established and appropriate trap policies are installed on both ends. Labels
+received from peers are accepted if they match the configured label via
+association:polmatch.
+
+.TP
 .BR connections.<conn>.children.<child>.tfc_padding " [0]"
 Pads ESP packets with additional data to have a consistent ESP packet size for
 improved Traffic Flow Confidentiality. The padding defines the minimum size of
@@ -1342,7 +1387,10 @@ installs a trap policy, which triggers the tunnel as soon as
 matching traffic has been detected. The value
 .RI "" "start" ""
 initiates the connection
-actively.
+actively. These two modes can be combined with
+.RI "" "trap|start" ","
+to immediately
+initiate a connection for which trap policies have been installed.
 
 When unloading or replacing a CHILD_SA configuration having a
 .RB "" "start_action" ""
@@ -1352,7 +1400,10 @@ the inverse action is performed. Configurations with
 .RI "" "start" ""
 get closed, while such with
 .RI "" "trap" ""
-get uninstalled.
+get uninstalled (both happens for
+connections with
+.RI "" "trap|start" ")."
+
 
 .TP
 .BR connections.<conn>.children.<child>.close_action " [none]"
@@ -1360,9 +1411,14 @@ Action to perform after a CHILD_SA gets closed by the peer. The default of
 .RI "" "none" ""
 does not take any action,
 .RI "" "trap" ""
-installs a trap policy for the CHILD_SA.
+installs a trap policy for the CHILD_SA
+(note that this is redundant if
+.RB "" "start_action" ""
+includes
+.RI "" "trap" ")."
 .RI "" "start" ""
-tries to re\-create the CHILD_SA.
+tries
+to immediately re\-create the CHILD_SA.
 
 .RB "" "close_action" ""
 does not provide any guarantee that the CHILD_SA is kept alive.

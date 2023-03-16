@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2016 Andreas Steffen
- * HSR Hochschule fuer Technik Rapperswil
+ *
+ * Copyright (C) secunet Security Networks AG
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -379,7 +380,7 @@ START_TEST(test_ed25519_gen)
 	key2->destroy(key2);
 
 	/* decryption not supported */
-	ck_assert(!key->decrypt(key, ENCRYPT_UNKNOWN, msg, NULL));
+	ck_assert(!key->decrypt(key, ENCRYPT_UNKNOWN, NULL, msg, NULL));
 
 	/* wrong signature scheme */
 	ck_assert(!key->sign(key, SIGN_ED448, NULL, msg, &sig));
@@ -414,7 +415,7 @@ START_TEST(test_ed25519_gen)
 	pubkey2->destroy(pubkey2);
 
 	/* encryption not supported */
-	ck_assert(!pubkey->encrypt(pubkey, ENCRYPT_UNKNOWN, msg, NULL));
+	ck_assert(!pubkey->encrypt(pubkey, ENCRYPT_UNKNOWN, NULL, msg, NULL));
 
 	/* verify with wrong signature scheme */
 	ck_assert(!pubkey->verify(pubkey, SIGN_ED448, NULL, msg, sig));

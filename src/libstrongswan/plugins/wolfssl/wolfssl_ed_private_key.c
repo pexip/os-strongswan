@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2020 Tobias Brunner
- * HSR Hochschule fuer Technik Rapperswil
  *
  * Copyright (C) 2019 Sean Parkinson, wolfSSL Inc.
  *
@@ -113,7 +112,7 @@ METHOD(private_key_t, sign, bool,
 
 METHOD(private_key_t, decrypt, bool,
 	private_private_key_t *this, encryption_scheme_t scheme,
-	chunk_t crypto, chunk_t *plain)
+	void *params, chunk_t crypto, chunk_t *plain)
 {
 	DBG1(DBG_LIB, "EdDSA private key decryption not implemented");
 	return FALSE;

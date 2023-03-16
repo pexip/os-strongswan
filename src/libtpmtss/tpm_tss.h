@@ -1,7 +1,8 @@
 /*
  * Copyright (C) 2018 Tobias Brunner
  * Copyright (C) 2016-2020 Andreas Steffen
- * HSR Hochschule fuer Technik Rapperswil
+ *
+ * Copyright (C) secunet Security Networks AG
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -192,22 +193,22 @@ struct tpm_tss_t {
 };
 
 /**
- * Create a tpm_tss instance.
- *
- * @param version	TPM version that must be supported by TSS
- */
-tpm_tss_t *tpm_tss_probe(tpm_version_t version);
-
-/**
- * libtpmtss initialization function
+ * Initialize libtpmtss
  *
  * @return					TRUE if initialization was successful
  */
 bool libtpmtss_init(void);
 
 /**
- * libtpmtss de-initialization function
+ * Deinitialize libtpmtss
  */
 void libtpmtss_deinit(void);
+
+/**
+ * Create a tpm_tss instance.
+ *
+ * @param version			TPM version that must be supported by TSS
+ */
+tpm_tss_t *tpm_tss_probe(tpm_version_t version);
 
 #endif /** TPM_TSS_H_ @}*/

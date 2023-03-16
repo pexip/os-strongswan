@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2006 Martin Willi
- * HSR Hochschule fuer Technik Rapperswil
+ *
+ * Copyright (C) secunet Security Networks AG
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -96,7 +97,7 @@ struct eap_method_t {
 	 * @param vendor	pointer receiving vendor identifier for type, 0 for none
 	 * @return			type of the EAP method
 	 */
-	eap_type_t (*get_type) (eap_method_t *this, uint32_t *vendor);
+	eap_type_t (*get_type) (eap_method_t *this, pen_t *vendor);
 
 	/**
 	 * Check if this EAP method authenticates the server.
@@ -114,10 +115,16 @@ struct eap_method_t {
 	 * Not all EAP methods establish a shared secret. For implementations of
 	 * the EAP-Identity method, get_msk() returns the received identity.
 	 *
+	 * @note Returning NOT_SUPPORTED is important for implementations of EAP
+	 * methods that don't establish an MSK.  In particular as client because
+	 * key-generating EAP methods MUST fail to process EAP-Success messages if
+	 * no MSK is established.
+	 *
 	 * @param msk			chunk receiving internal stored MSK
 	 * @return
-	 *						- SUCCESS, or
+	 *						- SUCCESS, if MSK is established
 	 * 						- FAILED, if MSK not established (yet)
+	 *						- NOT_SUPPORTED, for non-MSK-establishing methods
 	 */
 	status_t (*get_msk) (eap_method_t *this, chunk_t *msk);
 

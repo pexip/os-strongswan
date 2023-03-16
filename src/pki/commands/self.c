@@ -1,7 +1,8 @@
 /*
  * Copyright (C) 2009 Martin Willi
  * Copyright (C) 2015-2019 Andreas Steffen
- * HSR Hochschule fuer Technik Rapperswil
+ *
+ * Copyright (C) secunet Security Networks AG
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -368,23 +369,10 @@ static int self()
 	{
 		serial = chunk_from_hex(chunk_create(hex, strlen(hex)), NULL);
 	}
-	else
+	else if (!allocate_serial(8, &serial))
 	{
-		rng_t *rng = lib->crypto->create_rng(lib->crypto, RNG_WEAK);
-
-		if (!rng)
-		{
-			error = "no random number generator found";
-			goto end;
-		}
-		if (!rng_allocate_bytes_not_zero(rng, 8, &serial, FALSE))
-		{
-			error = "failed to generate serial number";
-			rng->destroy(rng);
-			goto end;
-		}
-		serial.ptr[0] &= 0x7F;
-		rng->destroy(rng);
+		error = "failed to generate serial number";
+		goto end;
 	}
 	scheme = get_signature_scheme(private, digest, pss);
 	if (!scheme)

@@ -1,7 +1,8 @@
 /*
  * Copyright (C) 2005-2006 Martin Willi
  * Copyright (C) 2005 Jan Hutter
- * HSR Hochschule fuer Technik Rapperswil
+ *
+ * Copyright (C) secunet Security Networks AG
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -65,6 +66,7 @@ enum encryption_algorithm_t {
 	/* see macros below to handle RC2 (effective) key length */
 	ENCR_RC2_CBC =          1028,
 	ENCR_AES_ECB =			1029,
+	ENCR_AES_CFB =			1030,
 };
 
 #define DES_BLOCK_SIZE			 8

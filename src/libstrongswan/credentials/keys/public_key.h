@@ -2,7 +2,8 @@
  * Copyright (C) 2015-2017 Tobias Brunner
  * Copyright (C) 2014-2017 Andreas Steffen
  * Copyright (C) 2007 Martin Willi
- * HSR Hochschule fuer Technik Rapperswil
+ *
+ * Copyright (C) secunet Security Networks AG
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -182,12 +183,13 @@ struct public_key_t {
 	 * Encrypt a chunk of data.
 	 *
 	 * @param scheme	encryption scheme to use
+	 * @param params	optional parameters required by the specified scheme
 	 * @param plain		chunk containing plaintext data
 	 * @param crypto	where to allocate encrypted data
 	 * @return			TRUE if data successfully encrypted
 	 */
 	bool (*encrypt)(public_key_t *this, encryption_scheme_t scheme,
-					chunk_t plain, chunk_t *crypto);
+					void *params, chunk_t plain, chunk_t *crypto);
 
 	/**
 	 * Check if two public keys are equal.

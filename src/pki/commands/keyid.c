@@ -1,7 +1,8 @@
 /*
  * Copyright (C) 2009 Martin Willi
  * Copyright (C) 2017 Andreas Steffen
- * HSR Hochschule fuer Technik Rapperswil
+ *
+ * Copyright (C) secunet Security Networks AG
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -76,7 +77,7 @@ static int keyid()
 		ID_TYPE_ALL,
 		ID_TYPE_SPK,
 		ID_TYPE_SPKI,
-	} id_type = FORMAT_PRETTY;
+	} id_type = ID_TYPE_ALL;
 	char *file = NULL, *keyid = NULL;
 	void *cred;
 	chunk_t id, spk = chunk_empty, spki = chunk_empty;

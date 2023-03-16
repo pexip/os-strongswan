@@ -1,10 +1,10 @@
 /*
  * Copyright (C) 2006-2018 Tobias Brunner
  * Copyright (C) 2005-2010 Martin Willi
- * Copyright (C) 2010 revosec AG
  * Copyright (C) 2006 Daniel Roethlisberger
  * Copyright (C) 2005 Jan Hutter
- * HSR Hochschule fuer Technik Rapperswil
+ *
+ * Copyright (C) secunet Security Networks AG
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -1335,8 +1335,8 @@ static char* get_string(private_message_t *this, char *buf, int len)
 		if (payload->get_type(payload) == PLV2_EAP)
 		{
 			eap_payload_t *eap = (eap_payload_t*)payload;
-			uint32_t vendor;
 			eap_type_t type;
+			pen_t vendor;
 			char method[64] = "";
 
 			type = eap->get_type(eap, &vendor);
@@ -1344,7 +1344,8 @@ static char* get_string(private_message_t *this, char *buf, int len)
 			{
 				if (vendor)
 				{
-					snprintf(method, sizeof(method), "/%d-%d", type, vendor);
+					snprintf(method, sizeof(method), "/%d-%N", type,
+							 pen_short_names, vendor);
 				}
 				else
 				{
@@ -1565,7 +1566,7 @@ static encrypted_payload_t* wrap_payloads(private_message_t *this)
 		}
 	}
 	if (encrypted)
-	{	/* simply adopt all the unencrypted payloads */
+	{	/* simply adopt all the unprotected payloads */
 		this->payloads->destroy(this->payloads);
 		this->payloads = payloads;
 		return encrypted;
@@ -1655,7 +1656,7 @@ static ike_header_t *create_header(private_message_t *this)
  *
  * The generator and the possible encrypted payload are returned.  The latter
  * is not yet encrypted (but the transform is set).  It is also not added to
- * the payload list (so unless there are unencrypted payloads that list will
+ * the payload list (so unless there are unprotected payloads that list will
  * be empty afterwards).
  */
 static status_t generate_message(private_message_t *this, keymat_t *keymat,
@@ -1889,17 +1890,13 @@ METHOD(message_t, generate, status_t,
 static message_t *clone_message(private_message_t *this)
 {
 	message_t *message;
-	host_t *src, *dst;
 
-	src = this->packet->get_source(this->packet);
-	dst = this->packet->get_destination(this->packet);
-
-	message = message_create(this->major_version, this->minor_version);
+	message = message_create_from_packet(packet_clone_no_data(this->packet));
+	message->set_major_version(message, this->major_version);
+	message->set_minor_version(message, this->minor_version);
 	message->set_ike_sa_id(message, this->ike_sa_id);
 	message->set_message_id(message, this->message_id);
 	message->set_request(message, this->is_request);
-	message->set_source(message, src->clone(src));
-	message->set_destination(message, dst->clone(dst));
 	message->set_exchange_type(message, this->exchange_type);
 	memcpy(((private_message_t*)message)->reserved, this->reserved,
 		   sizeof(this->reserved));
@@ -1947,7 +1944,7 @@ static message_t *create_fragment(private_message_t *this, payload_type_t next,
 			/* only in the first fragment is this set to the type of the first
 			 * payload in the encrypted payload */
 			fragment->set_next_type(fragment, next);
-			/* move unencrypted payloads to the first fragment */
+			/* move unprotected payloads to the first fragment */
 			enumerator = this->payloads->create_enumerator(this->payloads);
 			while (enumerator->enumerate(enumerator, &payload))
 			{
@@ -2100,7 +2097,7 @@ METHOD(message_t, fragment, status_t,
 		/* padding and padding length */
 		frag_len = round_down(frag_len, aead->get_block_size(aead));
 		REDUCE_FRAG_LEN(frag_len, 1);
-		/* TODO-FRAG: if there are unencrypted payloads, should we account for
+		/* TODO-FRAG: if there are unprotected payloads, should we account for
 		 * their length in the first fragment? we still would have to add
 		 * an encrypted fragment payload (albeit empty), even so we couldn't
 		 * prevent IP fragmentation in every case */
@@ -2898,7 +2895,7 @@ METHOD(message_t, add_fragment_v2, status_t,
 		/* the first fragment denotes the payload type of the first payload in
 		 * the original encrypted payload, cache that */
 		this->first_payload = payload->get_next_type(payload);
-		/* move all unencrypted payloads contained in the first fragment */
+		/* move all unprotected payloads contained in the first fragment */
 		enumerator = message->create_payload_enumerator(message);
 		while (enumerator->enumerate(enumerator, &payload))
 		{
@@ -2924,10 +2921,18 @@ METHOD(message_t, add_fragment_v2, status_t,
 
 	data = merge_fragments(this, message);
 
+	/* use the cached next payload type from the SKF of the first fragment */
 	encrypted = encrypted_payload_create_from_plain(this->first_payload, data);
 	encrypted->set_transform(encrypted, aead);
+
+	if (this->payloads->get_last(this->payloads, (void**)&payload) == SUCCESS)
+	{	/* if there are any unprotected payloads, update the last one's next
+		 * payload type (it points to an SKF instead of an SK) */
+		payload->set_next_type(payload, encrypted->payload_interface.get_type(
+												&encrypted->payload_interface));
+	}
 	this->payloads->insert_last(this->payloads, encrypted);
-	/* update next payload type (could be an unencrypted payload) */
+	/* update payload type in the header (could be an unprotected payload) */
 	this->payloads->get_first(this->payloads, (void**)&payload);
 	this->first_payload = payload->get_type(payload);
 
@@ -2944,6 +2949,18 @@ METHOD(message_t, add_fragment_v2, status_t,
 	DBG1(DBG_ENC, "received fragment #%hu of %hu, reassembled fragmented IKE "
 		 "message (%zu bytes)", num, total, len);
 	return SUCCESS;
+}
+
+METHOD(message_t, get_metadata, metadata_t*,
+	private_message_t *this, const char *key)
+{
+	return this->packet->get_metadata(this->packet, key);
+}
+
+METHOD(message_t, set_metadata, void,
+	private_message_t *this, const char *key, metadata_t *data)
+{
+	this->packet->set_metadata(this->packet, key, data);
 }
 
 METHOD(message_t, destroy, void,
@@ -3013,6 +3030,8 @@ message_t *message_create_from_packet(packet_t *packet)
 			.get_packet = _get_packet,
 			.get_packet_data = _get_packet_data,
 			.get_fragments = _get_fragments,
+			.get_metadata = _get_metadata,
+			.set_metadata = _set_metadata,
 			.destroy = _destroy,
 		},
 		.exchange_type = EXCHANGE_TYPE_UNDEFINED,

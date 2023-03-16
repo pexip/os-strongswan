@@ -187,6 +187,18 @@ METHOD(public_key_t, verify, bool,
 		case SIGN_RSA_EMSA_PKCS1_SHA2_512:
 			return verify_emsa_pkcs1_signature(this, WC_HASH_TYPE_SHA512, data,
 											   signature);
+		case SIGN_RSA_EMSA_PKCS1_SHA3_224:
+			return verify_emsa_pkcs1_signature(this, WC_HASH_TYPE_SHA3_224, data,
+											   signature);
+		case SIGN_RSA_EMSA_PKCS1_SHA3_256:
+			return verify_emsa_pkcs1_signature(this, WC_HASH_TYPE_SHA3_256, data,
+											   signature);
+		case SIGN_RSA_EMSA_PKCS1_SHA3_384:
+			return verify_emsa_pkcs1_signature(this, WC_HASH_TYPE_SHA3_384, data,
+											   signature);
+		case SIGN_RSA_EMSA_PKCS1_SHA3_512:
+			return verify_emsa_pkcs1_signature(this, WC_HASH_TYPE_SHA3_512, data,
+											   signature);
 		case SIGN_RSA_EMSA_PKCS1_SHA1:
 			return verify_emsa_pkcs1_signature(this, WC_HASH_TYPE_SHA, data,
 											   signature);
@@ -204,12 +216,18 @@ METHOD(public_key_t, verify, bool,
 	}
 }
 
-METHOD(public_key_t, encrypt, bool,
+METHOD(public_key_t, encrypt_, bool,
 	private_wolfssl_rsa_public_key_t *this, encryption_scheme_t scheme,
-	chunk_t plain, chunk_t *crypto)
+	void *params, chunk_t plain, chunk_t *crypto)
 {
 	int padding, mgf, len;
 	enum wc_HashType hash;
+	chunk_t label = chunk_empty;
+
+	if (params)
+	{
+		label = *(chunk_t *)params;
+	}
 
 	switch (scheme)
 	{
@@ -264,7 +282,7 @@ METHOD(public_key_t, encrypt, bool,
 	*crypto = chunk_alloc(len);
 	len = wc_RsaPublicEncrypt_ex(plain.ptr, plain.len, crypto->ptr, len,
 								 &this->rsa, &this->rng, padding, hash, mgf,
-								 NULL, 0);
+								 label.ptr, label.len);
 	if (len < 0)
 	{
 		DBG1(DBG_LIB, "RSA encryption failed");
@@ -352,7 +370,7 @@ bool wolfssl_rsa_fingerprint(RsaKey *rsa, cred_encoding_type_t type,
 	}
 	else
 	{
-		lib->encoding->cache(lib->encoding, type, rsa, *fp);
+		lib->encoding->cache(lib->encoding, type, rsa, fp);
 		success = TRUE;
 	}
 	DESTROY_IF(hasher);
@@ -422,7 +440,7 @@ static private_wolfssl_rsa_public_key_t *create_empty()
 			.key = {
 				.get_type = _get_type,
 				.verify = _verify,
-				.encrypt = _encrypt,
+				.encrypt = _encrypt_,
 				.equals = public_key_equals,
 				.get_keysize = _get_keysize,
 				.get_fingerprint = _get_fingerprint,

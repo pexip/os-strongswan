@@ -2,7 +2,8 @@
  * Copyright (C) 2012-2017 Tobias Brunner
  * Copyright (C) 2012 Reto Buerki
  * Copyright (C) 2012 Adrian-Ken Rueegsegger
- * HSR Hochschule fuer Technik Rapperswil
+ *
+ * Copyright (C) secunet Security Networks AG
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -323,8 +324,17 @@ int main(int argc, char *argv[])
 		goto deinit;
 	}
 
+	if (!register_ca_mapping())
+	{
+		DBG1(DBG_DMN, "no CA certificate ID mapping defined - aborting %s", dmn_name);
+		goto deinit;
+	}
+
 	/* register TKM keymat variant */
 	keymat_register_constructor(IKEV2, (keymat_constructor_t)tkm_keymat_create);
+
+	/* register TKM credential encoder */
+	lib->encoding->add_encoder(lib->encoding, tkm_encoder_encode);
 
 	/* initialize daemon */
 	if (!charon->initialize(charon, PLUGINS))
@@ -367,9 +377,6 @@ int main(int argc, char *argv[])
 	creds = tkm_cred_create();
 	lib->credmgr->add_set(lib->credmgr, (credential_set_t*)creds);
 
-	/* register TKM credential encoder */
-	lib->encoding->add_encoder(lib->encoding, tkm_encoder_encode);
-
 	/* add handler for fatal signals,
 	 * INT and TERM are handled by sigwaitinfo() in run() */
 	action.sa_flags = 0;
@@ -404,6 +411,7 @@ int main(int argc, char *argv[])
 
 deinit:
 	destroy_dh_mapping();
+	destroy_ca_mapping();
 	libcharon_deinit();
 	tkm_deinit();
 	unlink_pidfile();
