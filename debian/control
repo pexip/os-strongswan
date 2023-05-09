@@ -4,7 +4,7 @@ Priority: optional
 Maintainer: Pexip AS <packaging@pexip.com>
 XSBC-Pexip-Original-Maintainer: strongSwan Maintainers <pkg-swan-devel@lists.alioth.debian.org>
 XSBC-Pexip-Original-Uploaders: Yves-Alexis Perez <corsac@debian.org>
-Standards-Version: 4.6.0
+Standards-Version: 4.6.2
 Vcs-Browser: https://salsa.debian.org/debian/strongswan
 Vcs-Git: https://salsa.debian.org/debian/strongswan.git
 Build-Depends: bison,
@@ -210,7 +210,7 @@ Architecture: any
 Pre-Depends: ${misc:Pre-Depends}
 Depends: adduser,
          libstrongswan (= ${binary:Version}),
-         lsb-base (>= 3.0-6),
+         sysvinit-utils (>= 3.05-3),
          ${misc:Depends},
          ${shlibs:Depends}
 Recommends: strongswan-charon
