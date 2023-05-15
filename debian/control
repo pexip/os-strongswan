@@ -96,6 +96,7 @@ Description: strongSwan utility and crypto library
 Package: libstrongswan-standard-plugins
 Architecture: any
 Depends: libstrongswan (= ${binary:Version}),
+         libssl3 (>= 3.0.8-0pexip4),
          ${misc:Depends},
          ${shlibs:Depends}
 Description: strongSwan utility and crypto library (standard plugins)
