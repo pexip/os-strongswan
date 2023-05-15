@@ -1,3 +1,9 @@
+strongswan (5.9.8-5pexip3) pexip; urgency=medium
+
+  * Patch openssl plugin to use i2d_X509_tbs() API
+
+ -- John-Mark Bell <jmb@pexip.com>  Mon, 15 May 2023 16:06:44 +0000
+
 strongswan (5.9.8-5pexip2) pexip; urgency=medium
 
   * Switch the sysvinit-utils dependency back to lsb-base; we still
