@@ -1,0 +1,13 @@
+diff --git a/src/libstrongswan/plugins/openssl/openssl_x509.c b/src/libstrongswan/plugins/openssl/openssl_x509.c
+index 4b331ad4f0..dd08be0292 100644
+--- a/src/libstrongswan/plugins/openssl/openssl_x509.c
++++ b/src/libstrongswan/plugins/openssl/openssl_x509.c
+@@ -441,7 +441,7 @@ METHOD(certificate_t, issued_by, bool,
+ 	}
+ 	/* i2d_re_X509_tbs() was added with 1.1.0 when X509 was made opaque */
+ #if OPENSSL_VERSION_NUMBER >= 0x10100000L
+-	tbs = openssl_i2chunk(re_X509_tbs, this->x509);
++	tbs = openssl_i2chunk(X509_tbs, this->x509);
+ #else
+ 	tbs = openssl_i2chunk(X509_CINF, this->x509->cert_info);
+ #endif
