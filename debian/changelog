@@ -1,3 +1,10 @@
+strongswan (5.9.8-5pexip4) pexip; urgency=medium
+
+  * d/patches/pexip/03-kdf-salt.patch: Add patch to ensure KDF salt is
+    initialised
+
+ -- John-Mark Bell <jmb@pexip.com>  Sat, 16 Sep 2023 18:50:47 +0100
+
 strongswan (5.9.8-5pexip3) pexip; urgency=medium
 
   * Patch openssl plugin to use i2d_X509_tbs() API
