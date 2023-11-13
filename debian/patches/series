@@ -3,3 +3,4 @@
 04_disable-libtls-tests.patch
 dont-load-kernel-libipsec-plugin-by-default.patch
 0005-libtls-Fix-authentication-bypass-and-expired-pointer.patch
+0006-charon-tkm-Validate-DH-public-key-to-fix-potential-b.patch
