@@ -1,3 +1,9 @@
+strongswan (5.9.8-5pexip5) pexip-bookworm; urgency=medium
+
+  * Initial bookworm build
+
+ -- Mark Hymers <mark.hymers@pexip.com>  Thu, 16 Nov 2023 10:34:14 +0000
+
 strongswan (5.9.8-5pexip4) pexip; urgency=medium
 
   * d/patches/pexip/03-kdf-salt.patch: Add patch to ensure KDF salt is
