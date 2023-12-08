@@ -1,3 +1,10 @@
+strongswan (5.9.8-5+deb12u1) bookworm-security; urgency=medium
+
+  * d/patches: add fix for CVE-2023-41913 in charon-tkm
+    Buffer Overflow When Handling DH Public Values
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Mon, 13 Nov 2023 21:29:34 +0100
+
 strongswan (5.9.8-5pexip5) pexip-bookworm; urgency=medium
 
   * Initial bookworm build
