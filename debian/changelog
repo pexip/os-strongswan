@@ -1,3 +1,16 @@
+strongswan (5.9.8-5+deb12u1pexip3) pexip; urgency=medium
+
+  * New upstream release with security update
+
+ -- Steve McIntyre <steve.mcintyre@pexip.com>  Tue, 16 Jan 2024 17:02:55 +0000
+
+strongswan (5.9.8-5+deb12u1) bookworm-security; urgency=medium
+
+  * d/patches: add fix for CVE-2023-41913 in charon-tkm
+    Buffer Overflow When Handling DH Public Values
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Mon, 13 Nov 2023 21:29:34 +0100
+
 strongswan (5.9.8-5pexip4) pexip; urgency=medium
 
   * d/patches/pexip/03-kdf-salt.patch: Add patch to ensure KDF salt is
