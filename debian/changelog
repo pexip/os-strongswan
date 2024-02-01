@@ -1,3 +1,9 @@
+strongswan (5.9.8-5+deb12u1+pexip24u5) pexip-bookworm; urgency=medium
+
+  * New versioning scheme
+
+ -- Mark Hymers <mark.hymers@pexip.com>  Thu, 01 Feb 2024 16:36:41 +0000
+
 strongswan (5.9.8-5+deb12u1pexip4) pexip-bookworm; urgency=medium
 
   * No-change rebuild to stay ahead of bullseye version
