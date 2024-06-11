@@ -1,8 +1,130 @@
-diff --git a/src/libstrongswan/plugins/openssl/openssl_kdf.c b/src/libstrongswan/plugins/openssl/openssl_kdf.c
-index cca81783ab..461764e124 100644
---- a/src/libstrongswan/plugins/openssl/openssl_kdf.c
-+++ b/src/libstrongswan/plugins/openssl/openssl_kdf.c
-@@ -199,6 +199,9 @@ kdf_t *openssl_kdf_create(key_derivation_function_t algo, va_list args)
+Index: os-strongswan/src/libstrongswan/plugins/openssl/openssl_kdf.c
+===================================================================
+--- os-strongswan.orig/src/libstrongswan/plugins/openssl/openssl_kdf.c
++++ os-strongswan/src/libstrongswan/plugins/openssl/openssl_kdf.c
+@@ -24,6 +24,8 @@
+ 
+ #include "openssl_kdf.h"
+ 
++#include <utils/debug.h>
++
+ typedef struct private_kdf_t private_kdf_t;
+ 
+ /**
+@@ -80,22 +82,58 @@ METHOD(kdf_t, get_length, size_t,
+  */
+ static bool set_params(private_kdf_t *this, EVP_PKEY_CTX *ctx)
+ {
++
++    int r1, r2, r3;
+ 	if (this->type == KDF_PRF)
+ 	{
+-		return EVP_PKEY_CTX_hkdf_mode(ctx, EVP_PKEY_HKDEF_MODE_EXTRACT_ONLY) > 0 &&
+-			   EVP_PKEY_CTX_set1_hkdf_key(ctx, this->key.ptr, this->key.len) > 0 &&
+-			   EVP_PKEY_CTX_set1_hkdf_salt(ctx, this->salt.ptr, this->salt.len) > 0;
++        r1 = EVP_PKEY_CTX_hkdf_mode(ctx, EVP_PKEY_HKDEF_MODE_EXTRACT_ONLY);
++        if (r1 > 0) {
++            DBG1(DBG_IKE, "FUCKED UP IN PART 1 (A)");
++            return false;
++        }
++
++        r2 = EVP_PKEY_CTX_set1_hkdf_key(ctx, this->key.ptr, this->key.len);
++        if (r2 > 0) {
++            DBG1(DBG_IKE, "FUCKED UP IN PART 2 (A)");
++            return false;
++        }
++
++        r3 = EVP_PKEY_CTX_set1_hkdf_salt(ctx, this->salt.ptr, this->salt.len);
++        if (r3 > 0) {
++            DBG1(DBG_IKE, "FUCKED UP IN PART 3 (A)");
++            return false;
++        }
++
++        return true;
+ 	}
+ 	/* for HKDF-Expand() we map the salt to the "info" field */
+-	return EVP_PKEY_CTX_hkdf_mode(ctx, EVP_PKEY_HKDEF_MODE_EXPAND_ONLY) > 0 &&
+-		   EVP_PKEY_CTX_set1_hkdf_key(ctx, this->key.ptr, this->key.len) > 0 &&
+-		   EVP_PKEY_CTX_add1_hkdf_info(ctx, this->salt.ptr, this->salt.len) > 0;
++    r1 = EVP_PKEY_CTX_hkdf_mode(ctx, EVP_PKEY_HKDEF_MODE_EXPAND_ONLY);
++    if (r1 > 0) {
++        DBG1(DBG_IKE, "FUCKED UP IN PART 1 (B)");
++        return false;
++    }
++
++    r2 = EVP_PKEY_CTX_set1_hkdf_key(ctx, this->key.ptr, this->key.len);
++    if (r2 > 0) {
++        DBG1(DBG_IKE, "FUCKED UP IN PART 2 (B)");
++        return false;
++    }
++
++    r3 = EVP_PKEY_CTX_add1_hkdf_info(ctx, this->salt.ptr, this->salt.len);
++    if (r3 > 0) {
++        DBG1(DBG_IKE, "FUCKED UP IN PART 3 (B)");
++        return false;
++    }
++
++    return true;
+ }
+ 
+ METHOD(kdf_t, get_bytes, bool,
+ 	private_kdf_t *this, size_t out_len, uint8_t *buffer)
+ {
+ 	EVP_PKEY_CTX *ctx;
++    int r1, r2, r3;
++    bool b1;
+ 
+ 	if (this->type == KDF_PRF && out_len != get_length(this))
+ 	{
+@@ -103,15 +141,41 @@ METHOD(kdf_t, get_bytes, bool,
+ 	}
+ 
+ 	ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_HKDF, NULL);
+-	if (!ctx ||
+-		EVP_PKEY_derive_init(ctx) <= 0 ||
+-		EVP_PKEY_CTX_set_hkdf_md(ctx, this->hasher) <= 0 ||
+-		!set_params(this, ctx) ||
+-		EVP_PKEY_derive(ctx, buffer, &out_len) <= 0)
+-	{
++	if (!ctx) {
++        EVP_PKEY_CTX_free(ctx);
++        DBG1(DBG_IKE, "GET BYTES FAILURE 0");
++        return FALSE;
++    }
++
++    r1 = EVP_PKEY_derive_init(ctx);
++
++    if (r1 <= 0) {
++        EVP_PKEY_CTX_free(ctx);
++        DBG1(DBG_IKE, "GET BYTES FAILURE 1");
++        return FALSE;
++    }
++
++	r2 = EVP_PKEY_CTX_set_hkdf_md(ctx, this->hasher);
++    if (r2 <= 0) {
++        EVP_PKEY_CTX_free(ctx);
++        DBG1(DBG_IKE, "GET BYTES FAILURE 2");
++        return FALSE;
++    }
++
++	b1 = set_params(this, ctx);
++    if (!b1) {
++        EVP_PKEY_CTX_free(ctx);
++        DBG1(DBG_IKE, "GET BYTES FAILURE 3");
++        return FALSE;
++    }
++
++	r3 = EVP_PKEY_derive(ctx, buffer, &out_len);
++    if (r3 <= 0) {
+ 		EVP_PKEY_CTX_free(ctx);
++        DBG1(DBG_IKE, "GET BYTES FAILURE 4");
+ 		return FALSE;
+ 	}
++
+ 	EVP_PKEY_CTX_free(ctx);
+ 	return TRUE;
+ }
+@@ -199,6 +263,9 @@ kdf_t *openssl_kdf_create(key_derivation
  		/* use a lengthy key to test the implementation below to make sure the
  		 * algorithms are usable, see openssl_hmac.c for details */
  		.key = chunk_clone(chunk_from_str("00000000000000000000000000000000")),
