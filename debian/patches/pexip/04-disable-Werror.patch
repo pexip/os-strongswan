@@ -1,0 +1,17 @@
+diff --git a/configure.ac b/configure.ac
+index f9e6e55c2..c664198c9 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -530,12 +530,6 @@ if test x$kdf = xfalse; then
+ 	fi
+ fi
+ 
+-# enable warnings and -Werror by default when building from the repo (check with
+-# -e as .git is a file in worktrees)
+-if test x$warnings_given = xfalse -a -e "$srcdir"/.git; then
+-	warnings=true
+-fi
+-
+ # ===========================================
+ #  check required libraries and header files
+ # ===========================================

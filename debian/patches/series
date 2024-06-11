@@ -7,3 +7,4 @@ dont-load-kernel-libipsec-plugin-by-default.patch
 pexip/01-ipsec-stop-with-old-pidfile.patch
 pexip/02-x509-tbs.patch
 pexip/03-kdf-salt.patch
+pexip/04-disable-Werror.patch

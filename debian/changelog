@@ -1,3 +1,9 @@
+strongswan (5.9.8-5+pexip24u6+deb12u1) pexip; urgency=medium
+
+  * Stop the build adding -Werror if building from git
+
+ -- Steve McIntyre <steve.mcintyre@pexip.com>  Tue, 11 Jun 2024 14:39:17 +0100
+
 strongswan (5.9.8-5+deb12u1+pexip24u5) pexip-bookworm; urgency=medium
 
   * New versioning scheme
