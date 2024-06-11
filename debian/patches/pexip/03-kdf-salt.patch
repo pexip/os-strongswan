@@ -23,19 +23,19 @@ Index: os-strongswan/src/libstrongswan/plugins/openssl/openssl_kdf.c
 -			   EVP_PKEY_CTX_set1_hkdf_key(ctx, this->key.ptr, this->key.len) > 0 &&
 -			   EVP_PKEY_CTX_set1_hkdf_salt(ctx, this->salt.ptr, this->salt.len) > 0;
 +        r1 = EVP_PKEY_CTX_hkdf_mode(ctx, EVP_PKEY_HKDEF_MODE_EXTRACT_ONLY);
-+        if (r1 > 0) {
++        if (r1 <= 0) {
 +            DBG1(DBG_IKE, "FUCKED UP IN PART 1 (A)");
 +            return false;
 +        }
 +
 +        r2 = EVP_PKEY_CTX_set1_hkdf_key(ctx, this->key.ptr, this->key.len);
-+        if (r2 > 0) {
++        if (r2 <= 0) {
 +            DBG1(DBG_IKE, "FUCKED UP IN PART 2 (A)");
 +            return false;
 +        }
 +
 +        r3 = EVP_PKEY_CTX_set1_hkdf_salt(ctx, this->salt.ptr, this->salt.len);
-+        if (r3 > 0) {
++        if (r3 <= 0) {
 +            DBG1(DBG_IKE, "FUCKED UP IN PART 3 (A)");
 +            return false;
 +        }
@@ -47,19 +47,19 @@ Index: os-strongswan/src/libstrongswan/plugins/openssl/openssl_kdf.c
 -		   EVP_PKEY_CTX_set1_hkdf_key(ctx, this->key.ptr, this->key.len) > 0 &&
 -		   EVP_PKEY_CTX_add1_hkdf_info(ctx, this->salt.ptr, this->salt.len) > 0;
 +    r1 = EVP_PKEY_CTX_hkdf_mode(ctx, EVP_PKEY_HKDEF_MODE_EXPAND_ONLY);
-+    if (r1 > 0) {
++    if (r1 <= 0) {
 +        DBG1(DBG_IKE, "FUCKED UP IN PART 1 (B)");
 +        return false;
 +    }
 +
 +    r2 = EVP_PKEY_CTX_set1_hkdf_key(ctx, this->key.ptr, this->key.len);
-+    if (r2 > 0) {
++    if (r2 <= 0) {
 +        DBG1(DBG_IKE, "FUCKED UP IN PART 2 (B)");
 +        return false;
 +    }
 +
 +    r3 = EVP_PKEY_CTX_add1_hkdf_info(ctx, this->salt.ptr, this->salt.len);
-+    if (r3 > 0) {
++    if (r3 <= 0) {
 +        DBG1(DBG_IKE, "FUCKED UP IN PART 3 (B)");
 +        return false;
 +    }
