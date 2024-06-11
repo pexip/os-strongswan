@@ -124,13 +124,3 @@ Index: os-strongswan/src/libstrongswan/plugins/openssl/openssl_kdf.c
  	EVP_PKEY_CTX_free(ctx);
  	return TRUE;
  }
-@@ -199,6 +263,9 @@ kdf_t *openssl_kdf_create(key_derivation
- 		/* use a lengthy key to test the implementation below to make sure the
- 		 * algorithms are usable, see openssl_hmac.c for details */
- 		.key = chunk_clone(chunk_from_str("00000000000000000000000000000000")),
-+		.salt = chunk_clone(chunk_from_chars(
-+			    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+			    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)),
- 	);
- 
- 	if (!this->hasher ||
