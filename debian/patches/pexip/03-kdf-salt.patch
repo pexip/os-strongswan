@@ -24,19 +24,19 @@ Index: os-strongswan/src/libstrongswan/plugins/openssl/openssl_kdf.c
 -			   EVP_PKEY_CTX_set1_hkdf_salt(ctx, this->salt.ptr, this->salt.len) > 0;
 +        r1 = EVP_PKEY_CTX_hkdf_mode(ctx, EVP_PKEY_HKDEF_MODE_EXTRACT_ONLY);
 +        if (r1 <= 0) {
-+            DBG1(DBG_IKE, "FUCKED UP IN PART 1 (A)");
++            DBG1(DBG_IKE, "FUCKED UP IN PART 1 (A) %d", r1);
 +            return false;
 +        }
 +
 +        r2 = EVP_PKEY_CTX_set1_hkdf_key(ctx, this->key.ptr, this->key.len);
 +        if (r2 <= 0) {
-+            DBG1(DBG_IKE, "FUCKED UP IN PART 2 (A)");
++            DBG1(DBG_IKE, "FUCKED UP IN PART 2 (A) %d", r2);
 +            return false;
 +        }
 +
 +        r3 = EVP_PKEY_CTX_set1_hkdf_salt(ctx, this->salt.ptr, this->salt.len);
 +        if (r3 <= 0) {
-+            DBG1(DBG_IKE, "FUCKED UP IN PART 3 (A)");
++            DBG1(DBG_IKE, "FUCKED UP IN PART 3 (A) %d", r3);
 +            return false;
 +        }
 +
@@ -48,19 +48,19 @@ Index: os-strongswan/src/libstrongswan/plugins/openssl/openssl_kdf.c
 -		   EVP_PKEY_CTX_add1_hkdf_info(ctx, this->salt.ptr, this->salt.len) > 0;
 +    r1 = EVP_PKEY_CTX_hkdf_mode(ctx, EVP_PKEY_HKDEF_MODE_EXPAND_ONLY);
 +    if (r1 <= 0) {
-+        DBG1(DBG_IKE, "FUCKED UP IN PART 1 (B)");
++        DBG1(DBG_IKE, "FUCKED UP IN PART 1 (B) %d", r1);
 +        return false;
 +    }
 +
 +    r2 = EVP_PKEY_CTX_set1_hkdf_key(ctx, this->key.ptr, this->key.len);
 +    if (r2 <= 0) {
-+        DBG1(DBG_IKE, "FUCKED UP IN PART 2 (B)");
++        DBG1(DBG_IKE, "FUCKED UP IN PART 2 (B) %d", r2);
 +        return false;
 +    }
 +
 +    r3 = EVP_PKEY_CTX_add1_hkdf_info(ctx, this->salt.ptr, this->salt.len);
 +    if (r3 <= 0) {
-+        DBG1(DBG_IKE, "FUCKED UP IN PART 3 (B)");
++        DBG1(DBG_IKE, "FUCKED UP IN PART 3 (B) %d", r3);
 +        return false;
 +    }
 +
@@ -96,28 +96,28 @@ Index: os-strongswan/src/libstrongswan/plugins/openssl/openssl_kdf.c
 +
 +    if (r1 <= 0) {
 +        EVP_PKEY_CTX_free(ctx);
-+        DBG1(DBG_IKE, "GET BYTES FAILURE 1");
++        DBG1(DBG_IKE, "GET BYTES FAILURE 1 %d", r1);
 +        return FALSE;
 +    }
 +
 +	r2 = EVP_PKEY_CTX_set_hkdf_md(ctx, this->hasher);
 +    if (r2 <= 0) {
 +        EVP_PKEY_CTX_free(ctx);
-+        DBG1(DBG_IKE, "GET BYTES FAILURE 2");
++        DBG1(DBG_IKE, "GET BYTES FAILURE 2 %d", r2);
 +        return FALSE;
 +    }
 +
 +	b1 = set_params(this, ctx);
 +    if (!b1) {
 +        EVP_PKEY_CTX_free(ctx);
-+        DBG1(DBG_IKE, "GET BYTES FAILURE 3");
++        DBG1(DBG_IKE, "GET BYTES FAILURE 3 %d", b1);
 +        return FALSE;
 +    }
 +
 +	r3 = EVP_PKEY_derive(ctx, buffer, &out_len);
 +    if (r3 <= 0) {
  		EVP_PKEY_CTX_free(ctx);
-+        DBG1(DBG_IKE, "GET BYTES FAILURE 4");
++        DBG1(DBG_IKE, "GET BYTES FAILURE 4 %d", r3);
  		return FALSE;
  	}
 +
