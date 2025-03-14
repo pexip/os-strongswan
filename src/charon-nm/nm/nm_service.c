@@ -1,7 +1,6 @@
 /*
  * Copyright (C) 2017 Lubomir Rintel
- *
- * Copyright (C) 2013-2020 Tobias Brunner
+ * Copyright (C) 2013-2023 Tobias Brunner
  * Copyright (C) 2008-2009 Martin Willi
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -15,6 +14,10 @@
  * for more details.
  */
 
+#include <stdio.h>
+#include <inttypes.h>
+#include <net/if.h>
+
 #include "nm_service.h"
 
 #include <daemon.h>
@@ -23,8 +26,9 @@
 #include <config/peer_cfg.h>
 #include <credentials/certificates/x509.h>
 #include <networking/tun_device.h>
+#include <plugins/kernel_netlink/kernel_netlink_xfrmi.h>
 
-#include <stdio.h>
+#define XFRMI_DEFAULT_MTU 1400
 
 /**
  * Private data of NMStrongswanPlugin
@@ -40,7 +44,13 @@ typedef struct {
 	nm_creds_t *creds;
 	/* attribute handler for DNS/NBNS server information */
 	nm_handler_t *handler;
-	/* dummy TUN device */
+	/* manager for XFRM interfaces, if supported */
+	kernel_netlink_xfrmi_t *xfrmi_manager;
+	/* interface ID of XFRM interface */
+	uint32_t xfrmi_id;
+	/* name of XFRM interface if one is used */
+	char *xfrmi;
+	/* dummy TUN device if not using XFRM interface */
 	tun_device_t *tun;
 	/* name of the connection */
 	char *name;
@@ -108,6 +118,83 @@ static GVariant* handler_to_variant(nm_handler_t *handler, char *variant_type,
 }
 
 /**
+ * Destroy any allocated XFRM or TUN interface
+ */
+static void delete_interface(NMStrongswanPluginPrivate *priv)
+{
+	if (priv->xfrmi)
+	{
+		priv->xfrmi_manager->delete(priv->xfrmi_manager, priv->xfrmi);
+		free(priv->xfrmi);
+		priv->xfrmi = NULL;
+	}
+	if (priv->tun)
+	{
+		priv->tun->destroy(priv->tun);
+		priv->tun = NULL;
+	}
+}
+
+/**
+ * Create an XFRM or TUN interface
+ */
+static void create_interface(NMStrongswanPluginPrivate *priv,
+							 const char *interface_name)
+{
+	if (priv->xfrmi_manager)
+	{
+		char name[IFNAMSIZ];
+		int mtu;
+
+		/* allocate a random interface ID */
+		priv->xfrmi_id = random();
+
+		if (interface_name)
+		{	/* use the preferred interface name if one is provided */
+			snprintf(name, sizeof(name), "%s", interface_name);
+		}
+		else
+		{
+			/* use the interface ID to get a unique name, fine if it's cut off */
+			snprintf(name, sizeof(name), "nm-xfrm-%" PRIu32, priv->xfrmi_id);
+		}
+
+		mtu = lib->settings->get_int(lib->settings, "charon-nm.mtu",
+									 XFRMI_DEFAULT_MTU);
+
+		if (priv->xfrmi_manager->create(priv->xfrmi_manager, name,
+										priv->xfrmi_id, NULL, mtu))
+		{
+			priv->xfrmi = strdup(name);
+		}
+		else
+		{
+			priv->xfrmi_id = 0;
+		}
+	}
+	if (!priv->xfrmi)
+	{	/* use a TUN device as fallback */
+		priv->tun = tun_device_create(NULL);
+	}
+
+	if (priv->xfrmi)
+	{
+		DBG1(DBG_CFG, "created XFRM interface %s for NetworkManager connection "
+			 "%s", priv->xfrmi, priv->name);
+	}
+	else if (priv->tun)
+	{
+		DBG1(DBG_CFG, "created TUN device %s for NetworkManager connection "
+			 "%s", priv->tun->get_name(priv->tun), priv->name);
+	}
+	else
+	{
+		DBG1(DBG_CFG, "failed to create XFRM or dummy TUN device, might affect "
+			 "DNS server installation negatively");
+	}
+}
+
+/**
  * Signal IP config to NM, set connection as established
  */
 static void signal_ip_config(NMVpnServicePlugin *plugin,
@@ -127,17 +214,18 @@ static void signal_ip_config(NMVpnServicePlugin *plugin,
 
 	handler = priv->handler;
 
-	/* NM apparently requires to know the gateway */
+	/* NM apparently requires to know the gateway (it uses it to install a
+	 * direct route via physical interface if conflicting routes are passed) */
 	other = ike_sa->get_other_host(ike_sa);
 	g_variant_builder_add (&builder, "{sv}", NM_VPN_PLUGIN_CONFIG_EXT_GATEWAY,
 						   host_to_variant(other));
 
-	/* systemd-resolved requires a device to properly install DNS servers, but
-	 * Netkey does not use one.  Passing the physical interface is not ideal,
-	 * as NM fiddles around with it and systemd-resolved likes a separate
-	 * device. So we pass a dummy TUN device along for NM etc. to play with...
-	 */
-	if (priv->tun)
+	if (priv->xfrmi)
+	{
+		g_variant_builder_add (&builder, "{sv}", NM_VPN_PLUGIN_CONFIG_TUNDEV,
+							   g_variant_new_string (priv->xfrmi));
+	}
+	else if (priv->tun)
 	{
 		g_variant_builder_add (&builder, "{sv}", NM_VPN_PLUGIN_CONFIG_TUNDEV,
 							   g_variant_new_string (priv->tun->get_name(priv->tun)));
@@ -184,18 +272,16 @@ static void signal_ip_config(NMVpnServicePlugin *plugin,
 							   host_to_variant(vip4));
 		g_variant_builder_add (&ip4builder, "{sv}", NM_VPN_PLUGIN_IP4_CONFIG_PREFIX,
 							   g_variant_new_uint32 (vip4->get_address(vip4).len * 8));
+		g_variant_builder_add (&ip4builder, "{sv}", NM_VPN_PLUGIN_IP4_CONFIG_DNS,
+							   handler_to_variant(handler, "au", INTERNAL_IP4_DNS));
+		g_variant_builder_add (&ip4builder, "{sv}", NM_VPN_PLUGIN_IP4_CONFIG_NBNS,
+							   handler_to_variant(handler, "au", INTERNAL_IP4_NBNS));
 
-		/* prevent NM from changing the default route. we set our own route in our
-		 * own routing table
+		/* prevent NM from changing the default route, as we set our own routes
+		 * in a separate routing table
 		 */
 		g_variant_builder_add (&ip4builder, "{sv}", NM_VPN_PLUGIN_IP4_CONFIG_NEVER_DEFAULT,
 							   g_variant_new_boolean (TRUE));
-
-		g_variant_builder_add (&ip4builder, "{sv}", NM_VPN_PLUGIN_IP4_CONFIG_DNS,
-							   handler_to_variant(handler, "au", INTERNAL_IP4_DNS));
-
-		g_variant_builder_add (&ip4builder, "{sv}", NM_VPN_PLUGIN_IP4_CONFIG_NBNS,
-							   handler_to_variant(handler, "au", INTERNAL_IP4_NBNS));
 	}
 
 	if (vip6)
@@ -204,11 +290,12 @@ static void signal_ip_config(NMVpnServicePlugin *plugin,
 							   host_to_variant(vip6));
 		g_variant_builder_add (&ip6builder, "{sv}", NM_VPN_PLUGIN_IP6_CONFIG_PREFIX,
 							   g_variant_new_uint32 (vip6->get_address(vip6).len * 8));
-		g_variant_builder_add (&ip6builder, "{sv}", NM_VPN_PLUGIN_IP6_CONFIG_NEVER_DEFAULT,
-							   g_variant_new_boolean (TRUE));
 		g_variant_builder_add (&ip6builder, "{sv}", NM_VPN_PLUGIN_IP6_CONFIG_DNS,
 							   handler_to_variant(handler, "aay", INTERNAL_IP6_DNS));
 		/* NM_VPN_PLUGIN_IP6_CONFIG_NBNS is not defined */
+
+		g_variant_builder_add (&ip6builder, "{sv}", NM_VPN_PLUGIN_IP6_CONFIG_NEVER_DEFAULT,
+							   g_variant_new_boolean (TRUE));
 	}
 
 	ip4config = g_variant_builder_end (&ip4builder);
@@ -588,6 +675,51 @@ static bool add_auth_cfg_pw(NMStrongswanPluginPrivate *priv,
 }
 
 /**
+ * Add traffic selectors to the given config, optionally parse them from a
+ * semicolon-separated list.
+ */
+static bool add_traffic_selectors(child_cfg_t *child_cfg, bool local,
+								  const char *list, GError **err)
+{
+	enumerator_t *enumerator;
+	traffic_selector_t *ts;
+	char *token;
+
+	if (list && strlen(list))
+	{
+		enumerator = enumerator_create_token(list, ";", "");
+		while (enumerator->enumerate(enumerator, &token))
+		{
+			ts = traffic_selector_create_from_cidr(token, 0, 0, 65535);
+			if (!ts)
+			{
+				g_set_error(err, NM_VPN_PLUGIN_ERROR,
+							NM_VPN_PLUGIN_ERROR_LAUNCH_FAILED,
+							"Invalid %s traffic selector '%s'.",
+							local ? "local" : "remote", token);
+				enumerator->destroy(enumerator);
+				return FALSE;
+			}
+			child_cfg->add_traffic_selector(child_cfg, local, ts);
+		}
+		enumerator->destroy(enumerator);
+	}
+	else if (local)
+	{
+		ts = traffic_selector_create_dynamic(0, 0, 65535);
+		child_cfg->add_traffic_selector(child_cfg, TRUE, ts);
+	}
+	else
+	{
+		ts = traffic_selector_create_from_cidr("0.0.0.0/0", 0, 0, 65535);
+		child_cfg->add_traffic_selector(child_cfg, FALSE, ts);
+		ts = traffic_selector_create_from_cidr("::/0", 0, 0, 65535);
+		child_cfg->add_traffic_selector(child_cfg, FALSE, ts);
+	}
+	return TRUE;
+}
+
+/**
  * Connect function called from NM via DBUS
  */
 static gboolean connect_(NMVpnServicePlugin *plugin, NMConnection *connection,
@@ -605,7 +737,6 @@ static gboolean connect_(NMVpnServicePlugin *plugin, NMConnection *connection,
 	ike_cfg_t *ike_cfg;
 	peer_cfg_t *peer_cfg;
 	child_cfg_t *child_cfg;
-	traffic_selector_t *ts;
 	ike_sa_t *ike_sa;
 	auth_cfg_t *auth;
 	certificate_t *cert = NULL;
@@ -646,20 +777,15 @@ static gboolean connect_(NMVpnServicePlugin *plugin, NMConnection *connection,
 												NM_TYPE_SETTING_CONNECTION));
 	vpn = NM_SETTING_VPN(nm_connection_get_setting(connection,
 												NM_TYPE_SETTING_VPN));
-	if (priv->name)
-	{
-		free(priv->name);
-	}
+	free(priv->name);
 	priv->name = strdup(nm_setting_connection_get_id(conn));
 	DBG1(DBG_CFG, "received initiate for NetworkManager connection %s",
 		 priv->name);
+	DBG3(DBG_CFG, "%s",
+		 nm_setting_to_string(NM_SETTING(conn)));
 	DBG4(DBG_CFG, "%s",
 		 nm_setting_to_string(NM_SETTING(vpn)));
-	if (!priv->tun)
-	{
-		DBG1(DBG_CFG, "failed to create dummy TUN device, might affect DNS "
-			 "server installation negatively");
-	}
+
 	ike.remote = (char*)nm_setting_vpn_get_data_item(vpn, "address");
 	if (!ike.remote || !*ike.remote)
 	{
@@ -819,6 +945,23 @@ static gboolean connect_(NMVpnServicePlugin *plugin, NMConnection *connection,
 	auth->add(auth, AUTH_RULE_IDENTITY_LOOSE, loose_gateway_id);
 	peer_cfg->add_auth_cfg(peer_cfg, auth, FALSE);
 
+	/* systemd-resolved requires a device to properly install DNS servers, but
+	 * Netkey does not require one.  Passing the physical interface is not ideal,
+	 * as NM fiddles around with it and systemd-resolved likes a separate
+	 * device. So we pass either an XFRM interface or a dummy TUN device along
+	 * for NM etc. to play with...
+	 */
+	delete_interface(priv);
+	create_interface(priv, nm_setting_connection_get_interface_name(conn));
+	if (priv->xfrmi_id)
+	{	/* set the same mark as for IKE packets on the ESP packets so no routing
+		 * loop is created if the TS covers the VPN server's IP */
+		mark_from_string(lib->settings->get_str(lib->settings,
+							"charon-nm.plugins.socket-default.fwmark", NULL),
+						 MARK_OP_NONE, &child.set_mark_out);
+		child.if_id_in = child.if_id_out = priv->xfrmi_id;
+	}
+
 	child_cfg = child_cfg_create(priv->name, &child);
 	str = nm_setting_vpn_get_data_item(vpn, "esp");
 	if (proposal && str && strlen(str))
@@ -846,36 +989,22 @@ static gboolean connect_(NMVpnServicePlugin *plugin, NMConnection *connection,
 		child_cfg->add_proposal(child_cfg, proposal_create_default_aead(PROTO_ESP));
 		child_cfg->add_proposal(child_cfg, proposal_create_default(PROTO_ESP));
 	}
-	ts = traffic_selector_create_dynamic(0, 0, 65535);
-	child_cfg->add_traffic_selector(child_cfg, TRUE, ts);
+
+	str = nm_setting_vpn_get_data_item(vpn, "local-ts");
+	if (!add_traffic_selectors(child_cfg, TRUE, str, err))
+	{
+		child_cfg->destroy(child_cfg);
+		peer_cfg->destroy(peer_cfg);
+		return FALSE;
+	}
 	str = nm_setting_vpn_get_data_item(vpn, "remote-ts");
-	if (str && strlen(str))
+	if (!add_traffic_selectors(child_cfg, FALSE, str, err))
 	{
-		enumerator = enumerator_create_token(str, ";", "");
-		while (enumerator->enumerate(enumerator, &str))
-		{
-			ts = traffic_selector_create_from_cidr((char*)str, 0, 0, 65535);
-			if (!ts)
-			{
-				g_set_error(err, NM_VPN_PLUGIN_ERROR,
-							NM_VPN_PLUGIN_ERROR_LAUNCH_FAILED,
-							"Invalid remote traffic selector.");
-				enumerator->destroy(enumerator);
-				child_cfg->destroy(child_cfg);
-				peer_cfg->destroy(peer_cfg);
-				return FALSE;
-			}
-			child_cfg->add_traffic_selector(child_cfg, FALSE, ts);
-		}
-		enumerator->destroy(enumerator);
+		child_cfg->destroy(child_cfg);
+		peer_cfg->destroy(peer_cfg);
+		return FALSE;
 	}
-	else
-	{
-		ts = traffic_selector_create_from_cidr("0.0.0.0/0", 0, 0, 65535);
-		child_cfg->add_traffic_selector(child_cfg, FALSE, ts);
-		ts = traffic_selector_create_from_cidr("::/0", 0, 0, 65535);
-		child_cfg->add_traffic_selector(child_cfg, FALSE, ts);
-	}
+
 	peer_cfg->add_child_cfg(peer_cfg, child_cfg);
 
 	/**
@@ -989,7 +1118,7 @@ static gboolean do_disconnect(gpointer plugin)
 	NMStrongswanPluginPrivate *priv = NM_STRONGSWAN_PLUGIN_GET_PRIVATE(plugin);
 	enumerator_t *enumerator;
 	ike_sa_t *ike_sa;
-	u_int id;
+	u_int id = 0;
 
 	/* our ike_sa pointer might be invalid, lookup sa */
 	enumerator = charon->controller->create_ike_sa_enumerator(
@@ -999,20 +1128,27 @@ static gboolean do_disconnect(gpointer plugin)
 		if (priv->ike_sa == ike_sa)
 		{
 			id = ike_sa->get_unique_id(ike_sa);
-			enumerator->destroy(enumerator);
-			charon->controller->terminate_ike(charon->controller, id, FALSE,
-											  controller_cb_empty, NULL, 0);
-
-			/* clear secrets as we are asked for new secrets (where we'd find
-			 * the cached secrets from earlier connections) before we clear
-			 * them in connect() */
-			priv->creds->clear(priv->creds);
-			return FALSE;
+			break;
 		}
 	}
 	enumerator->destroy(enumerator);
 
-	g_debug("Connection not found.");
+	if (id)
+	{
+		charon->controller->terminate_ike(charon->controller, id, FALSE,
+									controller_cb_empty, NULL, LEVEL_SILENT, 0);
+	}
+	else
+	{
+		g_debug("Connection not found.");
+	}
+
+	/* clear secrets as we are asked for new secrets (where we'd find the cached
+	 * secrets from earlier connections) before we clear them in connect() */
+	priv->creds->clear(priv->creds);
+
+	/* delete any allocated interface */
+	delete_interface(priv);
 	return FALSE;
 }
 
@@ -1044,8 +1180,7 @@ static void nm_strongswan_plugin_init(NMStrongswanPlugin *plugin)
 	priv->listener.ike_reestablish_pre = _ike_reestablish_pre;
 	priv->listener.ike_reestablish_post = _ike_reestablish_post;
 	charon->bus->add_listener(charon->bus, &priv->listener);
-	priv->tun = tun_device_create(NULL);
-	priv->name = NULL;
+	priv->xfrmi_manager = lib->get(lib, KERNEL_NETLINK_XFRMI_MANAGER);
 }
 
 /**
@@ -1058,11 +1193,8 @@ static void nm_strongswan_plugin_dispose(GObject *obj)
 
 	plugin = NM_STRONGSWAN_PLUGIN(obj);
 	priv = NM_STRONGSWAN_PLUGIN_GET_PRIVATE(plugin);
-	if (priv->tun)
-	{
-		priv->tun->destroy(priv->tun);
-		priv->tun = NULL;
-	}
+	delete_interface(priv);
+	free(priv->name);
 	G_OBJECT_CLASS (nm_strongswan_plugin_parent_class)->dispose (obj);
 }
 

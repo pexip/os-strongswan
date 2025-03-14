@@ -53,7 +53,6 @@ ENUM(auth_rule_names, AUTH_RULE_IDENTITY, AUTH_HELPER_AC_CERT,
 	"RULE_GROUP",
 	"RULE_RSA_STRENGTH",
 	"RULE_ECDSA_STRENGTH",
-	"RULE_BLISS_STRENGTH",
 	"RULE_SIGNATURE_SCHEME",
 	"RULE_IKE_SIGNATURE_SCHEME",
 	"RULE_CERT_POLICY",
@@ -96,7 +95,6 @@ static inline bool is_multi_value_rule(auth_rule_t type)
 		case AUTH_RULE_CERT_POLICY:
 		case AUTH_RULE_RSA_STRENGTH:
 		case AUTH_RULE_ECDSA_STRENGTH:
-		case AUTH_RULE_BLISS_STRENGTH:
 		case AUTH_RULE_SIGNATURE_SCHEME:
 		case AUTH_RULE_IKE_SIGNATURE_SCHEME:
 		case AUTH_HELPER_IM_CERT:
@@ -218,7 +216,6 @@ static void init_entry(entry_t *this, auth_rule_t type, va_list args)
 		case AUTH_RULE_OCSP_VALIDATION:
 		case AUTH_RULE_RSA_STRENGTH:
 		case AUTH_RULE_ECDSA_STRENGTH:
-		case AUTH_RULE_BLISS_STRENGTH:
 		case AUTH_RULE_CERT_VALIDATION_SUSPENDED:
 			/* integer type */
 			this->value = (void*)(uintptr_t)va_arg(args, u_int);
@@ -270,7 +267,6 @@ static bool entry_equals(entry_t *e1, entry_t *e2)
 		case AUTH_RULE_OCSP_VALIDATION:
 		case AUTH_RULE_RSA_STRENGTH:
 		case AUTH_RULE_ECDSA_STRENGTH:
-		case AUTH_RULE_BLISS_STRENGTH:
 		case AUTH_RULE_CERT_VALIDATION_SUSPENDED:
 		{
 			return e1->value == e2->value;
@@ -374,7 +370,6 @@ static void destroy_entry_value(entry_t *entry)
 		case AUTH_RULE_OCSP_VALIDATION:
 		case AUTH_RULE_RSA_STRENGTH:
 		case AUTH_RULE_ECDSA_STRENGTH:
-		case AUTH_RULE_BLISS_STRENGTH:
 		case AUTH_RULE_CERT_VALIDATION_SUSPENDED:
 		case AUTH_RULE_MAX:
 			break;
@@ -406,7 +401,6 @@ static void replace(private_auth_cfg_t *this, entry_enumerator_t *enumerator,
 			case AUTH_RULE_OCSP_VALIDATION:
 			case AUTH_RULE_RSA_STRENGTH:
 			case AUTH_RULE_ECDSA_STRENGTH:
-			case AUTH_RULE_BLISS_STRENGTH:
 			case AUTH_RULE_CERT_VALIDATION_SUSPENDED:
 				/* integer type */
 				entry->value = (void*)(uintptr_t)va_arg(args, u_int);
@@ -484,7 +478,6 @@ METHOD(auth_cfg_t, get, void*,
 		case AUTH_RULE_EAP_VENDOR:
 		case AUTH_RULE_RSA_STRENGTH:
 		case AUTH_RULE_ECDSA_STRENGTH:
-		case AUTH_RULE_BLISS_STRENGTH:
 			return (void*)0;
 		case AUTH_RULE_CRL_VALIDATION:
 		case AUTH_RULE_OCSP_VALIDATION:
@@ -604,9 +597,6 @@ METHOD(auth_cfg_t, add_pubkey_constraints, void,
 			{ "sha256",		SIGN_ECDSA_256,					KEY_ECDSA,	 },
 			{ "sha384",		SIGN_ECDSA_384,					KEY_ECDSA,	 },
 			{ "sha512",		SIGN_ECDSA_521,					KEY_ECDSA,	 },
-			{ "sha256",		SIGN_BLISS_WITH_SHA2_256,		KEY_BLISS,	 },
-			{ "sha384",		SIGN_BLISS_WITH_SHA2_384,		KEY_BLISS,	 },
-			{ "sha512",		SIGN_BLISS_WITH_SHA2_512,		KEY_BLISS,	 },
 			{ "identity",	SIGN_ED25519,					KEY_ED25519, },
 			{ "identity",	SIGN_ED448,						KEY_ED448,	 },
 		};
@@ -655,13 +645,6 @@ METHOD(auth_cfg_t, add_pubkey_constraints, void,
 		{
 			key_token = token;
 			expected_type = KEY_ED448;
-			continue;
-		}
-		if (streq(token, "bliss") || streq(token, "ike:bliss"))
-		{
-			key_token = token;
-			expected_type = KEY_BLISS;
-			expected_strength = AUTH_RULE_BLISS_STRENGTH;
 			continue;
 		}
 		if (streq(token, "pubkey") || streq(token, "ike:pubkey"))
@@ -821,7 +804,6 @@ METHOD(auth_cfg_t, complies, bool,
 	signature_params_t *ike_scheme = NULL, *scheme = NULL;
 	u_int strength = 0;
 	auth_rule_t t1, t2;
-	char *key_type;
 	void *value;
 
 	e1 = constraints->create_enumerator(constraints);
@@ -957,13 +939,34 @@ METHOD(auth_cfg_t, complies, bool,
 						{
 							break;
 						}
+						if (log_error)
+						{
+							DBG1(DBG_CFG, "constraint check failed: certificate"
+								 " does not confirm identity '%Y' (%N)",
+								 id1, id_type_names, id1->get_type(id1));
+						}
+						success = FALSE;
+						break;
 					}
 					success = FALSE;
-					if (log_error)
+					if (!log_error)
+					{
+						break;
+				    }
+					if (id2)
 					{
 						DBG1(DBG_CFG, "constraint check failed: %sidentity '%Y'"
-							 " required ", t1 == AUTH_RULE_IDENTITY ? "" :
-							 "EAP ", id1);
+							 " (%N) required, not matched by '%Y' (%N)",
+							 t1 == AUTH_RULE_IDENTITY ? "" : "EAP ",
+							 id1, id_type_names, id1->get_type(id1),
+							 id2, id_type_names, id2->get_type(id2));
+					}
+					else
+					{
+						DBG1(DBG_CFG, "constraint check failed: %sidentity '%Y'"
+							 " (%N) required",
+							 t1 == AUTH_RULE_IDENTITY ? "" : "EAP ",
+							 id1, id_type_names, id1->get_type(id1));
 					}
 				}
 				break;
@@ -1033,7 +1036,6 @@ METHOD(auth_cfg_t, complies, bool,
 			}
 			case AUTH_RULE_RSA_STRENGTH:
 			case AUTH_RULE_ECDSA_STRENGTH:
-			case AUTH_RULE_BLISS_STRENGTH:
 			{
 				strength = (uintptr_t)value;
 				break;
@@ -1110,6 +1112,8 @@ METHOD(auth_cfg_t, complies, bool,
 	 * public key strength */
 	if (success && strength)
 	{
+		char *key_type DBG_UNUSED;
+
 		e2 = create_enumerator(this);
 		while (e2->enumerate(e2, &t2, &strength))
 		{
@@ -1122,9 +1126,6 @@ METHOD(auth_cfg_t, complies, bool,
 					break;
 				case AUTH_RULE_ECDSA_STRENGTH:
 					key_type = "ECDSA";
-					break;
-				case AUTH_RULE_BLISS_STRENGTH:
-					key_type = "BLISS";
 					break;
 			}
 			success = FALSE;
@@ -1224,7 +1225,6 @@ static void merge(private_auth_cfg_t *this, private_auth_cfg_t *other, bool copy
 				case AUTH_RULE_EAP_VENDOR:
 				case AUTH_RULE_RSA_STRENGTH:
 				case AUTH_RULE_ECDSA_STRENGTH:
-				case AUTH_RULE_BLISS_STRENGTH:
 				case AUTH_RULE_CERT_VALIDATION_SUSPENDED:
 				{
 					add(this, type, (uintptr_t)value);
@@ -1402,7 +1402,6 @@ METHOD(auth_cfg_t, clone_, auth_cfg_t*,
 			case AUTH_RULE_OCSP_VALIDATION:
 			case AUTH_RULE_RSA_STRENGTH:
 			case AUTH_RULE_ECDSA_STRENGTH:
-			case AUTH_RULE_BLISS_STRENGTH:
 			case AUTH_RULE_CERT_VALIDATION_SUSPENDED:
 				clone->add(clone, type, (uintptr_t)value);
 				break;

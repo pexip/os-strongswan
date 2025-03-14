@@ -156,7 +156,6 @@ DLLIB = @DLLIB@
 DLLTOOL = @DLLTOOL@
 DSYMUTIL = @DSYMUTIL@
 DUMPBIN = @DUMPBIN@
-EASY_INSTALL = @EASY_INSTALL@
 ECHO_C = @ECHO_C@
 ECHO_N = @ECHO_N@
 ECHO_T = @ECHO_T@
@@ -164,6 +163,7 @@ EGREP = @EGREP@
 ETAGS = @ETAGS@
 EXEEXT = @EXEEXT@
 FGREP = @FGREP@
+FILECMD = @FILECMD@
 FUZZING_CFLAGS = @FUZZING_CFLAGS@
 FUZZING_LDFLAGS = @FUZZING_LDFLAGS@
 GEM = @GEM@
@@ -224,7 +224,6 @@ PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
 PLUGIN_CFLAGS = @PLUGIN_CFLAGS@
 PTHREADLIB = @PTHREADLIB@
 PYTHON = @PYTHON@
-PYTHONEGGINSTALLDIR = @PYTHONEGGINSTALLDIR@
 PYTHON_EXEC_PREFIX = @PYTHON_EXEC_PREFIX@
 PYTHON_PACKAGE_VERSION = @PYTHON_PACKAGE_VERSION@
 PYTHON_PLATFORM = @PYTHON_PLATFORM@
@@ -348,7 +347,6 @@ sharedstatedir = @sharedstatedir@
 soup_CFLAGS = @soup_CFLAGS@
 soup_LIBS = @soup_LIBS@
 srcdir = @srcdir@
-starter_plugins = @starter_plugins@
 strongswan_conf = @strongswan_conf@
 strongswan_options = @strongswan_options@
 swanctldir = @swanctldir@
@@ -589,16 +587,16 @@ uninstall-am:
 
 all-local: Vici-Session/pm_to_blib
 
-Vici-Session/Makefile: $(srcdir)/Vici-Session/Makefile.PL
+$(srcdir)/Vici-Session/Makefile: $(srcdir)/Vici-Session/Makefile.PL
 	(cd $(srcdir)/Vici-Session; $(PERL) Makefile.PL)
 
-Vici-Session/pm_to_blib: $(EXTRA_DIST) $(srcdir)/Vici-Session/Makefile
+$(srcdir)/Vici-Session/pm_to_blib: $(EXTRA_DIST) $(srcdir)/Vici-Session/Makefile
 	(cd $(srcdir)/Vici-Session; make)
 
 clean-local:
 	(cd $(srcdir)/Vici-Session; [ ! -f Makefile ] || make clean)
 
-@PERL_CPAN_INSTALL_TRUE@install-exec-local: Vici-Session/pm_to_blib
+@PERL_CPAN_INSTALL_TRUE@install-exec-local: $(srcdir)/Vici-Session/pm_to_blib
 @PERL_CPAN_INSTALL_TRUE@	(cd $(srcdir)/Vici-Session; make install)
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
