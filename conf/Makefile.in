@@ -194,7 +194,6 @@ DLLIB = @DLLIB@
 DLLTOOL = @DLLTOOL@
 DSYMUTIL = @DSYMUTIL@
 DUMPBIN = @DUMPBIN@
-EASY_INSTALL = @EASY_INSTALL@
 ECHO_C = @ECHO_C@
 ECHO_N = @ECHO_N@
 ECHO_T = @ECHO_T@
@@ -202,6 +201,7 @@ EGREP = @EGREP@
 ETAGS = @ETAGS@
 EXEEXT = @EXEEXT@
 FGREP = @FGREP@
+FILECMD = @FILECMD@
 FUZZING_CFLAGS = @FUZZING_CFLAGS@
 FUZZING_LDFLAGS = @FUZZING_LDFLAGS@
 GEM = @GEM@
@@ -262,7 +262,6 @@ PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
 PLUGIN_CFLAGS = @PLUGIN_CFLAGS@
 PTHREADLIB = @PTHREADLIB@
 PYTHON = @PYTHON@
-PYTHONEGGINSTALLDIR = @PYTHONEGGINSTALLDIR@
 PYTHON_EXEC_PREFIX = @PYTHON_EXEC_PREFIX@
 PYTHON_PACKAGE_VERSION = @PYTHON_PACKAGE_VERSION@
 PYTHON_PLATFORM = @PYTHON_PLATFORM@
@@ -386,7 +385,6 @@ sharedstatedir = @sharedstatedir@
 soup_CFLAGS = @soup_CFLAGS@
 soup_LIBS = @soup_LIBS@
 srcdir = @srcdir@
-starter_plugins = @starter_plugins@
 strongswan_conf = @strongswan_conf@
 strongswan_options = @strongswan_options@
 swanctldir = @swanctldir@
@@ -451,7 +449,6 @@ plugins = \
 	plugins/android_log.opt \
 	plugins/attr.opt \
 	plugins/attr-sql.opt \
-	plugins/bliss.opt \
 	plugins/botan.opt \
 	plugins/bypass-lan.opt \
 	plugins/certexpire.opt \
@@ -497,8 +494,8 @@ plugins = \
 	plugins/kernel-pfroute.opt \
 	plugins/load-tester.opt \
 	plugins/lookip.opt \
-	plugins/ntru.opt \
 	plugins/openssl.opt \
+	plugins/openxpki.opt \
 	plugins/osx-attr.opt \
 	plugins/p-cscf.opt \
 	plugins/pkcs11.opt \

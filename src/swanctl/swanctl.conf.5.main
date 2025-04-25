@@ -75,15 +75,21 @@ automatic IKE port floating to port 4500 is used to work around NAT issues.
 
 .TP
 .BR connections.<conn>.proposals " [default]"
-A proposal is a set of algorithms. For non\-AEAD algorithms, this includes for
-IKE an encryption algorithm, an integrity algorithm, a pseudo random function
-and a Diffie\-Hellman group. For AEAD algorithms, instead of encryption and
-integrity algorithms, a combined algorithm is used.
+A proposal is a set of algorithms. For non\-AEAD IKE proposals, this includes an
+encryption algorithm, an integrity algorithm, a pseudo\-random function and a key
+exchange method. For AEAD proposals, instead of encryption and integrity
+algorithms, a combined mode algorithm is used.
 
-In IKEv2, multiple algorithms of the same kind can be specified in a single
-proposal, from which one gets selected. In IKEv1, only one algorithm per kind is
-allowed per proposal, more algorithms get implicitly stripped. Use multiple
-proposals to offer different algorithms combinations in IKEv1.
+With peers that support multiple IKEv2 key exchanges (RFC 9370), up to seven
+additional key exchanges may be negotiated. They can be configured by prefixing
+the algorithm keyword with
+.RB "" "keX_" ""
+(where X is a number between 1 and 7).
+
+For IKEv2, multiple algorithms of the same kind can be specified in a single
+proposal, from which one gets selected. For IKEv1, only one algorithm per kind
+is allowed per proposal, more algorithms get implicitly stripped. Use multiple
+proposals to offer different algorithm combinations with IKEv1.
 
 Algorithm keywords get separated using dashes. Multiple proposals may be
 separated by commas. The special value
@@ -194,26 +200,35 @@ irrespective of the value of this option (even when set to
 
 .TP
 .BR connections.<conn>.childless " [allow]"
-Use childless IKE_SA initiation (RFC 6023) for IKEv2.  Acceptable values are
+Use childless IKE_SA initiation (RFC 6023) for IKEv2, with the first CHILD_SA
+created with a separate CREATE_CHILD_SA exchange (e.g. to use an independent key
+exchange for all CHILD_SAs).  Acceptable values are
 .RI "" "allow" ""
 (the default),
+.RI "" "prefer" ","
 .RI "" "force" ""
 and
 .RI "" "never" "."
 If set to
 .RI "" "allow" ","
-responders will
-accept childless IKE_SAs (as indicated via notify in the IKE_SA_INIT response)
-while initiators continue to create regular IKE_SAs with the first CHILD_SA
-created during IKE_AUTH, unless the IKE_SA is initiated explicitly without any
-children (which will fail if the responder does not support or has disabled this
-extension).  If set to
+responders will accept
+childless IKE_SAs (as indicated via notify in the IKE_SA_INIT response) while
+initiators continue to create regular IKE_SAs with the first CHILD_SA created
+during IKE_AUTH, unless the IKE_SA is initiated explicitly without any children
+(which will fail if the responder does not support or has disabled this
+extension). The effect of
+.RI "" "prefer" ""
+is the same as
+.RI "" "allow" ""
+on responders, but as
+initiator a childless IKE_SA is initiated if the responder supports it. If set
+to
 .RI "" "force" ","
-only childless initiation is accepted and the
-first CHILD_SA is created with a separate CREATE_CHILD_SA exchange (e.g. to use
-an independent DH exchange for all CHILD_SAs).  Finally, setting the option to
+only childless initiation is accepted in either role.  Finally,
+setting the option to
 .RI "" "never" ""
-disables support for childless IKE_SAs as responder.
+disables support for childless IKE_SAs as
+responder.
 
 .TP
 .BR connections.<conn>.send_certreq " [yes]"
@@ -238,6 +253,28 @@ altogether,
 .RI "" "always" ""
 causes certificate payloads to be sent unconditionally
 whenever certificate authentication is used.
+
+.TP
+.BR connections.<conn>.ocsp " [reply]"
+Send OCSP status requests in certificate request payloads and/or send OCSP
+status response in certificate payloads when using certificate authentication.
+With the default of
+.RI "" "reply" ""
+the daemon sends OCSP status responses in
+certificate payloads if an OCSP status request has been received in a
+certificate request,
+.RI "" "never" ""
+disables sending of OCSP status requests and
+responses altogether,
+.RI "" "request" ""
+causes OCSP status requests in certificate
+request payloads to be sent whenever certificate authentication is used,
+.RI "" "both" ""
+combines
+.RI "" "reply" ""
+and
+.RI "" "request" "."
+
 
 .TP
 .BR connections.<conn>.ppk_id " []"
@@ -295,9 +332,10 @@ configurations (with EAP or configuration payloads) it might not be possible to
 actively reauthenticate as responder. The IKEv2 reauthentication lifetime
 negotiation can instruct the client to perform reauthentication.
 
-Reauthentication is disabled by default. Enabling it usually may lead to small
-connection interruptions, as strongSwan uses a break\-before\-make policy with
-IKEv2 to avoid any conflicts with associated tunnel resources.
+Reauthentication is disabled by default. Enabling it can usually result in short
+connection interruptions, even when using make\-before\-break reauthentication,
+which is now the default. However, they are significantly shorter than when
+using the legacy break\-before\-make approach.
 
 .TP
 .BR connections.<conn>.rekey_time " [4h]"
@@ -359,10 +397,26 @@ section or an external pool.
 XFRM interface ID set on inbound policies/SA, can be overridden by child config,
 see there for details.
 
+The special value
+.RI "" "%unique" ""
+allocates a unique interface ID per IKE_SA, which is
+inherited by all its CHILD_SAs (unless overridden there), beyond that the value
+.RI "" "%unique\-dir" ""
+assigns a different unique interface ID for each direction
+(in/out).
+
 .TP
 .BR connections.<conn>.if_id_out " [0]"
 XFRM interface ID set on outbound policies/SA, can be overridden by child
 config, see there for details.
+
+The special value
+.RI "" "%unique" ""
+allocates a unique interface ID per IKE_SA, which is
+inherited by all its CHILD_SAs (unless overridden there), beyond that the value
+.RI "" "%unique\-dir" ""
+assigns a different unique interface ID for each direction
+(in/out).
 
 .TP
 .BR connections.<conn>.mediation " [no]"
@@ -840,16 +894,22 @@ the CHILD_SA configuration, which must be unique within the connection.
 .TP
 .BR connections.<conn>.children.<child>.ah_proposals " []"
 AH proposals to offer for the CHILD_SA. A proposal is a set of algorithms. For
-AH, this includes an integrity algorithm and an optional Diffie\-Hellman group.
-If a DH group is specified, CHILD_SA/Quick Mode rekeying and initial negotiation
-uses a separate Diffie\-Hellman exchange using the specified group (refer to
+AH, this includes an integrity algorithm and an optional key exchange method. If
+a KE method is specified, CHILD_SA/Quick Mode rekeying and initial
+negotiation uses a separate key exchange using the negotiated method (refer to
 .RI "" "esp_proposals" ""
 for details).
 
-In IKEv2, multiple algorithms of the same kind can be specified in a single
-proposal, from which one gets selected. In IKEv1, only one algorithm per kind is
-allowed per proposal, more algorithms get implicitly stripped. Use multiple
-proposals to offer different algorithms combinations in IKEv1.
+With peers that support multiple IKEv2 key exchanges (RFC 9370), up to seven
+additional key exchanges may be negotiated. They can be configured by prefixing
+the algorithm keyword with
+.RB "" "keX_" ""
+(where X is a number between 1 and 7).
+
+For IKEv2, multiple algorithms of the same kind can be specified in a single
+proposal, from which one gets selected. For IKEv1, only one algorithm per kind
+is allowed per proposal, more algorithms get implicitly stripped. Use multiple
+proposals to offer different algorithm combinations with IKEv1.
 
 Algorithm keywords get separated using dashes. Multiple proposals may be
 separated by commas. The special value
@@ -862,18 +922,25 @@ proposed.
 .TP
 .BR connections.<conn>.children.<child>.esp_proposals " [default]"
 ESP proposals to offer for the CHILD_SA. A proposal is a set of algorithms. For
-ESP non\-AEAD proposals, this includes an integrity algorithm, an encryption
-algorithm, an optional Diffie\-Hellman group and an optional Extended Sequence
+non\-AEAD ESP proposals, this includes an integrity algorithm, an encryption
+algorithm, an optional key exchange method and an optional Extended Sequence
 Number Mode indicator. For AEAD proposals, a combined mode algorithm is used
 instead of the separate encryption/integrity algorithms.
 
-If a DH group is specified, CHILD_SA/Quick Mode rekeying and initial negotiation
-use a separate Diffie\-Hellman exchange using the specified group. However, for
+If a key exchange method is specified, CHILD_SA/Quick Mode rekeying and initial
+negotiation use a separate key exchange using the specified method. However, for
 IKEv2, the keys of the CHILD_SA created implicitly with the IKE_SA will always
-be derived from the IKE_SA's key material. So any DH group specified here will
-only apply when the CHILD_SA is later rekeyed or is created with a separate
-CREATE_CHILD_SA exchange. A proposal mismatch might, therefore, not immediately
-be noticed when the SA is established, but may later cause rekeying to fail.
+be derived from the IKE_SA's key material. So any key exchange method specified
+here will only apply when the CHILD_SA is later rekeyed or is created with a
+separate CREATE_CHILD_SA exchange. A proposal mismatch might, therefore, not
+immediately be noticed when the SA is established, but may later cause rekeying
+to fail.
+
+With peers that support multiple IKEv2 key exchanges (RFC 9370), up to seven
+additional key exchanges may be negotiated. They can be configured by prefixing
+the algorithm keyword with
+.RB "" "keX_" ""
+(where X is a number between 1 and 7).
 
 Extended Sequence Number support may be indicated with the
 .RI "" "esn" ""
@@ -883,10 +950,10 @@ values, both may be included to indicate support for both modes. If omitted,
 .RI "" "noesn" ""
 is assumed.
 
-In IKEv2, multiple algorithms of the same kind can be specified in a single
-proposal, from which one gets selected. In IKEv1, only one algorithm per kind is
-allowed per proposal, more algorithms get implicitly stripped. Use multiple
-proposals to offer different algorithms combinations in IKEv1.
+For IKEv2, multiple algorithms of the same kind can be specified in a single
+proposal, from which one gets selected. For IKEv1, only one algorithm per kind
+is allowed per proposal, more algorithms get implicitly stripped. Use multiple
+proposals to offer different algorithm combinations with IKEv1.
 
 Algorithm keywords get separated using dashes. Multiple proposals may be
 separated by commas. The special value
@@ -926,7 +993,13 @@ service name, or the special value
 .RI "" "opaque" ""
 for RFC 4301
 OPAQUE selectors. Port ranges may be specified as well, none of the kernel
-backends currently support port ranges, though.
+backends currently support port ranges, though. If the protocol is
+.RI "" "icmp" ""
+or
+.RI "" "ipv6\-icmp" ","
+the port is interpreted as ICMP message type if it is less than 256
+or as type and code if it is greater or equal to 256, with the type in the most
+significant 8 bits and the code in the least significant 8 bits.
 
 When IKEv1 is used only the first selector is interpreted, except if the Cisco
 Unity extension plugin is used. This is due to a limitation of the IKEv1
@@ -946,7 +1019,7 @@ Comma separated list of remote selectors to include in CHILD_SA. See
 for a description of the selector syntax.
 
 .TP
-.BR connections.<conn>.children.<child>.rekey_time " [1h]"
+.BR connections.<conn>.children.<child>.rekey_time " [1h or life_time - 10%]"
 Time to schedule CHILD_SA rekeying. CHILD_SA rekeying refreshes key material,
 optionally using a Diffie\-Hellman exchange if a group is specified in the
 proposal.
@@ -956,7 +1029,12 @@ range of
 .RB "" "rand_time" ""
 gets subtracted to form the effective soft lifetime.
 
-By default CHILD_SA rekeying is scheduled every hour, minus
+If
+.RB "" "life_time" ""
+is explicitly configured,
+.RB "" "rekey_time" ""
+defaults to 10% less
+than that,       otherwise, CHILD_SA rekeying is scheduled every hour, minus
 .RB "" "rand_time" "."
 
 
@@ -981,7 +1059,7 @@ and
 
 
 .TP
-.BR connections.<conn>.children.<child>.rekey_bytes " [0]"
+.BR connections.<conn>.children.<child>.rekey_bytes " [0 or life_bytes - 10%]"
 Number of bytes processed before initiating CHILD_SA rekeying. CHILD_SA rekeying
 refreshes key material, optionally using a Diffie\-Hellman exchange if a group is
 specified in the proposal.
@@ -991,7 +1069,12 @@ range of
 .RB "" "rand_bytes" ""
 gets subtracted to form the effective soft volume limit.
 
-Volume based CHILD_SA rekeying is disabled by default.
+Volume based CHILD_SA rekeying is disabled by default. If
+.RB "" "life_bytes" ""
+is
+explicitly configured,
+.RB "" "rekey_bytes" ""
+defaults to 10% less than that.
 
 .TP
 .BR connections.<conn>.children.<child>.life_bytes " [rekey_bytes + 10%]"
@@ -1014,7 +1097,7 @@ and
 
 
 .TP
-.BR connections.<conn>.children.<child>.rekey_packets " [0]"
+.BR connections.<conn>.children.<child>.rekey_packets " [0 or life_packets - 10%]"
 Number of packets processed before initiating CHILD_SA rekeying. CHILD_SA
 rekeying refreshes key material, optionally using a Diffie\-Hellman exchange if a
 group is specified in the proposal.
@@ -1025,7 +1108,11 @@ range of
 gets subtracted to form the effective soft packet
 count limit.
 
-Packet count based CHILD_SA rekeying is disabled by default.
+Packet count based CHILD_SA rekeying is disabled by default. If
+.RB "" "life_packets" ""
+is explicitly configured,
+.RB "" "rekey_packets" ""
+defaults to 10% less than that.
 
 .TP
 .BR connections.<conn>.children.<child>.life_packets " [rekey_packets + 10%]"
@@ -1327,13 +1414,19 @@ disables IPsec replay protection.
 .TP
 .BR connections.<conn>.children.<child>.hw_offload " [no]"
 Enable hardware offload for this CHILD_SA, if supported by the IPsec
-implementation. The value
-.RI "" "yes" ""
-enforces offloading and the installation will
-fail if it's not supported by either kernel or device.       The value
+implementation. The values
+.RI "" "crypto" ""
+or
+.RI "" "packet" ""
+enforce crypto or full packet
+offloading and the installation will fail if the selected mode is not supported
+by either kernel or device. On Linux,
+.RI "" "packet" ""
+also offloads policies, including
+trap policies. The value
 .RI "" "auto" ""
-enables offloading, if it's supported, but the installation does not fail
-otherwise.
+enables full packet or crypto offloading, if
+either is supported, but the installation does not fail otherwise.
 
 .TP
 .BR connections.<conn>.children.<child>.copy_df " [yes]"
@@ -1675,7 +1768,10 @@ Section defining a single pool with a unique name.
 .BR pools.<name>.addrs " []"
 Subnet or range defining addresses allocated in pool. Accepts a single CIDR
 subnet defining the pool to allocate addresses from or an address range
-(<from>\-<to>).  Pools must be unique and non\-overlapping.
+(<from>\-<to>). If the address in CIDR notation is not the network ID of the
+subnet (e.g. 10.1.0.5/24 instead of 10.1.0.0/24), addresses below it won't be
+allocated to clients (they could e.g. be assigned manually to internal hosts
+like the VPN server itself). Pools must be unique and non\-overlapping.
 
 .TP
 .BR pools.<name>.<attr> " []"

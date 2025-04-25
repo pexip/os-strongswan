@@ -451,7 +451,8 @@ static int list_identifiers(sw_collector_db_t *db, sw_collector_db_query_t type)
 {
 	enumerator_t *e;
 	char *name, *package, *version;
-	uint32_t sw_id, count = 0, installed_count = 0, removed_count, installed;
+	uint32_t sw_id, installed;
+	uint32_t count DBG_UNUSED = 0, installed_count DBG_UNUSED = 0;
 
 	e = db->create_sw_enumerator(db, type, NULL);
 	if (!e)
@@ -467,14 +468,14 @@ static int list_identifiers(sw_collector_db_t *db, sw_collector_db_query_t type)
 		}
 		count++;
 	}
-	removed_count = count - installed_count;
 	e->destroy(e);
 
 	switch (type)
 	{
 		case SW_QUERY_ALL:
 			DBG1(DBG_IMC, "retrieved %u software identities with %u installed "
-				 "and %u removed", count, installed_count, removed_count);
+				 "and %u removed", count, installed_count,
+				 count - installed_count);
 			break;
 		case SW_QUERY_INSTALLED:
 			DBG1(DBG_IMC, "retrieved %u installed software identities", count);
@@ -492,7 +493,7 @@ static bool query_registry(sw_collector_rest_api_t *rest_api, bool installed)
 	sw_collector_db_query_t type;
 	enumerator_t *enumerator;
 	char *sw_id;
-	int count = 0;
+	int count DBG_UNUSED = 0;
 
 	type = installed ? SW_QUERY_INSTALLED : SW_QUERY_REMOVED;
 	enumerator = rest_api->create_sw_enumerator(rest_api, type);
@@ -557,7 +558,8 @@ static int generate_tags(sw_collector_db_t *db, bool full_tags,
 	enumerator_t *enumerator;
 	uint32_t sw_id;
 	bool installed;
-	int count = 0, installed_count = 0, status = EXIT_FAILURE;
+	int count DBG_UNUSED = 0, installed_count DBG_UNUSED = 0;
+	int status = EXIT_FAILURE;
 
 	swid_gen = swid_gen_create();
 	rest_api = sw_collector_rest_api_create(db);
@@ -629,7 +631,7 @@ static int migrate(sw_collector_db_t *db)
 
 	char *package, *arch, *version;
 	char package_filter[BUF_LEN];
-	int res, count = 0;
+	int res, count DBG_UNUSED = 0;
 	int status = EXIT_SUCCESS;
 	enumerator_t *enumerator;
 
