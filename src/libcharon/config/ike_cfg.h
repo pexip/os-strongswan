@@ -68,6 +68,8 @@ enum fragmentation_t {
 enum childless_t {
 	/** Allow childless IKE_SAs as responder, but initiate regular IKE_SAs */
 	CHILDLESS_ALLOW,
+	/** Initiate childless IKE_SAs if supported, allow them as responder */
+	CHILDLESS_PREFER,
 	/** Don't accept childless IKE_SAs as responder, don't initiate them */
 	CHILDLESS_NEVER,
 	/** Only accept the creation of childless IKE_SAs (also as responder) */
@@ -209,6 +211,13 @@ struct ike_cfg_t {
 	bool (*send_certreq) (ike_cfg_t *this);
 
 	/**
+	 * Should we send an OCSP status request in IKE_SA_INIT?
+	 *
+	 * @return				OCSP status request sending policy
+	 */
+	bool (*send_ocsp_certreq) (ike_cfg_t *this);
+
+	/**
 	 * Enforce UDP encapsulation by faking NATD notifies?
 	 *
 	 * @return				TRUE to enforce UDP encapsulation
@@ -286,6 +295,8 @@ struct ike_cfg_create_t {
 	uint16_t remote_port;
 	/** TRUE to not send any certificate requests */
 	bool no_certreq;
+	/** TRUE to send OCSP status requests */
+	bool ocsp_certreq;
 	/** Enforce UDP encapsulation by faking NATD notify */
 	bool force_encap;
 	/** Use IKE fragmentation */

@@ -36,6 +36,10 @@
 /* have binutils bfd.h */
 #undef HAVE_BFD_H
 
+/* Define to 1 if you have the `botan_pubkey_ecc_key_used_explicit_encoding'
+   function. */
+#undef HAVE_BOTAN_PUBKEY_ECC_KEY_USED_EXPLICIT_ENCODING
+
 /* Define to 1 if you have the `botan_rng_init_custom' function. */
 #undef HAVE_BOTAN_RNG_INIT_CUSTOM
 
@@ -150,6 +154,9 @@
 
 /* Define to 1 if you have the <linux/udp.h> header file. */
 #undef HAVE_LINUX_UDP_H
+
+/* Define to 1 if you have the <linux/vm_sockets.h> header file. */
+#undef HAVE_LINUX_VM_SOCKETS_H
 
 /* Define to 1 if you have the `mallinfo' function. */
 #undef HAVE_MALLINFO

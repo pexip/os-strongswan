@@ -7,15 +7,15 @@ Subject: dont-load-kernel-libipsec-plugin-by-default
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/conf/plugins/kernel-libipsec.conf b/conf/plugins/kernel-libipsec.conf
-index 3411be2..6352003 100644
+index e9834da..89c3c5e 100644
 --- a/conf/plugins/kernel-libipsec.conf
 +++ b/conf/plugins/kernel-libipsec.conf
-@@ -5,7 +5,7 @@ kernel-libipsec {
+@@ -8,7 +8,7 @@ kernel-libipsec {
  
      # Whether to load the plugin. Can also be an integer to increase the
      # priority of this plugin.
 -    load = yes
 +    load = no
  
- }
- 
+     # Whether to send and receive ESP packets without UDP encapsulation if
+     # supported on this platform and no NAT is detected.

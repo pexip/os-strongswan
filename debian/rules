@@ -5,6 +5,7 @@ export DEB_BUILD_MAINT_OPTIONS=hardening=+all
 
 CONFIGUREARGS := --libdir=/usr/lib --libexecdir=/usr/lib \
 		--enable-addrblock \
+		--enable-aes \
 		--enable-agent \
 		--enable-bypass-lan \
 		--enable-ccm \
@@ -13,6 +14,7 @@ CONFIGUREARGS := --libdir=/usr/lib --libexecdir=/usr/lib \
 		--enable-cmd \
 		--enable-ctr \
 		--enable-curl \
+		--enable-curve25519 \
 		--enable-eap-aka \
 		--enable-eap-gtc \
 		--enable-eap-identity \
@@ -26,14 +28,23 @@ CONFIGUREARGS := --libdir=/usr/lib --libexecdir=/usr/lib \
 		--enable-forecast \
 		--enable-gcm \
 		--enable-gcrypt \
+		--enable-gmp \
 		--enable-ha \
+		--enable-hmac \
 		--enable-kernel-libipsec \
 		--enable-ldap \
 		--enable-led \
 		--enable-lookip \
 		--enable-mediation \
+		--enable-md5 \
+		--enable-mgf1 \
 		--enable-openssl \
 		--enable-pkcs11 \
+		--enable-pkcs12 \
+		--enable-rc2 \
+		--enable-sha1 \
+		--enable-sha2 \
+		--enable-stroke \
 		--enable-test-vectors \
 		--enable-unity \
 		--enable-xauth-eap \
@@ -84,6 +95,8 @@ ifeq ($(DEB_HOST_ARCH_OS),kfreebsd)
 		--with-group=wheel
 endif
 
+deb_systemdsystemunitdir = $(shell pkg-config --variable=systemdsystemunitdir systemd | sed s,^/,,)
+
 override_dh_auto_configure:
 	dh_auto_configure -- $(CONFIGUREARGS)
 
@@ -127,7 +140,9 @@ ifeq ($(DEB_HOST_ARCH_OS),linux)
 	dh_install -p libstrongswan-extra-plugins usr/share/strongswan/templates/config/plugins/af-alg.conf
 	dh_install -p libstrongswan-extra-plugins etc/strongswan.d/charon/af-alg.conf
 	# the systemd service file only gets generated on Linux
-	dh_install -p strongswan-starter lib/systemd/system/strongswan-starter.service
+	dh_install -p strongswan-starter "$(deb_systemdsystemunitdir)/strongswan-starter.service"
+	dh_link -p strongswan-starter "$(deb_systemdsystemunitdir)/strongswan-starter.service" "$(deb_systemdsystemunitdir)/ipsec.service"
+	dh_install -p charon-systemd "$(deb_systemdsystemunitdir)/strongswan.service"
 	# XFRM is Linux only
 	dh_install -p strongswan-libcharon usr/lib/ipsec/xfrmi
 endif
@@ -195,7 +210,6 @@ endif
 	chmod 600 $(CURDIR)/debian/strongswan-starter/etc/ipsec.secrets
 	chmod 700 -R $(CURDIR)/debian/strongswan-starter/etc/ipsec.d/private/
 	chmod 700 -R $(CURDIR)/debian/strongswan-starter/var/lib/strongswan/
-	chmod 700 -R $(CURDIR)/debian/strongswan-swanctl/etc/swanctl/bliss/
 	chmod 700 -R $(CURDIR)/debian/strongswan-swanctl/etc/swanctl/ecdsa/
 	chmod 700 -R $(CURDIR)/debian/strongswan-swanctl/etc/swanctl/pkcs8/
 	chmod 700 -R $(CURDIR)/debian/strongswan-swanctl/etc/swanctl/private/
