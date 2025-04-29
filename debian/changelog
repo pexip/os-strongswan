@@ -1,3 +1,9 @@
+strongswan (6.0.1-1+pexip25u1) pexip-trixie; urgency=medium
+
+  * Initial trixie build
+
+ -- Mark Hymers <mark.hymers@pexip.com>  Tue, 29 Apr 2025 22:58:49 +0100
+
 strongswan (6.0.1-1) unstable; urgency=medium
 
   * d/control: revert strongswan-charon to strongswan-starter dependency
