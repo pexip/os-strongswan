@@ -3,5 +3,5 @@ Depends: strongswan-starter, strongswan-charon, strongswan-pki
 Restrictions: needs-root isolation-container allow-stderr
 
 Tests: daemon plugins
-Depends: strongswan-starter, libstrongswan-standard-plugins, libstrongswan-extra-plugins, libcharon-extra-plugins
+Depends: strongswan-starter, strongswan-charon, libstrongswan-standard-plugins, libstrongswan-extra-plugins, libcharon-extra-plugins
 Restrictions: needs-root isolation-machine allow-stderr

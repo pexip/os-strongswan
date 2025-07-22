@@ -3,8 +3,9 @@
 # and compare that with what ipsec has loaded.
 
 # restart strongswan to get current list of loaded modules
-invoke-rc.d strongswan restart
-invoke-rc.d strongswan status
+invoke-rc.d strongswan-starter restart
+sleep 1
+invoke-rc.d strongswan-starter status
 
 STRONGSWAN_PKGS="$(dpkg --list | awk '/(strongswan|charon)/ {print $2}')"
 PLUGIN_PATH="/usr/lib/ipsec/plugins/"
