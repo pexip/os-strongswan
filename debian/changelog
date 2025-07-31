@@ -1,3 +1,36 @@
+strongswan (6.0.1-6) unstable; urgency=medium
+
+  * d/control: keep strongswan-charon and strongswan-starter as acceptable
+    dependencies for strongswan
+    (Closes: #1109510)
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Tue, 22 Jul 2025 18:24:43 +0200
+
+strongswan (6.0.1-5) unstable; urgency=medium
+
+  * autopkgtests: wait a bit to make sure daemons are started
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Tue, 20 May 2025 13:15:45 +0200
+
+strongswan (6.0.1-4) unstable; urgency=medium
+
+  * autopkgtest: make sure the charon daemon is started
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Wed, 14 May 2025 22:03:02 +0200
+
+strongswan (6.0.1-3) unstable; urgency=medium
+
+  * autopkgtest: daemon test also requires strongswan-charon
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Wed, 14 May 2025 14:15:36 +0200
+
+strongswan (6.0.1-2) unstable; urgency=medium
+
+  * autopkgtest: plugins uses the strongswan-starter service
+  * d/control: add conflicts against libreswan
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Tue, 13 May 2025 17:28:42 +0200
+
 strongswan (6.0.1-1+pexip25u1) pexip-trixie; urgency=medium
 
   * Initial trixie build
