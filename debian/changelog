@@ -1,3 +1,15 @@
+strongswan (5.9.8-5+pexip24u7+deb12u2) pexip; urgency=medium
+
+  * New upstream release with security fixes
+
+ -- Steve McIntyre <steve.mcintyre@pexip.com>  Mon, 03 Nov 2025 09:52:31 +0000
+
+strongswan (5.9.8-5+deb12u2) bookworm-security; urgency=medium
+
+  * d/patches: add fix for buffer overflow in EAP-MSCHAPv2 (CVE-2025-62291)
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Wed, 15 Oct 2025 12:21:12 +0200
+
 strongswan (5.9.8-5+pexip24u6+deb12u1) pexip; urgency=medium
 
   * Stop the build adding -Werror if building from git
