@@ -1,3 +1,9 @@
+strongswan (6.0.1-6+pexip25u1+pexip25u1) pexip-trixie; urgency=medium
+
+  * New upstream release
+
+ -- Mark Hymers <mark.hymers@pexip.com>  Wed, 05 Nov 2025 11:03:22 +0000
+
 strongswan (6.0.1-6+pexip25u1) pexip-trixie; urgency=medium
 
   * New upstream release
