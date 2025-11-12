@@ -1,14 +1,8 @@
-strongswan (6.0.1-6+pexip25u1+pexip25u1) pexip-trixie; urgency=medium
-
-  * New upstream release
-
- -- Mark Hymers <mark.hymers@pexip.com>  Wed, 05 Nov 2025 11:03:22 +0000
-
 strongswan (6.0.1-6+pexip25u1) pexip-trixie; urgency=medium
 
   * New upstream release
 
- -- Mark Hymers <mark.hymers@pexip.com>  Thu, 31 Jul 2025 15:05:37 +0100
+ -- Mark Hymers <mark.hymers@pexip.com>  Wed, 05 Nov 2025 11:03:22 +0000
 
 strongswan (6.0.1-6) unstable; urgency=medium
 
@@ -17,6 +11,12 @@ strongswan (6.0.1-6) unstable; urgency=medium
     (Closes: #1109510)
 
  -- Yves-Alexis Perez <corsac@debian.org>  Tue, 22 Jul 2025 18:24:43 +0200
+
+strongswan (6.0.1-5+pexip25u1) pexip-trixie; urgency=medium
+
+  * New upstream release
+
+ -- Mark Hymers <mark.hymers@pexip.com>  Thu, 31 Jul 2025 15:05:37 +0100
 
 strongswan (6.0.1-5) unstable; urgency=medium
 
