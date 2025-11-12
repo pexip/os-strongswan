@@ -1,3 +1,15 @@
+strongswan (6.0.1-6+deb13u2) trixie-security; urgency=medium
+
+  * d/patches: add fix for buffer overflow in EAP-MSCHAPv2 (CVE-2025-62291)
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Wed, 15 Oct 2025 12:09:29 +0200
+
+strongswan (6.0.1-6+deb13u1) trixie; urgency=medium
+
+  * d/patches: add patches to fix OpenSSL 3.5.1 support (Closes: #1109942)
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Fri, 22 Aug 2025 09:58:42 +0200
+
 strongswan (6.0.1-6+pexip25u1) pexip-trixie; urgency=medium
 
   * New upstream release
