@@ -359,10 +359,26 @@ section or an external pool.
 XFRM interface ID set on inbound policies/SA, can be overridden by child config,
 see there for details.
 
+The special value
+.RI "" "%unique" ""
+allocates a unique interface ID per IKE_SA, which is
+inherited by all its CHILD_SAs (unless overridden there), beyond that the value
+.RI "" "%unique\-dir" ""
+assigns a different unique interface ID for each direction
+(in/out).
+
 .TP
 .BR connections.<conn>.if_id_out " [0]"
 XFRM interface ID set on outbound policies/SA, can be overridden by child
 config, see there for details.
+
+The special value
+.RI "" "%unique" ""
+allocates a unique interface ID per IKE_SA, which is
+inherited by all its CHILD_SAs (unless overridden there), beyond that the value
+.RI "" "%unique\-dir" ""
+assigns a different unique interface ID for each direction
+(in/out).
 
 .TP
 .BR connections.<conn>.mediation " [no]"

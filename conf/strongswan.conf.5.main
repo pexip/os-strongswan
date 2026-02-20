@@ -712,7 +712,7 @@ Send RADIUS accounting information to RADIUS servers.
 Close the IKE_SA if there is a timeout during interim RADIUS accounting updates.
 
 .TP
-.BR charon.plugins.eap-radius.accounting_interval " [0]"
+.BR charon.plugins.eap-radius.accounting_interval " [0s]"
 Interval in seconds for interim RADIUS accounting updates, if not specified by
 the RADIUS server in the Access\-Accept message.
 
@@ -1533,18 +1533,32 @@ File to read pseudo random bytes from.
 
 .TP
 .BR charon.plugins.resolve.file " [/etc/resolv.conf]"
-File where to add DNS server entries.
+File where to add DNS server entries if not using resolvconf(8).
 
 .TP
-.BR charon.plugins.resolve.resolvconf.iface_prefix " [lo.inet.ipsec.]"
-Prefix used for interface names sent to
+.BR charon.plugins.resolve.resolvconf.iface " [lo.ipsec]"
+The interface name and protocol sent to
 .RB "" "resolvconf" "(8)."
-The nameserver
-address is appended to this prefix to make it unique.  The result has to be a
+This has to be a
 valid interface name according to the rules defined by resolvconf.  Also, it
 should have a high priority according to the order defined in
-.RB "" "interface\-order" "(5)."
+.RB "" "interface\-order" "(5)"
+if relevant on the system.
 
+.TP
+.BR charon.plugins.resolve.resolvconf.path " [/sbin/resolvconf]"
+Path/command for
+.RB "" "resolvconf" "(8)."
+The command is executed by a shell, so
+"resolvconf" will work if it's in $PATH of the daemon.
+
+If not configured,
+.RB "" "resolvconf" "(8)"
+will be used if found at the default
+location.  Otherwise, the file in
+.RI "" "charon.plugins.resolve.file" ""
+will be modified
+directly.
 
 .TP
 .BR charon.plugins.revocation.enable_crl " [yes]"
@@ -1977,6 +1991,10 @@ Specific IKEv2 message type to delay, 0 for any.
 Size of the AH/ESP replay window, in packets.
 
 .TP
+.BR charon.reqid_base " [1]"
+Value of the first reqid to be automatically assigned to a CHILD_SA.
+
+.TP
 .BR charon.retransmit_base " [1.8]"
 Base to use for calculating exponential back off, see IKEv2 RETRANSMISSION in
 .RB "" "strongswan.conf" "(5)."
@@ -2000,7 +2018,7 @@ Timeout in seconds before sending first retransmit.
 Number of times to retransmit a packet before giving up.
 
 .TP
-.BR charon.retry_initiate_interval " [0]"
+.BR charon.retry_initiate_interval " [0s]"
 Interval in seconds to use when retrying to initiate an IKE_SA (e.g. if DNS
 resolution failed), 0 to disable retries.
 
