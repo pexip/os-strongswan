@@ -465,7 +465,6 @@ sharedstatedir = @sharedstatedir@
 soup_CFLAGS = @soup_CFLAGS@
 soup_LIBS = @soup_LIBS@
 srcdir = @srcdir@
-starter_plugins = @starter_plugins@
 strongswan_conf = @strongswan_conf@
 strongswan_options = @strongswan_options@
 swanctldir = @swanctldir@

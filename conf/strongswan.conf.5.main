@@ -60,9 +60,9 @@ single peer IP.
 Whether Certificate Revocation Lists (CRLs) fetched via HTTP or LDAP should be
 saved under a unique file name derived from the public key of the Certification
 Authority (CA) to
-.RB "" "/etc/ipsec.d/crls" ""
+.RB "" "${sysconfdir}/ipsec.d/crls" ""
 (stroke) or
-.RB "" "/etc/swanctl/x509crl" ""
+.RB "" "${sysconfdir}/swanctl/x509crl" ""
 (vici), respectively.
 
 .TP
@@ -596,6 +596,13 @@ Maximum number of redirects followed by the plugin, set to 0 to disable
 following redirects, set to \-1 for no limit.
 
 .TP
+.BR charon.plugins.curl.tls_backend " []"
+The SSL/TLS backend to configure in curl if multiple are available (requires
+libcurl 7.56 or newer). A list of available options is logged on level 2 if
+nothing is configured. Similar but on level 1 if the selected backend isn't
+available.
+
+.TP
 .BR charon.plugins.dhcp.force_server_address " [no]"
 Always use the configured server address. This might be helpful if the DHCP
 server runs on the same host as strongSwan, and the DHCP daemon does not listen
@@ -693,7 +700,8 @@ Phase2 EAP client authentication method.
 
 .TP
 .BR charon.plugins.eap-peap.phase2_piggyback " [no]"
-Phase2 EAP Identity request piggybacked by server onto TLS Finished message.
+Phase2 EAP Identity request piggybacked by server onto TLS Finished message,
+relevant only if TLS 1.2 or earlier is negotiated.
 
 .TP
 .BR charon.plugins.eap-peap.phase2_tnc " [no]"
@@ -1096,6 +1104,18 @@ interface for offload feature detection.
 .TP
 .BR charon.plugins.kernel-netlink.ignore_retransmit_errors " [no]"
 Whether to ignore errors potentially resulting from a retransmission.
+
+.TP
+.BR charon.plugins.kernel-netlink.install_routes_xfrmi " [no]"
+Whether routes via XFRM interfaces are automatically installed for SAs that
+reference such an interface via
+.RI "" "if_id_out" "."
+If the traffic selectors include
+the IKE traffic to the peer, this requires special care (e.g. installing bypass
+policies and/or routes, or setting a mark on the IKE socket and excluding such
+packets from the configured routing table via
+.RI "" "fwmark" ""
+option).
 
 .TP
 .BR charon.plugins.kernel-netlink.mss " [0]"
@@ -1847,7 +1867,7 @@ then used as a root trusted DLV, this means that it is a lookaside for the root.
 File to read DNS resolver configuration from.
 
 .TP
-.BR charon.plugins.unbound.trust_anchors " [/etc/ipsec.d/dnssec.keys]"
+.BR charon.plugins.unbound.trust_anchors " [${sysconfdir}/ipsec.d/dnssec.keys]"
 File to read DNSSEC trust anchors from (usually root zone KSK). The format of
 the file is the standard DNS Zone file format, anchors can be stored as DS or
 DNSKEY entries in the file.
@@ -2224,6 +2244,10 @@ Discard certificates with unsupported or unknown critical extensions.
 .TP
 .BR charon-nm.ca_dir " [<default>]"
 Directory from which to load CA certificates if no certificate is configured.
+
+.TP
+.BR charon-nm.mtu " [1400]"
+MTU for XFRM interfaces created by the NM plugin.
 
 .TP
 .B charon-systemd.journal

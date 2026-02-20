@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2022 Tobias Brunner
+ * Copyright (C) 2008-2023 Tobias Brunner
  * Copyright (C) 2014 Martin Willi
  *
  * Copyright (C) secunet Security Networks AG
@@ -52,7 +52,13 @@
 #include <collections/array.h>
 #include <collections/hashtable.h>
 
+/* some older versions of socket.h don't define this yet */
+#ifndef SOL_NETLINK
+#define SOL_NETLINK 270
+#endif
+
 typedef struct private_netlink_socket_t private_netlink_socket_t;
+typedef struct private_netlink_event_socket_t private_netlink_event_socket_t;
 
 /**
  * Private variables and functions of netlink_socket_t class.
@@ -118,6 +124,37 @@ struct private_netlink_socket_t {
 	 * Ignore errors potentially resulting from a retransmission
 	 */
 	bool ignore_retransmit_errors;
+};
+
+/**
+ * Private data of netlink_event_socket_t class
+ */
+struct private_netlink_event_socket_t {
+
+	/**
+	 * Public interface
+	 */
+	netlink_event_socket_t public;
+
+	/**
+	 * Registered callback
+	 */
+	netlink_event_cb_t cb;
+
+	/**
+	 * User data to pass to callback
+	 */
+	void *user;
+
+	/**
+	 * Netlink socket
+	 */
+	int socket;
+
+	/**
+	 * Buffer size for received Netlink messages
+	 */
+	u_int buflen;
 };
 
 /**
@@ -322,7 +359,7 @@ static status_t send_once(private_netlink_socket_t *this, struct nlmsghdr *in,
 
 	if (this->names)
 	{
-		DBG3(DBG_KNL, "sending %N %u: %b", this->names, in->nlmsg_type,
+		DBG4(DBG_KNL, "sending %N %u: %b", this->names, in->nlmsg_type,
 			 (u_int)seq, in, in->nlmsg_len);
 	}
 
@@ -389,7 +426,7 @@ static status_t send_once(private_netlink_socket_t *this, struct nlmsghdr *in,
 	{
 		if (this->names)
 		{
-			DBG3(DBG_KNL, "received %N %u: %b", this->names, hdr->nlmsg_type,
+			DBG4(DBG_KNL, "received %N %u: %b", this->names, hdr->nlmsg_type,
 				 hdr->nlmsg_seq, hdr, hdr->nlmsg_len);
 		}
 		memcpy(ptr, hdr, hdr->nlmsg_len);
@@ -691,6 +728,92 @@ netlink_socket_t *netlink_socket_create(int protocol, enum_name_t *names,
 	{
 		lib->watcher->add(lib->watcher, this->socket, WATCHER_READ, watch, this);
 	}
+
+	return &this->public;
+}
+
+CALLBACK(watch_event, bool,
+	private_netlink_event_socket_t *this, int fd, watcher_event_t event)
+{
+	char buf[this->buflen];
+	struct nlmsghdr *hdr = (struct nlmsghdr*)buf;
+	struct sockaddr_nl addr;
+	socklen_t addr_len = sizeof(addr);
+	int len;
+
+	len = recvfrom(this->socket, buf, sizeof(buf), MSG_DONTWAIT,
+				   (struct sockaddr*)&addr, &addr_len);
+	if (len < 0)
+	{
+		if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)
+		{
+			DBG1(DBG_KNL, "netlink event read error: %s", strerror(errno));
+		}
+		return TRUE;
+	}
+	else if (addr.nl_pid != 0)
+	{	/* ignore non-kernel messages */
+		return TRUE;
+	}
+
+	while (NLMSG_OK(hdr, len))
+	{
+		this->cb(this->user, hdr);
+		hdr = NLMSG_NEXT(hdr, len);
+	}
+	return TRUE;
+}
+
+METHOD(netlink_event_socket_t, destroy_event, void,
+	private_netlink_event_socket_t *this)
+{
+	if (this->socket != -1)
+	{
+		lib->watcher->remove(lib->watcher, this->socket);
+		close(this->socket);
+	}
+	free(this);
+}
+
+/*
+ * Described in header
+ */
+netlink_event_socket_t *netlink_event_socket_create(int protocol, uint32_t groups,
+													netlink_event_cb_t cb, void *user)
+{
+	private_netlink_event_socket_t *this;
+	struct sockaddr_nl addr = {
+		.nl_family = AF_NETLINK,
+		.nl_groups = groups,
+	};
+
+	INIT(this,
+		.public = {
+			.destroy = _destroy_event,
+		},
+		.cb = cb,
+		.user = user,
+		.buflen = netlink_get_buflen(),
+	);
+
+	this->socket = socket(AF_NETLINK, SOCK_RAW, protocol);
+	if (this->socket == -1)
+	{
+		DBG1(DBG_KNL, "unable to create netlink event socket: %s (%d)",
+			 strerror(errno), errno);
+		destroy_event(this);
+		return NULL;
+	}
+
+	if (bind(this->socket, (struct sockaddr*)&addr, sizeof(addr)))
+	{
+		DBG1(DBG_KNL, "unable to bind netlink event socket: %s (%d)",
+			 strerror(errno), errno);
+		destroy_event(this);
+		return NULL;
+	}
+
+	lib->watcher->add(lib->watcher, this->socket, WATCHER_READ, watch_event, this);
 
 	return &this->public;
 }

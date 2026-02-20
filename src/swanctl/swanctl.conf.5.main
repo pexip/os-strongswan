@@ -194,26 +194,35 @@ irrespective of the value of this option (even when set to
 
 .TP
 .BR connections.<conn>.childless " [allow]"
-Use childless IKE_SA initiation (RFC 6023) for IKEv2.  Acceptable values are
+Use childless IKE_SA initiation (RFC 6023) for IKEv2, with the first CHILD_SA
+created with a separate CREATE_CHILD_SA exchange (e.g. to use an independent DH
+exchange for all CHILD_SAs).  Acceptable values are
 .RI "" "allow" ""
 (the default),
+.RI "" "prefer" ","
 .RI "" "force" ""
 and
 .RI "" "never" "."
 If set to
 .RI "" "allow" ","
-responders will
-accept childless IKE_SAs (as indicated via notify in the IKE_SA_INIT response)
-while initiators continue to create regular IKE_SAs with the first CHILD_SA
-created during IKE_AUTH, unless the IKE_SA is initiated explicitly without any
-children (which will fail if the responder does not support or has disabled this
-extension).  If set to
+responders will accept
+childless IKE_SAs (as indicated via notify in the IKE_SA_INIT response) while
+initiators continue to create regular IKE_SAs with the first CHILD_SA created
+during IKE_AUTH, unless the IKE_SA is initiated explicitly without any children
+(which will fail if the responder does not support or has disabled this
+extension). The effect of
+.RI "" "prefer" ""
+is the same as
+.RI "" "allow" ""
+on responders, but as
+initiator a childless IKE_SA is initiated if the responder supports it. If set
+to
 .RI "" "force" ","
-only childless initiation is accepted and the
-first CHILD_SA is created with a separate CREATE_CHILD_SA exchange (e.g. to use
-an independent DH exchange for all CHILD_SAs).  Finally, setting the option to
+only childless initiation is accepted in either role.  Finally,
+setting the option to
 .RI "" "never" ""
-disables support for childless IKE_SAs as responder.
+disables support for childless IKE_SAs as
+responder.
 
 .TP
 .BR connections.<conn>.send_certreq " [yes]"
@@ -1343,13 +1352,19 @@ disables IPsec replay protection.
 .TP
 .BR connections.<conn>.children.<child>.hw_offload " [no]"
 Enable hardware offload for this CHILD_SA, if supported by the IPsec
-implementation. The value
-.RI "" "yes" ""
-enforces offloading and the installation will
-fail if it's not supported by either kernel or device.       The value
+implementation. The values
+.RI "" "crypto" ""
+or
+.RI "" "packet" ""
+enforce crypto or full packet
+offloading and the installation will fail if the selected mode is not supported
+by either kernel or device. On Linux,
+.RI "" "packet" ""
+also offloads policies, including
+trap policies. The value
 .RI "" "auto" ""
-enables offloading, if it's supported, but the installation does not fail
-otherwise.
+enables full packet or crypto offloading, if
+either is supported, but the installation does not fail otherwise.
 
 .TP
 .BR connections.<conn>.children.<child>.copy_df " [yes]"
