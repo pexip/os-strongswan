@@ -2,7 +2,7 @@
 03_systemd-service.patch
 04_disable-libtls-tests.patch
 dont-load-kernel-libipsec-plugin-by-default.patch
-0005-libtls-Fix-authentication-bypass-and-expired-pointer.patch
+#0005-libtls-Fix-authentication-bypass-and-expired-pointer.patch
 0006-charon-tkm-Validate-DH-public-key-to-fix-potential-b.patch
 0007-eap-mschapv2-Fix-length-check-for-Failure-Request-pa.patch
 pexip/01-ipsec-stop-with-old-pidfile.patch
