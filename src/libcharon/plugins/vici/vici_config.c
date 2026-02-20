@@ -1040,9 +1040,11 @@ CALLBACK(parse_hw_offload, bool,
 	action_t *out, chunk_t v)
 {
 	enum_map_t map[] = {
-		{ "no",		HW_OFFLOAD_NO	},
-		{ "yes",	HW_OFFLOAD_YES	},
-		{ "auto",	HW_OFFLOAD_AUTO	},
+		{ "no",		HW_OFFLOAD_NO		},
+		{ "yes",	HW_OFFLOAD_CRYPTO	},
+		{ "crypto",	HW_OFFLOAD_CRYPTO	},
+		{ "packet",	HW_OFFLOAD_PACKET	},
+		{ "auto",	HW_OFFLOAD_AUTO		},
 	};
 	int d;
 
@@ -1641,6 +1643,7 @@ CALLBACK(parse_childless, bool,
 {
 	enum_map_t map[] = {
 		{ "allow",		CHILDLESS_ALLOW		},
+		{ "prefer",		CHILDLESS_PREFER	},
 		{ "never",		CHILDLESS_NEVER		},
 		{ "force",		CHILDLESS_FORCE		},
 	};

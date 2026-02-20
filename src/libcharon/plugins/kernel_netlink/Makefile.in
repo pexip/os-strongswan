@@ -143,7 +143,7 @@ am__DEPENDENCIES_1 =
 libstrongswan_kernel_netlink_la_DEPENDENCIES = $(am__DEPENDENCIES_1)
 am_libstrongswan_kernel_netlink_la_OBJECTS = kernel_netlink_plugin.lo \
 	kernel_netlink_ipsec.lo kernel_netlink_net.lo \
-	kernel_netlink_shared.lo
+	kernel_netlink_shared.lo kernel_netlink_xfrmi.lo
 libstrongswan_kernel_netlink_la_OBJECTS =  \
 	$(am_libstrongswan_kernel_netlink_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
@@ -191,6 +191,7 @@ am__depfiles_remade = ./$(DEPDIR)/kernel_netlink_ipsec.Plo \
 	./$(DEPDIR)/kernel_netlink_shared.Plo \
 	./$(DEPDIR)/kernel_netlink_tests-kernel_netlink_shared.Po \
 	./$(DEPDIR)/kernel_netlink_tests-tests.Po \
+	./$(DEPDIR)/kernel_netlink_xfrmi.Plo \
 	suites/$(DEPDIR)/kernel_netlink_tests-test_socket.Po
 am__mv = mv -f
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
@@ -481,7 +482,6 @@ sharedstatedir = @sharedstatedir@
 soup_CFLAGS = @soup_CFLAGS@
 soup_LIBS = @soup_LIBS@
 srcdir = @srcdir@
-starter_plugins = @starter_plugins@
 strongswan_conf = @strongswan_conf@
 strongswan_options = @strongswan_options@
 swanctldir = @swanctldir@
@@ -529,7 +529,8 @@ libstrongswan_kernel_netlink_la_SOURCES = \
 	kernel_netlink_plugin.h kernel_netlink_plugin.c \
 	kernel_netlink_ipsec.h kernel_netlink_ipsec.c \
 	kernel_netlink_net.h kernel_netlink_net.c \
-	kernel_netlink_shared.h kernel_netlink_shared.c
+	kernel_netlink_shared.h kernel_netlink_shared.c \
+	kernel_netlink_xfrmi.h kernel_netlink_xfrmi.c
 
 libstrongswan_kernel_netlink_la_LIBADD = $(DLLIB)
 libstrongswan_kernel_netlink_la_LDFLAGS = -module -avoid-version
@@ -666,6 +667,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/kernel_netlink_shared.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/kernel_netlink_tests-kernel_netlink_shared.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/kernel_netlink_tests-tests.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/kernel_netlink_xfrmi.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@suites/$(DEPDIR)/kernel_netlink_tests-test_socket.Po@am__quote@ # am--include-marker
 
 $(am__depfiles_remade):
@@ -976,6 +978,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/kernel_netlink_shared.Plo
 	-rm -f ./$(DEPDIR)/kernel_netlink_tests-kernel_netlink_shared.Po
 	-rm -f ./$(DEPDIR)/kernel_netlink_tests-tests.Po
+	-rm -f ./$(DEPDIR)/kernel_netlink_xfrmi.Plo
 	-rm -f suites/$(DEPDIR)/kernel_netlink_tests-test_socket.Po
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
@@ -1028,6 +1031,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/kernel_netlink_shared.Plo
 	-rm -f ./$(DEPDIR)/kernel_netlink_tests-kernel_netlink_shared.Po
 	-rm -f ./$(DEPDIR)/kernel_netlink_tests-tests.Po
+	-rm -f ./$(DEPDIR)/kernel_netlink_xfrmi.Plo
 	-rm -f suites/$(DEPDIR)/kernel_netlink_tests-test_socket.Po
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
