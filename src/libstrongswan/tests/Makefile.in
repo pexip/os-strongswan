@@ -154,6 +154,8 @@ am_libstrongswan_tests_OBJECTS = libstrongswan_tests-tests.$(OBJEXT) \
 	suites/libstrongswan_tests-test_rsa_oaep_sha512.$(OBJEXT) \
 	suites/libstrongswan_tests-test_certpolicy.$(OBJEXT) \
 	suites/libstrongswan_tests-test_certnames.$(OBJEXT) \
+	suites/libstrongswan_tests-test_serial_gen.$(OBJEXT) \
+	suites/libstrongswan_tests-test_serial_parse.$(OBJEXT) \
 	suites/libstrongswan_tests-test_host.$(OBJEXT) \
 	suites/libstrongswan_tests-test_auth_cfg.$(OBJEXT) \
 	suites/libstrongswan_tests-test_hasher.$(OBJEXT) \
@@ -240,6 +242,8 @@ am__depfiles_remade = ./$(DEPDIR)/libstrongswan_tests-tests.Po \
 	suites/$(DEPDIR)/libstrongswan_tests-test_rsa_oaep_sha384.Po \
 	suites/$(DEPDIR)/libstrongswan_tests-test_rsa_oaep_sha512.Po \
 	suites/$(DEPDIR)/libstrongswan_tests-test_rsa_pkcs1.Po \
+	suites/$(DEPDIR)/libstrongswan_tests-test_serial_gen.Po \
+	suites/$(DEPDIR)/libstrongswan_tests-test_serial_parse.Po \
 	suites/$(DEPDIR)/libstrongswan_tests-test_settings.Po \
 	suites/$(DEPDIR)/libstrongswan_tests-test_signature_params.Po \
 	suites/$(DEPDIR)/libstrongswan_tests-test_stream.Po \
@@ -611,6 +615,8 @@ libstrongswan_tests_SOURCES = tests.h tests.c \
   suites/test_rsa_oaep_sha512.c \
   suites/test_certpolicy.c \
   suites/test_certnames.c \
+  suites/test_serial_gen.c \
+  suites/test_serial_parse.c \
   suites/test_host.c \
   suites/test_auth_cfg.c \
   suites/test_hasher.c \
@@ -764,6 +770,10 @@ suites/libstrongswan_tests-test_certpolicy.$(OBJEXT):  \
 	suites/$(am__dirstamp) suites/$(DEPDIR)/$(am__dirstamp)
 suites/libstrongswan_tests-test_certnames.$(OBJEXT):  \
 	suites/$(am__dirstamp) suites/$(DEPDIR)/$(am__dirstamp)
+suites/libstrongswan_tests-test_serial_gen.$(OBJEXT):  \
+	suites/$(am__dirstamp) suites/$(DEPDIR)/$(am__dirstamp)
+suites/libstrongswan_tests-test_serial_parse.$(OBJEXT):  \
+	suites/$(am__dirstamp) suites/$(DEPDIR)/$(am__dirstamp)
 suites/libstrongswan_tests-test_host.$(OBJEXT):  \
 	suites/$(am__dirstamp) suites/$(DEPDIR)/$(am__dirstamp)
 suites/libstrongswan_tests-test_auth_cfg.$(OBJEXT):  \
@@ -860,6 +870,8 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@suites/$(DEPDIR)/libstrongswan_tests-test_rsa_oaep_sha384.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@suites/$(DEPDIR)/libstrongswan_tests-test_rsa_oaep_sha512.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@suites/$(DEPDIR)/libstrongswan_tests-test_rsa_pkcs1.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@suites/$(DEPDIR)/libstrongswan_tests-test_serial_gen.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@suites/$(DEPDIR)/libstrongswan_tests-test_serial_parse.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@suites/$(DEPDIR)/libstrongswan_tests-test_settings.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@suites/$(DEPDIR)/libstrongswan_tests-test_signature_params.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@suites/$(DEPDIR)/libstrongswan_tests-test_stream.Po@am__quote@ # am--include-marker
@@ -1332,6 +1344,34 @@ suites/libstrongswan_tests-test_certnames.obj: suites/test_certnames.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='suites/test_certnames.c' object='suites/libstrongswan_tests-test_certnames.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libstrongswan_tests_CFLAGS) $(CFLAGS) -c -o suites/libstrongswan_tests-test_certnames.obj `if test -f 'suites/test_certnames.c'; then $(CYGPATH_W) 'suites/test_certnames.c'; else $(CYGPATH_W) '$(srcdir)/suites/test_certnames.c'; fi`
+
+suites/libstrongswan_tests-test_serial_gen.o: suites/test_serial_gen.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libstrongswan_tests_CFLAGS) $(CFLAGS) -MT suites/libstrongswan_tests-test_serial_gen.o -MD -MP -MF suites/$(DEPDIR)/libstrongswan_tests-test_serial_gen.Tpo -c -o suites/libstrongswan_tests-test_serial_gen.o `test -f 'suites/test_serial_gen.c' || echo '$(srcdir)/'`suites/test_serial_gen.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) suites/$(DEPDIR)/libstrongswan_tests-test_serial_gen.Tpo suites/$(DEPDIR)/libstrongswan_tests-test_serial_gen.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='suites/test_serial_gen.c' object='suites/libstrongswan_tests-test_serial_gen.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libstrongswan_tests_CFLAGS) $(CFLAGS) -c -o suites/libstrongswan_tests-test_serial_gen.o `test -f 'suites/test_serial_gen.c' || echo '$(srcdir)/'`suites/test_serial_gen.c
+
+suites/libstrongswan_tests-test_serial_gen.obj: suites/test_serial_gen.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libstrongswan_tests_CFLAGS) $(CFLAGS) -MT suites/libstrongswan_tests-test_serial_gen.obj -MD -MP -MF suites/$(DEPDIR)/libstrongswan_tests-test_serial_gen.Tpo -c -o suites/libstrongswan_tests-test_serial_gen.obj `if test -f 'suites/test_serial_gen.c'; then $(CYGPATH_W) 'suites/test_serial_gen.c'; else $(CYGPATH_W) '$(srcdir)/suites/test_serial_gen.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) suites/$(DEPDIR)/libstrongswan_tests-test_serial_gen.Tpo suites/$(DEPDIR)/libstrongswan_tests-test_serial_gen.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='suites/test_serial_gen.c' object='suites/libstrongswan_tests-test_serial_gen.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libstrongswan_tests_CFLAGS) $(CFLAGS) -c -o suites/libstrongswan_tests-test_serial_gen.obj `if test -f 'suites/test_serial_gen.c'; then $(CYGPATH_W) 'suites/test_serial_gen.c'; else $(CYGPATH_W) '$(srcdir)/suites/test_serial_gen.c'; fi`
+
+suites/libstrongswan_tests-test_serial_parse.o: suites/test_serial_parse.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libstrongswan_tests_CFLAGS) $(CFLAGS) -MT suites/libstrongswan_tests-test_serial_parse.o -MD -MP -MF suites/$(DEPDIR)/libstrongswan_tests-test_serial_parse.Tpo -c -o suites/libstrongswan_tests-test_serial_parse.o `test -f 'suites/test_serial_parse.c' || echo '$(srcdir)/'`suites/test_serial_parse.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) suites/$(DEPDIR)/libstrongswan_tests-test_serial_parse.Tpo suites/$(DEPDIR)/libstrongswan_tests-test_serial_parse.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='suites/test_serial_parse.c' object='suites/libstrongswan_tests-test_serial_parse.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libstrongswan_tests_CFLAGS) $(CFLAGS) -c -o suites/libstrongswan_tests-test_serial_parse.o `test -f 'suites/test_serial_parse.c' || echo '$(srcdir)/'`suites/test_serial_parse.c
+
+suites/libstrongswan_tests-test_serial_parse.obj: suites/test_serial_parse.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libstrongswan_tests_CFLAGS) $(CFLAGS) -MT suites/libstrongswan_tests-test_serial_parse.obj -MD -MP -MF suites/$(DEPDIR)/libstrongswan_tests-test_serial_parse.Tpo -c -o suites/libstrongswan_tests-test_serial_parse.obj `if test -f 'suites/test_serial_parse.c'; then $(CYGPATH_W) 'suites/test_serial_parse.c'; else $(CYGPATH_W) '$(srcdir)/suites/test_serial_parse.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) suites/$(DEPDIR)/libstrongswan_tests-test_serial_parse.Tpo suites/$(DEPDIR)/libstrongswan_tests-test_serial_parse.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='suites/test_serial_parse.c' object='suites/libstrongswan_tests-test_serial_parse.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libstrongswan_tests_CFLAGS) $(CFLAGS) -c -o suites/libstrongswan_tests-test_serial_parse.obj `if test -f 'suites/test_serial_parse.c'; then $(CYGPATH_W) 'suites/test_serial_parse.c'; else $(CYGPATH_W) '$(srcdir)/suites/test_serial_parse.c'; fi`
 
 suites/libstrongswan_tests-test_host.o: suites/test_host.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libstrongswan_tests_CFLAGS) $(CFLAGS) -MT suites/libstrongswan_tests-test_host.o -MD -MP -MF suites/$(DEPDIR)/libstrongswan_tests-test_host.Tpo -c -o suites/libstrongswan_tests-test_host.o `test -f 'suites/test_host.c' || echo '$(srcdir)/'`suites/test_host.c
@@ -1884,6 +1924,8 @@ distclean: distclean-am
 	-rm -f suites/$(DEPDIR)/libstrongswan_tests-test_rsa_oaep_sha384.Po
 	-rm -f suites/$(DEPDIR)/libstrongswan_tests-test_rsa_oaep_sha512.Po
 	-rm -f suites/$(DEPDIR)/libstrongswan_tests-test_rsa_pkcs1.Po
+	-rm -f suites/$(DEPDIR)/libstrongswan_tests-test_serial_gen.Po
+	-rm -f suites/$(DEPDIR)/libstrongswan_tests-test_serial_parse.Po
 	-rm -f suites/$(DEPDIR)/libstrongswan_tests-test_settings.Po
 	-rm -f suites/$(DEPDIR)/libstrongswan_tests-test_signature_params.Po
 	-rm -f suites/$(DEPDIR)/libstrongswan_tests-test_stream.Po
@@ -1981,6 +2023,8 @@ maintainer-clean: maintainer-clean-am
 	-rm -f suites/$(DEPDIR)/libstrongswan_tests-test_rsa_oaep_sha384.Po
 	-rm -f suites/$(DEPDIR)/libstrongswan_tests-test_rsa_oaep_sha512.Po
 	-rm -f suites/$(DEPDIR)/libstrongswan_tests-test_rsa_pkcs1.Po
+	-rm -f suites/$(DEPDIR)/libstrongswan_tests-test_serial_gen.Po
+	-rm -f suites/$(DEPDIR)/libstrongswan_tests-test_serial_parse.Po
 	-rm -f suites/$(DEPDIR)/libstrongswan_tests-test_settings.Po
 	-rm -f suites/$(DEPDIR)/libstrongswan_tests-test_signature_params.Po
 	-rm -f suites/$(DEPDIR)/libstrongswan_tests-test_stream.Po
