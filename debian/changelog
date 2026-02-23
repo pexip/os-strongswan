@@ -1,3 +1,9 @@
+strongswan (5.9.8-5+deb12u2+pexip25u1) pexip-trixie; urgency=medium
+
+  * Build for pexip-trixie
+
+ -- Huw Jones <huw@pexip.com>  Mon, 23 Feb 2025 11:49:22 +0000
+
 strongswan (5.9.8-5+pexip24u7+deb12u2) pexip; urgency=medium
 
   * New upstream release with security fixes
