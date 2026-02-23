@@ -1,1 +1,1 @@
-lib/systemd/system/strongswan-starter.service lib/systemd/system/ipsec.service
+usr/lib/systemd/system/strongswan-starter.service usr/lib/systemd/system/ipsec.service
