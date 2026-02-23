@@ -2,6 +2,7 @@ strongswan (5.9.8-5+deb12u2+pexip25u1) pexip-trixie; urgency=medium
 
   * Build for pexip-trixie
   * Fixup for usrmerge
+  * d/control: swap systemd for systemd-dev
 
  -- Huw Jones <huw@pexip.com>  Mon, 23 Feb 2025 11:49:22 +0000
 
