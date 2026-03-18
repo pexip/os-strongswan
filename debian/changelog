@@ -1,3 +1,9 @@
+strongswan (5.9.8-5+deb12u3) bookworm-security; urgency=medium
+
+  * d/patch: fix integer overflow in EAP-TTLS plugin (CVE-2026-25075)
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Wed, 18 Mar 2026 08:53:16 +0100
+
 strongswan (5.9.8-5+deb12u2) bookworm-security; urgency=medium
 
   * d/patches: add fix for buffer overflow in EAP-MSCHAPv2 (CVE-2025-62291)
