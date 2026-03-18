@@ -1,3 +1,9 @@
+strongswan (5.9.8-5+pexip25u1+deb12u2) pexip-trixie; urgency=medium
+
+  * Fix version number to be higher than bookworm build.
+
+ -- Mark Hymers <mark.hymers@pexip.com>  Wed, 18 Mar 2026 11:35:23 +0000
+
 strongswan (5.9.8-5+deb12u2+pexip25u1) pexip-trixie; urgency=medium
 
   * Build for pexip-trixie
