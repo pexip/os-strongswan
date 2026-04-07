@@ -1,3 +1,5 @@
+Ensure salt is initialised in KDF code
+
 diff --git a/src/libstrongswan/plugins/openssl/openssl_kdf.c b/src/libstrongswan/plugins/openssl/openssl_kdf.c
 index cca81783ab..461764e124 100644
 --- a/src/libstrongswan/plugins/openssl/openssl_kdf.c

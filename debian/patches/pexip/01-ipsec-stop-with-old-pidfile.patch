@@ -1,3 +1,5 @@
+Handle old PID files for compatibility during upgrade.
+
 diff --git a/src/ipsec/_ipsec.in b/src/ipsec/_ipsec.in
 index a002614f..8aab2ec9 100644
 --- a/src/ipsec/_ipsec.in

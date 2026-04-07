@@ -1,3 +1,5 @@
+Stop the build adding -Werror if building from git.
+
 diff --git a/configure.ac b/configure.ac
 index f9e6e55c2..c664198c9 100644
 --- a/configure.ac

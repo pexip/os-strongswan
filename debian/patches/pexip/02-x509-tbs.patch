@@ -1,3 +1,5 @@
+Use i2d_X509_tbs() to obtain TBS bytes
+
 diff --git a/src/libstrongswan/plugins/openssl/openssl_x509.c b/src/libstrongswan/plugins/openssl/openssl_x509.c
 index 4b331ad4f0..dd08be0292 100644
 --- a/src/libstrongswan/plugins/openssl/openssl_x509.c
