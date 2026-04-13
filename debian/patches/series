@@ -6,3 +6,10 @@ dont-load-kernel-libipsec-plugin-by-default.patch
 0006-charon-tkm-Validate-DH-public-key-to-fix-potential-b.patch
 0007-eap-mschapv2-Fix-length-check-for-Failure-Request-pa.patch
 0008-eap-ttls-Prevent-crash-if-AVP-length-header-field-is.patch
+0009-libsimaka-Reject-zero-length-EAP-SIM-AKA-attributes.patch
+0010-libradius-Reject-undersized-attributes-in-enumerator.patch
+0011-tls-server-Only-accept-non-empty-ECDH-public-keys-wi.patch
+0012-tls-server-Prevent-infinite-loop-if-supported-versio.patch
+0013-pkcs5-pkcs7-Avoid-NULL-pointer-dereference-when-veri.patch
+0014-constraints-Case-insensitive-matching-and-reject-exc.patch
+0015-gmp-Avoid-crash-and-timing-leaks-in-PKCS-1-v1.5-decr.patch

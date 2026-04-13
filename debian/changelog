@@ -1,3 +1,22 @@
+strongswan (5.9.8-5+deb12u4) bookworm-security; urgency=medium
+
+  * d/patches: add fix for integer underflow in libsimaka when handling
+    EAP-SIM/AKA attributes (CVE-2026-35330)
+  * d/patches: add fix for integer underflow in libradius when handling RADIUS
+    attributes (CVE-2026-35333)
+  * d/patches: add fix for NULL-pointer dereference in libtls when handling
+    ECDH public values (CVE-2026-35332)
+  * d/patches: add fix for infinite loop in libtls when handling supported
+    versions TLS extension (CVE-2026-35328)
+  * d/patches: add fix for NULL-pointer dereference in libstrongswan (pkcs5)
+    and the pkcs7 plugin when processing padding in PKCS#7 (CVE-2026-35329)
+  * d/patches: add fix for acceptation of authentication certificates
+    violating name constraints (CVE-2026-35331)
+  * d/patches: add fix for possible NULL-pointer dereference in gmp plugin for
+    RSA decryption (CVE-2026-35334)
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Mon, 13 Apr 2026 11:19:15 +0200
+
 strongswan (5.9.8-5+deb12u3) bookworm-security; urgency=medium
 
   * d/patch: fix integer overflow in EAP-TTLS plugin (CVE-2026-25075)
