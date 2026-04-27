@@ -1,3 +1,9 @@
+strongswan (5.9.8-5+pexip25u3+deb12u4) pexip-trixie; urgency=medium
+
+  * New upstream release
+
+ -- Huw Jones <huw@pexip.com>  Mon, 27 Apr 2026 11:20:55 +0100
+
 strongswan (5.9.8-5+deb12u4) bookworm-security; urgency=medium
 
   * d/patches: add fix for integer underflow in libsimaka when handling
