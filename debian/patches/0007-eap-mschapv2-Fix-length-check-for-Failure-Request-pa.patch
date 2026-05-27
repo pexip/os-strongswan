@@ -26,10 +26,10 @@ Fixes: CVE-2025-62291
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/src/libcharon/plugins/eap_mschapv2/eap_mschapv2.c b/src/libcharon/plugins/eap_mschapv2/eap_mschapv2.c
-index 2e14bd9..1eedfeb 100644
+index 1bb54c8..9ad509a 100644
 --- a/src/libcharon/plugins/eap_mschapv2/eap_mschapv2.c
 +++ b/src/libcharon/plugins/eap_mschapv2/eap_mschapv2.c
-@@ -972,7 +972,7 @@ static status_t process_peer_failure(private_eap_mschapv2_t *this,
+@@ -974,7 +974,7 @@ static status_t process_peer_failure(private_eap_mschapv2_t *this,
  	data = in->get_data(in);
  	eap = (eap_mschapv2_header_t*)data.ptr;
  

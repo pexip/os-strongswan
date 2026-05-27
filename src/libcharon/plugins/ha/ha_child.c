@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2024 Tobias Brunner
  * Copyright (C) 2008 Martin Willi
  *
  * Copyright (C) secunet Security Networks AG
@@ -51,16 +52,15 @@ struct private_ha_child_t {
 
 METHOD(listener_t, child_keys, bool,
 	private_ha_child_t *this, ike_sa_t *ike_sa, child_sa_t *child_sa,
-	bool initiator, key_exchange_t *dh, chunk_t nonce_i, chunk_t nonce_r)
+	bool initiator, array_t *kes, chunk_t nonce_i, chunk_t nonce_r)
 {
 	ha_message_t *m;
-	chunk_t secret;
+	chunk_t secret, add_secret = chunk_empty;
 	proposal_t *proposal;
 	uint16_t alg, len;
 	linked_list_t *local_ts, *remote_ts;
 	enumerator_t *enumerator;
 	traffic_selector_t *ts;
-	u_int seg_i, seg_o;
 
 	if (this->tunnel && this->tunnel->is_sa(this->tunnel, ike_sa))
 	{	/* do not sync SA between nodes */
@@ -92,20 +92,23 @@ METHOD(listener_t, child_keys, bool,
 	{
 		m->add_attribute(m, HA_ALG_INTEG, alg);
 	}
-	if (proposal->get_algorithm(proposal, KEY_EXCHANGE_METHOD, &alg, NULL))
-	{
-		m->add_attribute(m, HA_ALG_DH, alg);
-	}
+	m->add_key_exchange_methods(m, proposal);
 	if (proposal->get_algorithm(proposal, EXTENDED_SEQUENCE_NUMBERS, &alg, NULL))
 	{
 		m->add_attribute(m, HA_ESN, alg);
 	}
+
 	m->add_attribute(m, HA_NONCE_I, nonce_i);
 	m->add_attribute(m, HA_NONCE_R, nonce_r);
-	if (dh && dh->get_shared_secret(dh, &secret))
+	if (kes && key_exchange_concat_secrets(kes, &secret, &add_secret))
 	{
 		m->add_attribute(m, HA_SECRET, secret);
 		chunk_clear(&secret);
+		if (add_secret.len)
+		{
+			m->add_attribute(m, HA_ADD_SECRET, add_secret);
+			chunk_clear(&add_secret);
+		}
 	}
 
 	local_ts = linked_list_create();
@@ -127,6 +130,9 @@ METHOD(listener_t, child_keys, bool,
 	}
 	enumerator->destroy(enumerator);
 
+#if DEBUG_LEVEL >= 1
+	u_int seg_i, seg_o;
+
 	seg_i = this->kernel->get_segment_spi(this->kernel,
 			ike_sa->get_my_host(ike_sa), child_sa->get_spi(child_sa, TRUE));
 	seg_o = this->kernel->get_segment_spi(this->kernel,
@@ -136,6 +142,7 @@ METHOD(listener_t, child_keys, bool,
 		child_sa->get_unique_id(child_sa), local_ts, remote_ts,
 		seg_i, this->segments->is_active(this->segments, seg_i) ? "*" : "",
 		seg_o, this->segments->is_active(this->segments, seg_o) ? "*" : "");
+#endif /* DEBUG_LEVEL */
 
 	local_ts->destroy(local_ts);
 	remote_ts->destroy(remote_ts);

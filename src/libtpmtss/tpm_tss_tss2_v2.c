@@ -536,8 +536,8 @@ METHOD(tpm_tss_t, get_version_info, chunk_t,
 /**
  * read the public key portion of a TSS 2.0 key from NVRAM
  */
-bool read_public(private_tpm_tss_tss2_t *this, TPMI_DH_OBJECT handle,
-	TPM2B_PUBLIC *public)
+static bool read_public(private_tpm_tss_tss2_t *this, TPMI_DH_OBJECT handle,
+						TPM2B_PUBLIC *public)
 {
 	uint32_t rval;
 
@@ -664,6 +664,8 @@ METHOD(tpm_tss_t, get_public, chunk_t,
 			DBG1(DBG_PTS, LABEL "unsupported key type");
 			return chunk_empty;
 	}
+
+#if DEBUG_LEVEL >= 1
 	if (public.publicArea.objectAttributes & TPMA_OBJECT_SIGN_ENCRYPT)
 	{
 		TPMT_ASYM_SCHEME *s;
@@ -682,6 +684,7 @@ METHOD(tpm_tss_t, get_public, chunk_t,
 					  tpm_alg_id_names, s->algorithm,
 					  tpm_alg_id_names, s->mode, s->keyBits.sym);
 	}
+#endif
 
 	return aik_pubkey;
 }
@@ -811,7 +814,7 @@ static bool init_pcr_selection(private_tpm_tss_tss2_t *this, uint32_t pcrs,
 	/* initialize the PCR Selection structure,*/
 	pcr_sel->count = 1;
 	pcr_sel->pcrSelections[0].hash = hash_alg_to_tpm_alg_id(alg);
-;
+
 	pcr_sel->pcrSelections[0].sizeofSelect = 3;
 	pcr_sel->pcrSelections[0].pcrSelect[0] = 0;
 	pcr_sel->pcrSelections[0].pcrSelect[1] = 0;

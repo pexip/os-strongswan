@@ -1,10 +1,10 @@
-strongswan (5.9.8-5+deb12u5) bookworm-security; urgency=medium
+strongswan (6.0.1-6+deb13u6) trixie-security; urgency=medium
 
   * d/patches: add fix for double-free when cloning empty IDs (CVE-2026-47895)
 
- -- Yves-Alexis Perez <corsac@debian.org>  Wed, 27 May 2026 08:58:30 +0200
+ -- Yves-Alexis Perez <corsac@debian.org>  Wed, 27 May 2026 08:40:18 +0200
 
-strongswan (5.9.8-5+deb12u4) bookworm-security; urgency=medium
+strongswan (6.0.1-6+deb13u5) trixie-security; urgency=medium
 
   * d/patches: add fix for integer underflow in libsimaka when handling
     EAP-SIM/AKA attributes (CVE-2026-35330)
@@ -21,32 +21,150 @@ strongswan (5.9.8-5+deb12u4) bookworm-security; urgency=medium
   * d/patches: add fix for possible NULL-pointer dereference in gmp plugin for
     RSA decryption (CVE-2026-35334)
 
- -- Yves-Alexis Perez <corsac@debian.org>  Mon, 13 Apr 2026 11:19:15 +0200
+ -- Yves-Alexis Perez <corsac@debian.org>  Thu, 09 Apr 2026 09:36:31 +0200
 
-strongswan (5.9.8-5+deb12u3) bookworm-security; urgency=medium
+strongswan (6.0.1-6+deb13u4) trixie-security; urgency=medium
 
   * d/patch: fix integer overflow in EAP-TTLS plugin (CVE-2026-25075)
 
- -- Yves-Alexis Perez <corsac@debian.org>  Wed, 18 Mar 2026 08:53:16 +0100
+ -- Yves-Alexis Perez <corsac@debian.org>  Mon, 16 Mar 2026 17:38:31 +0100
 
-strongswan (5.9.8-5+deb12u2) bookworm-security; urgency=medium
+strongswan (6.0.1-6+deb13u3) trixie-security; urgency=medium
+
+  * d/patches: add fix for unauthorized credentials access (CVE-2025-9615)
+    (Closes: #1122978)
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Mon, 15 Dec 2025 14:52:23 +0100
+
+strongswan (6.0.1-6+deb13u2) trixie-security; urgency=medium
 
   * d/patches: add fix for buffer overflow in EAP-MSCHAPv2 (CVE-2025-62291)
 
- -- Yves-Alexis Perez <corsac@debian.org>  Wed, 15 Oct 2025 12:21:12 +0200
+ -- Yves-Alexis Perez <corsac@debian.org>  Wed, 15 Oct 2025 12:09:29 +0200
 
-strongswan (5.9.8-5+deb12u1) bookworm-security; urgency=medium
+strongswan (6.0.1-6+deb13u1) trixie; urgency=medium
 
-  * d/patches: add fix for CVE-2023-41913 in charon-tkm
-    Buffer Overflow When Handling DH Public Values
+  * d/patches: add patches to fix OpenSSL 3.5.1 support (Closes: #1109942)
 
- -- Yves-Alexis Perez <corsac@debian.org>  Mon, 13 Nov 2023 21:29:34 +0100
+ -- Yves-Alexis Perez <corsac@debian.org>  Fri, 22 Aug 2025 09:58:42 +0200
 
-strongswan (5.9.8-5) unstable; urgency=medium
+strongswan (6.0.1-6) unstable; urgency=medium
 
-  * No-change upload for source-only upload.
+  * d/control: keep strongswan-charon and strongswan-starter as acceptable
+    dependencies for strongswan
+    (Closes: #1109510)
 
- -- Yves-Alexis Perez <corsac@debian.org>  Fri, 03 Mar 2023 18:56:58 +0100
+ -- Yves-Alexis Perez <corsac@debian.org>  Tue, 22 Jul 2025 18:24:43 +0200
+
+strongswan (6.0.1-5) unstable; urgency=medium
+
+  * autopkgtests: wait a bit to make sure daemons are started
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Tue, 20 May 2025 13:15:45 +0200
+
+strongswan (6.0.1-4) unstable; urgency=medium
+
+  * autopkgtest: make sure the charon daemon is started
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Wed, 14 May 2025 22:03:02 +0200
+
+strongswan (6.0.1-3) unstable; urgency=medium
+
+  * autopkgtest: daemon test also requires strongswan-charon
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Wed, 14 May 2025 14:15:36 +0200
+
+strongswan (6.0.1-2) unstable; urgency=medium
+
+  * autopkgtest: plugins uses the strongswan-starter service
+  * d/control: add conflicts against libreswan
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Tue, 13 May 2025 17:28:42 +0200
+
+strongswan (6.0.1-1) unstable; urgency=medium
+
+  * d/control: revert strongswan-charon to strongswan-starter dependency
+    (Closes: #1098714)
+  * New upstream version 6.0.1
+    - fix regression in DHCP handling (Closes: #1098857)
+  * d/strongswan-nm.install: ship the charon-nm config
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Fri, 14 Mar 2025 18:55:38 +0100
+
+strongswan (6.0.0-2) unstable; urgency=medium
+
+  * debian/tests: update tests dependencies for metapackage changes
+  * d/control: add breaks/replaces on libstrongswan to
+    libstrongswan-extra-plugins for plugin moves
+  * d/control: add conflicts between strongswan-charon and charon-systemd
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Fri, 21 Feb 2025 17:56:35 +0100
+
+strongswan (6.0.0-1) unstable; urgency=medium
+
+  [ Carles Pina i Estany ]
+  * Added po-debconf Catalan translation
+
+  [ Yves-Alexis Perez ]
+  * New upstream version 6.0.0
+  * d/patches: rebase against new upstream
+  * handle removal of bliss and ntru plugins
+  * d/control: drop breaks/replaces against 5.5 version
+  * d/rules: force-enable curve25519 plugin
+  * Enable some upstream-disabled plugin but move them to -extra-plugin
+  * move openssl plugin to libstrongswan package
+  * d/control: update pkg-config b-dep to pkgconf
+  * d/control: update strongswan metapackage to switch from strongswan-starter
+    to strongswan-swanctl (Closes: #1085384)
+  * d/copyright updated for new release (Closes: #1039527)
+  * d/control: drop conflict with openswan, not in Debian anymore
+  * d/control: drop obsolete breaks/replaces
+  * move pgp plugin to the -extra-plugins package
+  * move sshkey plugin to the -standard-plugin package
+  * move kdf and xcbc plugins to the -extra-plugins package
+  * move fips-prf to the -extra-plugins package
+  * update NEWS with info about the plugins moves
+  * d/control: update standards version to 4.7.1
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Fri, 21 Feb 2025 14:09:27 +0100
+
+strongswan (5.9.13-2) unstable; urgency=medium
+
+  * d/control: drop build-dep on systemd (Closes: #1060509)
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Sun, 21 Jan 2024 14:12:25 +0100
+
+strongswan (5.9.13-1) unstable; urgency=medium
+
+  * New upstream version 5.9.13
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Thu, 11 Jan 2024 17:09:17 +0100
+
+strongswan (5.9.12-1) unstable; urgency=medium
+
+  * New upstream version 5.9.12
+    - includes fix for CVE-2023-41913 in charon-tkm
+      Buffer Overflow When Handling DH Public Values
+  * d/strongswan-pki.install: install pki --ocsp manpage
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Mon, 20 Nov 2023 22:19:21 +0100
+
+strongswan (5.9.11-2) unstable; urgency=medium
+
+  [ Helmut Grohne ]
+  * Fix FTBFS when systemd.pc changes systemdsystemunitdir (Closes: #1052718)
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Mon, 13 Nov 2023 20:22:47 +0100
+
+strongswan (5.9.11-1) unstable; urgency=medium
+
+  * New upstream version 5.9.10
+  * d/patches: 0005-libtls-Fix-authentication-bypass-and-expired-pointer
+    dropped, included upstream
+  * New upstream version 5.9.11
+  * d/patches: rebase against new upstream
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Sun, 18 Jun 2023 11:53:15 +0200
 
 strongswan (5.9.8-4) unstable; urgency=medium
 
