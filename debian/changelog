@@ -1,3 +1,9 @@
+strongswan (5.9.8-5+deb12u5) bookworm-security; urgency=medium
+
+  * d/patches: add fix for double-free when cloning empty IDs (CVE-2026-47895)
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Wed, 27 May 2026 08:58:30 +0200
+
 strongswan (5.9.8-5+deb12u4) bookworm-security; urgency=medium
 
   * d/patches: add fix for integer underflow in libsimaka when handling
