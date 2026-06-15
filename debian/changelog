@@ -1,3 +1,15 @@
+strongswan (5.9.8-5+pexip25u4+deb12u5) pexip-trixie; urgency=medium
+
+  * New upstream release with security fix
+
+ -- Steve McIntyre <steve.mcintyre@pexip.com>  Mon, 15 Jun 2026 12:42:04 +0100
+
+strongswan (5.9.8-5+deb12u5) bookworm-security; urgency=medium
+
+  * d/patches: add fix for double-free when cloning empty IDs (CVE-2026-47895)
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Wed, 27 May 2026 08:58:30 +0200
+
 strongswan (5.9.8-5+pexip25u3+deb12u4) pexip-trixie; urgency=medium
 
   * New upstream release
