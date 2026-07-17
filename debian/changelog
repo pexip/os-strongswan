@@ -1,3 +1,9 @@
+strongswan (6.0.1-6+deb13u6+pexip25u1) pexip-trixie; urgency=medium
+
+  * Build for pexip-trixie
+
+ -- Huw Jones <huw@pexip.com>  Fri, 17 Jul 2026 15:34:57 +0100
+
 strongswan (6.0.1-6+deb13u6) trixie-security; urgency=medium
 
   * d/patches: add fix for double-free when cloning empty IDs (CVE-2026-47895)
