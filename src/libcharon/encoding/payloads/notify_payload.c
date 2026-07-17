@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006-2018 Tobias Brunner
+ * Copyright (C) 2006-2023 Tobias Brunner
  * Copyright (C) 2005-2010 Martin Willi
  * Copyright (C) 2006 Daniel Roethlisberger
  * Copyright (C) 2005 Jan Hutter
@@ -61,7 +61,9 @@ ENUM_NEXT(notify_type_names, SINGLE_PAIR_REQUIRED, CHILD_SA_NOT_FOUND, AUTHENTIC
 	"USE_ASSIGNED_HoA",
 	"TEMPORARY_FAILURE",
 	"CHILD_SA_NOT_FOUND");
-ENUM_NEXT(notify_type_names, ME_CONNECT_FAILED, ME_CONNECT_FAILED, CHILD_SA_NOT_FOUND,
+ENUM_NEXT(notify_type_names, STATE_NOT_FOUND, STATE_NOT_FOUND, CHILD_SA_NOT_FOUND,
+	"STATE_NOT_FOUND");
+ENUM_NEXT(notify_type_names, ME_CONNECT_FAILED, ME_CONNECT_FAILED, STATE_NOT_FOUND,
 	"ME_CONNECT_FAILED");
 ENUM_NEXT(notify_type_names, MS_NOTIFY_STATUS, MS_NOTIFY_STATUS, ME_CONNECT_FAILED,
 	"MS_NOTIFY_STATUS");
@@ -114,11 +116,14 @@ ENUM_NEXT(notify_type_names, INITIAL_CONTACT, SIGNATURE_HASH_ALGORITHMS, MS_NOTI
 	"SENDER_REQUEST_ID",
 	"FRAGMENTATION_SUPPORTED",
 	"SIGNATURE_HASH_ALGORITHMS");
-ENUM_NEXT(notify_type_names, USE_PPK, NO_PPK_AUTH, SIGNATURE_HASH_ALGORITHMS,
+ENUM_NEXT(notify_type_names, USE_PPK, INTERMEDIATE_EXCHANGE_SUPPORTED, SIGNATURE_HASH_ALGORITHMS,
 	"USE_PPK",
 	"PPK_IDENTITY",
-	"NO_PPK_AUTH");
-ENUM_NEXT(notify_type_names, INITIAL_CONTACT_IKEV1, INITIAL_CONTACT_IKEV1, NO_PPK_AUTH,
+	"NO_PPK_AUTH",
+	"INTERMEDIATE_EXCHANGE_SUPPORTED");
+ENUM_NEXT(notify_type_names, ADDITIONAL_KEY_EXCHANGE, ADDITIONAL_KEY_EXCHANGE, INTERMEDIATE_EXCHANGE_SUPPORTED,
+	"ADDITIONAL_KEY_EXCHANGE");
+ENUM_NEXT(notify_type_names, INITIAL_CONTACT_IKEV1, INITIAL_CONTACT_IKEV1, ADDITIONAL_KEY_EXCHANGE,
 	"INITIAL_CONTACT");
 ENUM_NEXT(notify_type_names, DPD_R_U_THERE, DPD_R_U_THERE_ACK, INITIAL_CONTACT_IKEV1,
 	"DPD_R_U_THERE",
@@ -175,7 +180,9 @@ ENUM_NEXT(notify_type_short_names, SINGLE_PAIR_REQUIRED, CHILD_SA_NOT_FOUND, AUT
 	"ASSIGNED_HoA",
 	"TEMP_FAIL",
 	"NO_CHILD_SA");
-ENUM_NEXT(notify_type_short_names, ME_CONNECT_FAILED, ME_CONNECT_FAILED, CHILD_SA_NOT_FOUND,
+ENUM_NEXT(notify_type_short_names, STATE_NOT_FOUND, STATE_NOT_FOUND, CHILD_SA_NOT_FOUND,
+	"NO_STATE");
+ENUM_NEXT(notify_type_short_names, ME_CONNECT_FAILED, ME_CONNECT_FAILED, STATE_NOT_FOUND,
 	"ME_CONN_FAIL");
 ENUM_NEXT(notify_type_short_names, MS_NOTIFY_STATUS, MS_NOTIFY_STATUS, ME_CONNECT_FAILED,
 	"MS_STATUS");
@@ -228,11 +235,14 @@ ENUM_NEXT(notify_type_short_names, INITIAL_CONTACT, SIGNATURE_HASH_ALGORITHMS, M
 	"SENDER_REQ_ID",
 	"FRAG_SUP",
 	"HASH_ALG");
-ENUM_NEXT(notify_type_short_names, USE_PPK, NO_PPK_AUTH, SIGNATURE_HASH_ALGORITHMS,
+ENUM_NEXT(notify_type_short_names, USE_PPK, INTERMEDIATE_EXCHANGE_SUPPORTED, SIGNATURE_HASH_ALGORITHMS,
 	"USE_PPK",
 	"PPK_ID",
-	"NO_PPK");
-ENUM_NEXT(notify_type_short_names, INITIAL_CONTACT_IKEV1, INITIAL_CONTACT_IKEV1, NO_PPK_AUTH,
+	"NO_PPK",
+	"IKE_INT_SUP");
+ENUM_NEXT(notify_type_short_names, ADDITIONAL_KEY_EXCHANGE, ADDITIONAL_KEY_EXCHANGE, INTERMEDIATE_EXCHANGE_SUPPORTED,
+	"ADD_KE");
+ENUM_NEXT(notify_type_short_names, INITIAL_CONTACT_IKEV1, INITIAL_CONTACT_IKEV1, ADDITIONAL_KEY_EXCHANGE,
 	"INITIAL_CONTACT");
 ENUM_NEXT(notify_type_short_names, DPD_R_U_THERE, DPD_R_U_THERE_ACK, INITIAL_CONTACT_IKEV1,
 	"DPD",
@@ -636,6 +646,21 @@ METHOD(notify_payload_t, set_notify_type, void,
 	this->notify_type = notify_type;
 }
 
+METHOD(notify_payload_t, get_spi_data, chunk_t,
+	private_notify_payload_t *this)
+{
+	return this->spi;
+}
+
+METHOD(notify_payload_t, set_spi_data, void,
+	private_notify_payload_t *this, chunk_t spi)
+{
+	chunk_free(&this->spi);
+	this->spi = chunk_clone(spi);
+	this->spi_size = this->spi.len;
+	compute_length(this);
+}
+
 METHOD(notify_payload_t, get_spi, uint32_t,
 	private_notify_payload_t *this)
 {
@@ -656,50 +681,35 @@ METHOD(notify_payload_t, get_spi, uint32_t,
 METHOD(notify_payload_t, set_spi, void,
 	private_notify_payload_t *this, uint32_t spi)
 {
-	chunk_free(&this->spi);
 	switch (this->protocol_id)
 	{
 		case PROTO_AH:
 		case PROTO_ESP:
-			this->spi = chunk_alloc(4);
-			*((uint32_t*)this->spi.ptr) = spi;
+			set_spi_data(this, chunk_from_thing(spi));
 			break;
 		default:
 			break;
 	}
-	this->spi_size = this->spi.len;
-	compute_length(this);
 }
 
-METHOD(notify_payload_t, get_spi_data, chunk_t,
+METHOD(notify_payload_t, get_ike_spi, uint64_t,
 	private_notify_payload_t *this)
 {
-	switch (this->protocol_id)
+	if (this->protocol_id == PROTO_IKE &&
+		this->spi.len == 8)
 	{
-		case PROTO_IKE:
-			if (this->spi.len == 16)
-			{
-				return this->spi;
-			}
-		default:
-			break;
+		return *((uint64_t*)this->spi.ptr);
 	}
-	return chunk_empty;
+	return 0;
 }
 
-METHOD(notify_payload_t, set_spi_data, void,
-	private_notify_payload_t *this, chunk_t spi)
+METHOD(notify_payload_t, set_ike_spi, void,
+	private_notify_payload_t *this, uint64_t spi)
 {
-	chunk_free(&this->spi);
-	switch (this->protocol_id)
+	if (this->protocol_id == PROTO_IKE)
 	{
-		case PROTO_IKE:
-			this->spi = chunk_clone(spi);
-		default:
-			break;
+		set_spi_data(this, chunk_from_thing(spi));
 	}
-	this->spi_size = this->spi.len;
-	compute_length(this);
 }
 
 METHOD(notify_payload_t, get_notification_data, chunk_t,
@@ -749,6 +759,8 @@ notify_payload_t *notify_payload_create(payload_type_t type)
 			.set_notify_type = _set_notify_type,
 			.get_spi = _get_spi,
 			.set_spi = _set_spi,
+			.get_ike_spi = _get_ike_spi,
+			.set_ike_spi = _set_ike_spi,
 			.get_spi_data = _get_spi_data,
 			.set_spi_data = _set_spi_data,
 			.get_notification_data = _get_notification_data,

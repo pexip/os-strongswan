@@ -159,8 +159,8 @@ am_libstrongswan_test_vectors_la_OBJECTS = test_vectors_plugin.lo \
 	test_vectors/modp.lo test_vectors/modpsub.lo \
 	test_vectors/ecp.lo test_vectors/ecpbp.lo \
 	test_vectors/curve25519.lo test_vectors/curve448.lo \
-	test_vectors/drbg_ctr.lo test_vectors/drbg_hmac.lo \
-	test_vectors/rng.lo
+	test_vectors/ml_kem.lo test_vectors/drbg_ctr.lo \
+	test_vectors/drbg_hmac.lo test_vectors/rng.lo
 libstrongswan_test_vectors_la_OBJECTS =  \
 	$(am_libstrongswan_test_vectors_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
@@ -220,6 +220,7 @@ am__depfiles_remade = ./$(DEPDIR)/test_vectors_plugin.Plo \
 	test_vectors/$(DEPDIR)/md2.Plo test_vectors/$(DEPDIR)/md4.Plo \
 	test_vectors/$(DEPDIR)/md5.Plo \
 	test_vectors/$(DEPDIR)/md5_hmac.Plo \
+	test_vectors/$(DEPDIR)/ml_kem.Plo \
 	test_vectors/$(DEPDIR)/modp.Plo \
 	test_vectors/$(DEPDIR)/modpsub.Plo \
 	test_vectors/$(DEPDIR)/null.Plo test_vectors/$(DEPDIR)/rc2.Plo \
@@ -305,7 +306,6 @@ DLLIB = @DLLIB@
 DLLTOOL = @DLLTOOL@
 DSYMUTIL = @DSYMUTIL@
 DUMPBIN = @DUMPBIN@
-EASY_INSTALL = @EASY_INSTALL@
 ECHO_C = @ECHO_C@
 ECHO_N = @ECHO_N@
 ECHO_T = @ECHO_T@
@@ -313,6 +313,7 @@ EGREP = @EGREP@
 ETAGS = @ETAGS@
 EXEEXT = @EXEEXT@
 FGREP = @FGREP@
+FILECMD = @FILECMD@
 FUZZING_CFLAGS = @FUZZING_CFLAGS@
 FUZZING_LDFLAGS = @FUZZING_LDFLAGS@
 GEM = @GEM@
@@ -373,7 +374,6 @@ PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
 PLUGIN_CFLAGS = @PLUGIN_CFLAGS@
 PTHREADLIB = @PTHREADLIB@
 PYTHON = @PYTHON@
-PYTHONEGGINSTALLDIR = @PYTHONEGGINSTALLDIR@
 PYTHON_EXEC_PREFIX = @PYTHON_EXEC_PREFIX@
 PYTHON_PACKAGE_VERSION = @PYTHON_PACKAGE_VERSION@
 PYTHON_PLATFORM = @PYTHON_PLATFORM@
@@ -497,7 +497,6 @@ sharedstatedir = @sharedstatedir@
 soup_CFLAGS = @soup_CFLAGS@
 soup_LIBS = @soup_LIBS@
 srcdir = @srcdir@
-starter_plugins = @starter_plugins@
 strongswan_conf = @strongswan_conf@
 strongswan_options = @strongswan_options@
 swanctldir = @swanctldir@
@@ -581,6 +580,7 @@ libstrongswan_test_vectors_la_SOURCES = \
 	test_vectors/ecpbp.c \
 	test_vectors/curve25519.c \
 	test_vectors/curve448.c \
+	test_vectors/ml_kem.c \
 	test_vectors/drbg_ctr.c \
 	test_vectors/drbg_hmac.c \
 	test_vectors/rng.c
@@ -755,6 +755,8 @@ test_vectors/curve25519.lo: test_vectors/$(am__dirstamp) \
 	test_vectors/$(DEPDIR)/$(am__dirstamp)
 test_vectors/curve448.lo: test_vectors/$(am__dirstamp) \
 	test_vectors/$(DEPDIR)/$(am__dirstamp)
+test_vectors/ml_kem.lo: test_vectors/$(am__dirstamp) \
+	test_vectors/$(DEPDIR)/$(am__dirstamp)
 test_vectors/drbg_ctr.lo: test_vectors/$(am__dirstamp) \
 	test_vectors/$(DEPDIR)/$(am__dirstamp)
 test_vectors/drbg_hmac.lo: test_vectors/$(am__dirstamp) \
@@ -805,6 +807,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@test_vectors/$(DEPDIR)/md4.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@test_vectors/$(DEPDIR)/md5.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@test_vectors/$(DEPDIR)/md5_hmac.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@test_vectors/$(DEPDIR)/ml_kem.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@test_vectors/$(DEPDIR)/modp.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@test_vectors/$(DEPDIR)/modpsub.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@test_vectors/$(DEPDIR)/null.Plo@am__quote@ # am--include-marker
@@ -1018,6 +1021,7 @@ distclean: distclean-am
 	-rm -f test_vectors/$(DEPDIR)/md4.Plo
 	-rm -f test_vectors/$(DEPDIR)/md5.Plo
 	-rm -f test_vectors/$(DEPDIR)/md5_hmac.Plo
+	-rm -f test_vectors/$(DEPDIR)/ml_kem.Plo
 	-rm -f test_vectors/$(DEPDIR)/modp.Plo
 	-rm -f test_vectors/$(DEPDIR)/modpsub.Plo
 	-rm -f test_vectors/$(DEPDIR)/null.Plo
@@ -1109,6 +1113,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f test_vectors/$(DEPDIR)/md4.Plo
 	-rm -f test_vectors/$(DEPDIR)/md5.Plo
 	-rm -f test_vectors/$(DEPDIR)/md5_hmac.Plo
+	-rm -f test_vectors/$(DEPDIR)/ml_kem.Plo
 	-rm -f test_vectors/$(DEPDIR)/modp.Plo
 	-rm -f test_vectors/$(DEPDIR)/modpsub.Plo
 	-rm -f test_vectors/$(DEPDIR)/null.Plo

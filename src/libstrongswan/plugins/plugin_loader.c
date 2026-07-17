@@ -191,10 +191,12 @@ struct plugin_entry_t {
 	 */
 	bool critical;
 
+#ifdef HAVE_DLADDR
 	/**
 	 * dlopen handle, if in separate lib
 	 */
 	void *handle;
+#endif
 
 	/**
 	 * List of features, as provided_feature_t
@@ -208,10 +210,12 @@ struct plugin_entry_t {
 static void plugin_entry_destroy(plugin_entry_t *entry)
 {
 	DESTROY_IF(entry->plugin);
+#ifdef HAVE_DLADDR
 	if (entry->handle)
 	{
 		dlclose(entry->handle);
 	}
+#endif
 	entry->features->destroy(entry->features);
 	free(entry);
 }
@@ -369,11 +373,14 @@ static status_t create_plugin(private_plugin_loader_t *this, void *handle,
 	{
 		constructor = plugin_constructors->get(plugin_constructors, name);
 	}
+#elif defined(HAVE_DLADDR)
 	if (!constructor)
-#endif
 	{
 		constructor = dlsym(handle, create);
 	}
+#else
+	#error Neither dynamic linking nor static plugin constructors are supported!
+#endif
 	if (!constructor)
 	{
 		return NOT_FOUND;
@@ -412,8 +419,12 @@ static plugin_entry_t *load_plugin(private_plugin_loader_t *this, char *name,
 {
 	char create[128];
 	plugin_entry_t *entry;
-	void *handle;
+	void *handle = NULL;
+
+#ifdef HAVE_DLADDR
 	int flag = RTLD_LAZY;
+	handle = RTLD_DEFAULT;
+#endif
 
 	if (snprintf(create, sizeof(create), "%s_plugin_create",
 				 name) >= sizeof(create))
@@ -421,7 +432,7 @@ static plugin_entry_t *load_plugin(private_plugin_loader_t *this, char *name,
 		return NULL;
 	}
 	translate(create, "-", "_");
-	switch (create_plugin(this, RTLD_DEFAULT, name, create, FALSE, critical,
+	switch (create_plugin(this, handle, name, create, FALSE, critical,
 						  &entry))
 	{
 		case SUCCESS:
@@ -447,6 +458,7 @@ static plugin_entry_t *load_plugin(private_plugin_loader_t *this, char *name,
 			return NULL;
 		}
 	}
+#ifdef HAVE_DLADDR
 	if (lib->settings->get_bool(lib->settings, "%s.dlopen_use_rtld_now",
 								FALSE, lib->ns))
 	{
@@ -480,6 +492,9 @@ static plugin_entry_t *load_plugin(private_plugin_loader_t *this, char *name,
 	entry->handle = handle;
 	this->plugins->insert_last(this->plugins, entry);
 	return entry;
+#else
+	return NULL;
+#endif
 }
 
 CALLBACK(feature_filter, bool,
@@ -755,10 +770,11 @@ static bool load_dependencies(private_plugin_loader_t *this,
 		{
 			bool soft = provided->feature[i].kind == FEATURE_SDEPEND;
 
-#ifndef USE_FUZZING
+#if !defined(USE_FUZZING) && DEBUG_LEVEL >= 1
 			char *name, *provide, *depend;
+#if DEBUG_LEVEL >= 3
 			int indent = level * 2;
-
+#endif
 			name = provided->entry->plugin->get_name(provided->entry->plugin);
 			provide = plugin_feature_get_string(&provided->feature[0]);
 			depend = plugin_feature_get_string(&provided->feature[i]);
@@ -779,7 +795,7 @@ static bool load_dependencies(private_plugin_loader_t *this,
 			}
 			free(provide);
 			free(depend);
-#endif /* !USE_FUZZING */
+#endif /* !USE_FUZZING && DEBUG_LEVEL */
 
 			if (soft)
 			{	/* it's ok if we can't resolve soft dependencies */
@@ -809,7 +825,7 @@ static void load_feature(private_plugin_loader_t *this,
 			return;
 		}
 
-#ifndef USE_FUZZING
+#if !defined(USE_FUZZING) && DEBUG_LEVEL >= 1
 		char *name, *provide;
 
 		name = provided->entry->plugin->get_name(provided->entry->plugin);
@@ -825,7 +841,7 @@ static void load_feature(private_plugin_loader_t *this,
 				 provide, name);
 		}
 		free(provide);
-#endif /* !USE_FUZZING */
+#endif /* !USE_FUZZING && DEBUG_LEVEL */
 	}
 	else
 	{	/* TODO: we could check the current level and set a different flag when
@@ -845,13 +861,12 @@ static void load_provided(private_plugin_loader_t *this,
 						  provided_feature_t *provided,
 						  int level)
 {
-
 	if (provided->loaded || provided->failed)
 	{
 		return;
 	}
 
-#ifndef USE_FUZZING
+#if !defined(USE_FUZZING) && DEBUG_LEVEL >= 3
 	char *name, *provide;
 	int indent = level * 2;
 
@@ -872,7 +887,7 @@ static void load_provided(private_plugin_loader_t *this,
 	{
 		return;
 	}
-#endif /* USE_FUZZING */
+#endif /* USE_FUZZING && DEBUG_LEVEL */
 
 	provided->loading = TRUE;
 	load_feature(this, provided, level + 1);
@@ -1347,10 +1362,12 @@ METHOD(plugin_loader_t, unload, void,
 	unload_features(this);
 	while (this->plugins->remove_last(this->plugins, (void**)&entry) == SUCCESS)
 	{
+#ifdef HAVE_DLADDR
 		if (lib->leak_detective)
 		{	/* keep handle to report leaks properly */
 			entry->handle = NULL;
 		}
+#endif
 		unregister_features(this, entry);
 		plugin_entry_destroy(entry);
 	}
@@ -1474,8 +1491,11 @@ plugin_loader_t *plugin_loader_create()
 		.features = hashlist_create(
 							(hashtable_hash_t)registered_feature_hash,
 							(hashtable_equals_t)registered_feature_equals, 64),
-		.get_features = dlsym(RTLD_DEFAULT, "plugin_loader_feature_filter"),
 	);
+
+#ifdef HAVE_DLADDR
+	this->get_features = dlsym(RTLD_DEFAULT, "plugin_loader_feature_filter");
+#endif
 
 	if (!this->get_features)
 	{

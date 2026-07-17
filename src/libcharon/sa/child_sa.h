@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006-2019 Tobias Brunner
+ * Copyright (C) 2006-2023 Tobias Brunner
  * Copyright (C) 2006-2008 Martin Willi
  * Copyright (C) 2006 Daniel Roethlisberger
  *
@@ -173,6 +173,18 @@ struct child_sa_t {
 	 * @return 			reqid of the CHILD SA
 	 */
 	uint32_t (*get_reqid)(child_sa_t *this);
+
+	/**
+	 * Get an additional reference to the allocated reqid of this CHILD SA.
+	 *
+	 * For static reqids or until the reqid is allocated (if none was passed
+	 * in the constructor), this returns 0. The returned reqid must be released
+	 * via kernel_interface_t::release_reqid().
+	 *
+	 * @return 			allocated reqid of the CHILD SA, 0 if reqid is static or
+	 *					not allocated yet
+	 */
+	uint32_t (*get_reqid_ref)(child_sa_t *this);
 
 	/**
 	 * Get the unique numerical identifier for this CHILD_SA.
@@ -492,23 +504,24 @@ struct child_sa_t {
 	status_t (*install_policies)(child_sa_t *this);
 
 	/**
-	 * Set the outbound SPI of the CHILD_SA that replaced this CHILD_SA during
-	 * a rekeying.
+	 * Set the CHILD_SA that either replaced this one or the CHILD_SA that is
+	 * being replaced by this one during a passive rekeying (i.e. it links the
+	 * two SAs bidirectionally).
 	 *
-	 * @param spi		outbound SPI of the CHILD_SA that replaced this CHILD_SA
+	 * @param sa		other CHILD_SA involved in a passive rekeying
 	 */
-	void (*set_rekey_spi)(child_sa_t *this, uint32_t spi);
+	void (*set_rekey_sa)(child_sa_t *this, child_sa_t *sa);
 
 	/**
-	 * Get the outbound SPI of the CHILD_SA that replaced this CHILD_SA during
-	 * a rekeying.
+	 * Get the CHILD_SA that's linked to this in a passive rekeying (either
+	 * replacing this one, or being replaced by it).
 	 *
-	 * @return			outbound SPI of the CHILD_SA that replaced this CHILD_SA
+	 * @return			other CHILD_SA involved in a passive rekeying
 	 */
-	uint32_t (*get_rekey_spi)(child_sa_t *this);
+	child_sa_t *(*get_rekey_sa)(child_sa_t *this);
 
 	/**
-	 * Update hosts and ecapsulation mode in the kernel SAs and policies.
+	 * Update hosts and encapsulation mode in the kernel SAs and policies.
 	 *
 	 * @param me		the new local host
 	 * @param other		the new remote host

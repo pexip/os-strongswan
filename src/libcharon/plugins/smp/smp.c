@@ -76,44 +76,45 @@ static void write_bool(xmlTextWriterPtr writer, char *element, bool val)
  */
 static void write_id(xmlTextWriterPtr writer, char *element, identification_t *id)
 {
+	char *type = NULL;
+
 	xmlTextWriterStartElement(writer, element);
 	switch (id->get_type(id))
 	{
-		{
-			char *type;
 
-			while (TRUE)
-			{
-				case ID_ANY:
-					type = "any";
-					break;
-				case ID_IPV4_ADDR:
-					type = "ipv4";
-					break;
-				case ID_IPV6_ADDR:
-					type = "ipv6";
-					break;
-				case ID_FQDN:
-					type = "fqdn";
-					break;
-				case ID_RFC822_ADDR:
-					type = "email";
-					break;
-				case ID_DER_ASN1_DN:
-					type = "asn1dn";
-					break;
-				case ID_DER_ASN1_GN:
-					type = "asn1gn";
-					break;
-			}
-			xmlTextWriterWriteAttribute(writer, "type", type);
-			xmlTextWriterWriteFormatString(writer, "%Y", id);
+		case ID_ANY:
+			type = "any";
 			break;
-		}
+		case ID_IPV4_ADDR:
+			type = "ipv4";
+			break;
+		case ID_IPV6_ADDR:
+			type = "ipv6";
+			break;
+		case ID_FQDN:
+			type = "fqdn";
+			break;
+		case ID_RFC822_ADDR:
+			type = "email";
+			break;
+		case ID_DER_ASN1_DN:
+			type = "asn1dn";
+			break;
+		case ID_DER_ASN1_GN:
+			type = "asn1gn";
+			break;
 		default:
-			/* TODO: base64 keyid */
-			xmlTextWriterWriteAttribute(writer, "type", "keyid");
 			break;
+	}
+	if (type)
+	{
+		xmlTextWriterWriteAttribute(writer, "type", type);
+		xmlTextWriterWriteFormatString(writer, "%Y", id);
+	}
+	else
+	{
+		/* TODO: base64 keyid */
+		xmlTextWriterWriteAttribute(writer, "type", "keyid");
 	}
 	xmlTextWriterEndElement(writer);
 }
@@ -423,13 +424,13 @@ static void request_control_terminate(xmlTextReaderPtr reader,
 		{
 			status = charon->controller->terminate_ike(
 					charon->controller, id, FALSE,
-					(controller_cb_t)xml_callback, writer, 0);
+					(controller_cb_t)xml_callback, writer, LEVEL_CTRL, 0);
 		}
 		else
 		{
 			status = charon->controller->terminate_child(
 					charon->controller, id,
-					(controller_cb_t)xml_callback, writer, 0);
+					(controller_cb_t)xml_callback, writer, LEVEL_CTRL, 0);
 		}
 		/* </log> */
 		xmlTextWriterEndElement(writer);
@@ -495,7 +496,7 @@ static void request_control_initiate(xmlTextReaderPtr reader,
 			{
 				status = charon->controller->initiate(charon->controller,
 							peer, child, (controller_cb_t)xml_callback,
-							writer, 0, FALSE);
+							writer, LEVEL_CTRL, 0, FALSE);
 			}
 			else
 			{
@@ -653,7 +654,7 @@ static job_requeue_t process(int *fdp)
 	if (reader == NULL)
 	{
 		DBG1(DBG_CFG, "opening SMP XML reader failed");
-		return JOB_REQUEUE_FAIR;;
+		return JOB_REQUEUE_FAIR;
 	}
 
 	/* read message type and id */
@@ -681,7 +682,7 @@ static job_requeue_t process(int *fdp)
 		}
 	}
 	xmlFreeTextReader(reader);
-	return JOB_REQUEUE_FAIR;;
+	return JOB_REQUEUE_FAIR;
 }
 
 /**
@@ -703,7 +704,7 @@ static job_requeue_t dispatch(private_smp_t *this)
 	{
 		DBG1(DBG_CFG, "accepting SMP XML socket failed: %s", strerror(errno));
 		sleep(1);
-		return JOB_REQUEUE_FAIR;;
+		return JOB_REQUEUE_FAIR;
 	}
 
 	fdp = malloc_thing(int);
