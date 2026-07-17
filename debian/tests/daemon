@@ -4,6 +4,11 @@
 #------------------------
 DAEMONS="starter charon"
 
+# make sure charon is started
+invoke-rc.d strongswan-starter start
+sleep 1
+invoke-rc.d strongswan-starter status
+
 for daemon in $DAEMONS; do
     if pidof -x $daemon > /dev/null; then
         echo "$daemon OK"

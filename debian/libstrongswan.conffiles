@@ -1,0 +1,14 @@
+remove-on-upgrade /etc/strongswan.d/charon/aes.conf
+remove-on-upgrade /etc/strongswan.d/charon/gmp.conf
+remove-on-upgrade /etc/strongswan.d/charon/hmac.conf
+remove-on-upgrade /etc/strongswan.d/charon/md5.conf
+remove-on-upgrade /etc/strongswan.d/charon/mgf1.conf
+remove-on-upgrade /etc/strongswan.d/charon/pkcs12.conf
+remove-on-upgrade /etc/strongswan.d/charon/rc2.conf
+remove-on-upgrade /etc/strongswan.d/charon/sha1.conf
+remove-on-upgrade /etc/strongswan.d/charon/sha2.conf
+remove-on-upgrade /etc/strongswan.d/charon/pgp.conf
+remove-on-upgrade /etc/strongswan.d/charon/sshkey.conf
+remove-on-upgrade /etc/strongswan.d/charon/kdf.conf
+remove-on-upgrade /etc/strongswan.d/charon/xcbc.conf
+remove-on-upgrade /etc/strongswan.d/charon/fips-prf.conf

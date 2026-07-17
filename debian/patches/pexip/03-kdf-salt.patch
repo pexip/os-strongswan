@@ -13,4 +13,4 @@ index cca81783ab..461764e124 100644
 +			    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)),
  	);
  
- 	if (!this->hasher ||
+ 	/* also generate a salt (as if none was provided, i.e. zeroes of hash length)

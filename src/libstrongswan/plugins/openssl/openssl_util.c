@@ -35,6 +35,13 @@
 #define ASN1_STRING_get0_data(a) ASN1_STRING_data((ASN1_STRING*)a)
 #endif
 
+#if defined(OPENSSL_IS_BORINGSSL) || defined(OPENSSL_IS_AWSLC)
+/**
+ * Chunk for an ASN.1 Integer with a value of 0.
+ */
+static const chunk_t asn1_zero_int = chunk_from_chars(0x00);
+#endif
+
 /*
  * Described in header
  */
@@ -127,51 +134,6 @@ bool openssl_fingerprint(EVP_PKEY *key, cred_encoding_type_t type, chunk_t *fp)
 	hasher->destroy(hasher);
 	lib->encoding->cache(lib->encoding, type, key, fp);
 	return TRUE;
-}
-
-/**
- * Described in header.
- */
-bool openssl_hash_chunk(int hash_type, chunk_t data, chunk_t *hash)
-{
-	EVP_MD_CTX *ctx;
-	bool ret = FALSE;
-	const EVP_MD *hasher = EVP_get_digestbynid(hash_type);
-	if (!hasher)
-	{
-		return FALSE;
-	}
-
-	ctx = EVP_MD_CTX_create();
-	if (!ctx)
-	{
-		goto error;
-	}
-
-	if (!EVP_DigestInit_ex(ctx, hasher, NULL))
-	{
-		goto error;
-	}
-
-	if (!EVP_DigestUpdate(ctx, data.ptr, data.len))
-	{
-		goto error;
-	}
-
-	*hash = chunk_alloc(EVP_MD_size(hasher));
-	if (!EVP_DigestFinal_ex(ctx, hash->ptr, NULL))
-	{
-		chunk_free(hash);
-		goto error;
-	}
-
-	ret = TRUE;
-error:
-	if (ctx)
-	{
-		EVP_MD_CTX_destroy(ctx);
-	}
-	return ret;
 }
 
 /**
@@ -273,6 +235,22 @@ chunk_t openssl_asn1_str2chunk(const ASN1_STRING *asn1)
 							ASN1_STRING_length(asn1));
 	}
 	return chunk_empty;
+}
+
+/**
+ * Described in header.
+ */
+chunk_t openssl_asn1_int2chunk(const ASN1_INTEGER *asn1)
+{
+#if defined(OPENSSL_IS_BORINGSSL) || defined(OPENSSL_IS_AWSLC)
+	/* BoringSSL and AWS-LC use an empty chunk for 0 so return a properly
+	 * encoded chunk here. */
+	if (asn1 && ASN1_STRING_length(asn1) == 0)
+	{
+		return asn1_zero_int;
+	}
+#endif
+	return openssl_asn1_str2chunk(asn1);
 }
 
 /**

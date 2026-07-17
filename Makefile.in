@@ -270,7 +270,6 @@ DLLIB = @DLLIB@
 DLLTOOL = @DLLTOOL@
 DSYMUTIL = @DSYMUTIL@
 DUMPBIN = @DUMPBIN@
-EASY_INSTALL = @EASY_INSTALL@
 ECHO_C = @ECHO_C@
 ECHO_N = @ECHO_N@
 ECHO_T = @ECHO_T@
@@ -278,6 +277,7 @@ EGREP = @EGREP@
 ETAGS = @ETAGS@
 EXEEXT = @EXEEXT@
 FGREP = @FGREP@
+FILECMD = @FILECMD@
 FUZZING_CFLAGS = @FUZZING_CFLAGS@
 FUZZING_LDFLAGS = @FUZZING_LDFLAGS@
 GEM = @GEM@
@@ -338,7 +338,6 @@ PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
 PLUGIN_CFLAGS = @PLUGIN_CFLAGS@
 PTHREADLIB = @PTHREADLIB@
 PYTHON = @PYTHON@
-PYTHONEGGINSTALLDIR = @PYTHONEGGINSTALLDIR@
 PYTHON_EXEC_PREFIX = @PYTHON_EXEC_PREFIX@
 PYTHON_PACKAGE_VERSION = @PYTHON_PACKAGE_VERSION@
 PYTHON_PLATFORM = @PYTHON_PLATFORM@
@@ -462,7 +461,6 @@ sharedstatedir = @sharedstatedir@
 soup_CFLAGS = @soup_CFLAGS@
 soup_LIBS = @soup_LIBS@
 srcdir = @srcdir@
-starter_plugins = @starter_plugins@
 strongswan_conf = @strongswan_conf@
 strongswan_options = @strongswan_options@
 swanctldir = @swanctldir@
@@ -1071,10 +1069,11 @@ cov-reset-common:
 @COVERAGE_TRUE@cov-report:
 @COVERAGE_TRUE@		@mkdir $(top_builddir)/coverage
 @COVERAGE_TRUE@		lcov -c -o $(top_builddir)/coverage/coverage.info -d $(top_builddir) \
-@COVERAGE_TRUE@			 --rc lcov_branch_coverage=1
+@COVERAGE_TRUE@			 --rc branch_coverage=1
 @COVERAGE_TRUE@		lcov -r $(top_builddir)/coverage/coverage.info '*/tests/*' '*/suites/*' '/usr*' \
+@COVERAGE_TRUE@			 '*proposal_keywords_static.*' \
 @COVERAGE_TRUE@			 -o $(abs_top_builddir)/coverage/coverage.cleaned.info \
-@COVERAGE_TRUE@			 --rc lcov_branch_coverage=1
+@COVERAGE_TRUE@			 --rc branch_coverage=1
 @COVERAGE_TRUE@		genhtml --num-spaces 4 --legend --branch-coverage --ignore-errors source \
 @COVERAGE_TRUE@				-t "$(PACKAGE_STRING)" \
 @COVERAGE_TRUE@				-o $(top_builddir)/coverage/html \

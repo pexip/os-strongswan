@@ -1,0 +1,623 @@
+From: Tobias Brunner <tobias@strongswan.org>
+Date: Wed, 26 Nov 2025 13:55:54 +0100
+Subject: nm: Create safe copies of files for user-specific connections
+
+This ensures that only certificates/private keys accessible by the
+configured user are accessed and prevents attackers from misusing
+other user's credentials.
+
+Also removed setting NM_VERSION_MIN_REQUIRED, which suppresses deprecation
+warnings that were added with newer API versions, and
+NM_VERSION_MAX_ALLOWED, which warns if using functions added in newer
+API versions, so we always build against the latest API available.
+
+But we check explicitly for the required function so this works with
+older NM versions and automatically will use it if the function is
+backported.
+
+Note that we can't use BUILD_FROM_FILE to read the temporary files as that
+uses mmap() which SELinux policies prevent us from using at the location
+these files are stored ([/var]/run/NetworkManager/cert/).
+
+Fixes: CVE-2025-9615
+
+Includes other backported fixes.
+---
+ configure.ac                                       |   6 +-
+ src/charon-nm/nm/nm_service.c                      | 187 +++++++++++++++++++--
+ src/libstrongswan/credentials/builder.c            |   1 +
+ src/libstrongswan/credentials/builder.h            |   2 +
+ src/libstrongswan/plugins/agent/agent_plugin.c     |   7 +
+ .../plugins/agent/agent_private_key.c              |  98 +++++++++--
+ src/libstrongswan/utils/capabilities.h             |   6 +
+ 7 files changed, 275 insertions(+), 32 deletions(-)
+
+diff --git a/configure.ac b/configure.ac
+index f0160dc..73be8b2 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -1261,8 +1261,10 @@ fi
+ 
+ if test x$nm = xtrue; then
+ 	PKG_CHECK_MODULES(nm, [gthread-2.0 libnm])
+-	AC_SUBST(nm_CFLAGS)
+-	AC_SUBST(nm_LIBS)
++	saved_LIBS=$LIBS
++	LIBS="$nm_LIBS"
++	AC_CHECK_FUNCS(nm_utils_copy_cert_as_user)
++	LIBS=$saved_LIBS
+ 
+ 	AC_MSG_CHECKING([for D-Bus policy directory])
+ 	if test -n "$dbuspolicydir" -a "x$dbuspolicydir" != xno; then
+diff --git a/src/charon-nm/nm/nm_service.c b/src/charon-nm/nm/nm_service.c
+index b920d58..9c6bcf6 100644
+--- a/src/charon-nm/nm/nm_service.c
++++ b/src/charon-nm/nm/nm_service.c
+@@ -15,6 +15,7 @@
+  */
+ 
+ #include <stdio.h>
++#include <fcntl.h>
+ #include <inttypes.h>
+ #include <net/if.h>
+ 
+@@ -54,6 +55,10 @@ typedef struct {
+ 	tun_device_t *tun;
+ 	/* name of the connection */
+ 	char *name;
++	/* temporary files for safe access */
++	GPtrArray *safe_files;
++	/* already requested the ssh-agent socket for the current connection */
++	bool agent_requested;
+ } NMStrongswanPluginPrivate;
+ 
+ G_DEFINE_TYPE_WITH_PRIVATE(NMStrongswanPlugin, nm_strongswan_plugin, NM_TYPE_VPN_SERVICE_PLUGIN)
+@@ -417,6 +422,100 @@ METHOD(listener_t, child_updown, bool,
+ 	return TRUE;
+ }
+ 
++/**
++ * Determine the user configured in the given connection (if any).
++ */
++static const char *get_connection_permission_user(NMConnection *connection)
++{
++	NMSettingConnection *s_con;
++	const char *ptype, *pitem, *pdetail;
++	guint num_perms, i;
++
++	s_con = nm_connection_get_setting_connection(connection);
++	if (s_con)
++	{
++		num_perms = nm_setting_connection_get_num_permissions(s_con);
++		if (num_perms > 0)
++		{
++			for (i = 0; i < num_perms; i++)
++			{
++				if (nm_setting_connection_get_permission(s_con, i, &ptype,
++														 &pitem, &pdetail) &&
++					streq(ptype, "user"))
++				{
++					return pitem;
++				}
++			}
++		}
++	}
++	return NULL;
++}
++
++/**
++ * Given a file name and an (optional) user name owning the connection, returns
++ * the file name to be used in the configuration.
++ *
++ * If the user is set, the file is accessed on behalf of the user, and copied
++ * safely to a temporary file readable only by root.
++ *
++ * The returned file name must be freed by the caller.
++ */
++static char *access_file(NMStrongswanPluginPrivate *priv, const char *filename,
++						 const char *user, GError **err)
++{
++#ifdef HAVE_NM_UTILS_COPY_CERT_AS_USER
++	if (user)
++	{
++		char *tmp = nm_utils_copy_cert_as_user(filename, user, err);
++		if (tmp)
++		{
++			g_ptr_array_add(priv->safe_files, g_strdup(tmp));
++		}
++		return tmp;
++	}
++#endif
++	return g_strdup(filename);
++}
++
++/**
++ * Read the contents of the given file. If an (optional) user name owning
++ * the connection is given, the file is accessed safely on behalf of that user.
++ *
++ * We have to do this explicitly via open() because SELinux policies prevent us
++ * from using mmap(), which BUILD_FROM_FILE would use.
++ */
++static chunk_t read_safe_file(NMStrongswanPluginPrivate *priv,
++							  const char *filename, const char *user,
++							  GError **err)
++{
++	chunk_t chunk = chunk_empty;
++	char *safe_path;
++	int fd;
++
++	safe_path = access_file(priv, filename, user, err);
++	if (safe_path)
++	{
++		fd = open(safe_path, O_RDONLY);
++		if (fd != -1)
++		{
++			if (!chunk_from_fd(fd, &chunk))
++			{
++				g_set_error(err, NM_VPN_PLUGIN_ERROR,
++						NM_VPN_PLUGIN_ERROR_BAD_ARGUMENTS,
++						"Unable to read '%s': %s", safe_path, strerror(errno));
++			}
++			close(fd);
++		}
++		else
++		{
++			g_set_error(err, NM_VPN_PLUGIN_ERROR,
++						NM_VPN_PLUGIN_ERROR_BAD_ARGUMENTS,
++						"Unable to open '%s': %s", safe_path, strerror(errno));
++		}
++	}
++	return chunk;
++}
++
+ /**
+  * Find a certificate for which we have a private key on a smartcard
+  */
+@@ -475,12 +574,13 @@ static identification_t *find_smartcard_key(NMStrongswanPluginPrivate *priv,
+  */
+ static bool add_auth_cfg_cert(NMStrongswanPluginPrivate *priv,
+ 							  NMSettingVpn *vpn, peer_cfg_t *peer_cfg,
+-							  GError **err)
++							  const char *user, GError **err)
+ {
+ 	identification_t *id = NULL;
+ 	certificate_t *cert = NULL;
+ 	auth_cfg_t *auth;
+-	const char *str, *method, *cert_source;
++	const char *str, *method, *cert_source, *agent_user;
++	chunk_t safe_file;
+ 
+ 	method = nm_setting_vpn_get_data_item(vpn, "method");
+ 	cert_source = nm_setting_vpn_get_data_item(vpn, "cert-source") ?: method;
+@@ -510,8 +610,14 @@ static bool add_auth_cfg_cert(NMStrongswanPluginPrivate *priv,
+ 
+ 		bool agent = streq(cert_source, "agent");
+ 
++		safe_file = read_safe_file(priv, str, user, err);
++		if (!safe_file.ptr)
++		{
++			return FALSE;
++		}
+ 		cert = lib->creds->create(lib->creds, CRED_CERTIFICATE, CERT_X509,
+-								  BUILD_FROM_FILE, str, BUILD_END);
++								  BUILD_BLOB, safe_file, BUILD_END);
++		chunk_clear(&safe_file);
+ 		if (!cert)
+ 		{
+ 			g_set_error(err, NM_VPN_PLUGIN_ERROR,
+@@ -523,12 +629,15 @@ static bool add_auth_cfg_cert(NMStrongswanPluginPrivate *priv,
+ 		str = nm_setting_vpn_get_secret(vpn, "agent");
+ 		if (agent && str)
+ 		{
++			agent_user = nm_setting_vpn_get_secret(vpn, "agent-user");
++
+ 			public = cert->get_public_key(cert);
+ 			if (public)
+ 			{
+ 				private = lib->creds->create(lib->creds, CRED_PRIVATE_KEY,
+ 											 public->get_type(public),
+ 											 BUILD_AGENT_SOCKET, str,
++											 BUILD_AGENT_USER, agent_user ?: user,
+ 											 BUILD_PUBLIC_KEY, public,
+ 											 BUILD_END);
+ 				public->destroy(public);
+@@ -551,8 +660,14 @@ static bool add_auth_cfg_cert(NMStrongswanPluginPrivate *priv,
+ 			{
+ 				priv->creds->set_key_password(priv->creds, secret);
+ 			}
++			safe_file = read_safe_file(priv, str, user, err);
++			if (!safe_file.ptr)
++			{
++				return FALSE;
++			}
+ 			private = lib->creds->create(lib->creds, CRED_PRIVATE_KEY,
+-									KEY_ANY, BUILD_FROM_FILE, str, BUILD_END);
++								KEY_ANY, BUILD_BLOB, safe_file, BUILD_END);
++			chunk_clear(&safe_file);
+ 			if (!private)
+ 			{
+ 				g_set_error(err, NM_VPN_PLUGIN_ERROR,
+@@ -731,7 +846,8 @@ static gboolean connect_(NMVpnServicePlugin *plugin, NMConnection *connection,
+ 	NMSettingVpn *vpn;
+ 	enumerator_t *enumerator;
+ 	identification_t *gateway = NULL;
+-	const char *str, *method;
++	const char *str, *method, *user;
++	chunk_t safe_file;
+ 	bool virtual, proposal;
+ 	proposal_t *prop;
+ 	ike_cfg_t *ike_cfg;
+@@ -786,6 +902,8 @@ static gboolean connect_(NMVpnServicePlugin *plugin, NMConnection *connection,
+ 	DBG4(DBG_CFG, "%s",
+ 		 nm_setting_to_string(NM_SETTING(vpn)));
+ 
++	user = get_connection_permission_user(connection);
++
+ 	ike.remote = (char*)nm_setting_vpn_get_data_item(vpn, "address");
+ 	if (!ike.remote || !*ike.remote)
+ 	{
+@@ -814,8 +932,14 @@ static gboolean connect_(NMVpnServicePlugin *plugin, NMConnection *connection,
+ 	str = nm_setting_vpn_get_data_item(vpn, "certificate");
+ 	if (str)
+ 	{
++		safe_file = read_safe_file(priv, str, user, err);
++		if (!safe_file.ptr)
++		{
++			return FALSE;
++		}
+ 		cert = lib->creds->create(lib->creds, CRED_CERTIFICATE, CERT_X509,
+-								  BUILD_FROM_FILE, str, BUILD_END);
++								  BUILD_BLOB, safe_file, BUILD_END);
++		chunk_clear(&safe_file);
+ 		if (!cert)
+ 		{
+ 			g_set_error(err, NM_VPN_PLUGIN_ERROR,
+@@ -903,7 +1027,7 @@ static gboolean connect_(NMVpnServicePlugin *plugin, NMConnection *connection,
+ 		streq(method, "agent") ||
+ 		streq(method, "smartcard"))
+ 	{
+-		if (!add_auth_cfg_cert (priv, vpn, peer_cfg, err))
++		if (!add_auth_cfg_cert(priv, vpn, peer_cfg, user, err))
+ 		{
+ 			peer_cfg->destroy(peer_cfg);
+ 			ike_cfg->destroy(ike_cfg);
+@@ -1049,10 +1173,12 @@ static gboolean connect_(NMVpnServicePlugin *plugin, NMConnection *connection,
+ static gboolean need_secrets(NMVpnServicePlugin *plugin, NMConnection *connection,
+ 							 const char **setting_name, GError **error)
+ {
++	NMStrongswanPluginPrivate *priv;
+ 	NMSettingVpn *settings;
+ 	const char *method, *cert_source, *path;
+ 	bool need_secret = FALSE;
+ 
++	priv = NM_STRONGSWAN_PLUGIN_GET_PRIVATE((NMStrongswanPlugin*)plugin);
+ 	settings = NM_SETTING_VPN(nm_connection_get_setting(connection,
+ 														NM_TYPE_SETTING_VPN));
+ 	method = nm_setting_vpn_get_data_item(settings, "method");
+@@ -1071,7 +1197,14 @@ static gboolean need_secrets(NMVpnServicePlugin *plugin, NMConnection *connectio
+ 			}
+ 			if (streq(cert_source, "agent"))
+ 			{
+-				need_secret = !nm_setting_vpn_get_secret(settings, "agent");
++				/* always request the socket/username from the current user */
++				need_secret = !priv->agent_requested;
++				if (!priv->agent_requested)
++				{
++					nm_setting_vpn_remove_secret(settings, "agent");
++					nm_setting_vpn_remove_secret(settings, "agent-user");
++					priv->agent_requested = TRUE;
++				}
+ 			}
+ 			else if (streq(cert_source, "smartcard"))
+ 			{
+@@ -1084,18 +1217,27 @@ static gboolean need_secrets(NMVpnServicePlugin *plugin, NMConnection *connectio
+ 				if (path)
+ 				{
+ 					private_key_t *key;
++					const char *user;
++					chunk_t safe_file;
+ 
+-					/* try to load/decrypt the private key */
+-					key = lib->creds->create(lib->creds, CRED_PRIVATE_KEY,
+-									KEY_ANY, BUILD_FROM_FILE, path, BUILD_END);
+-					if (key)
+-					{
+-						key->destroy(key);
+-						need_secret = FALSE;
+-					}
+-					else if (nm_setting_vpn_get_secret(settings, "password"))
++					user = get_connection_permission_user(connection);
++					safe_file = read_safe_file(priv, path, user, error);
++					if (safe_file.ptr)
+ 					{
+-						need_secret = FALSE;
++						/* try to load/decrypt the private key */
++						key = lib->creds->create(lib->creds, CRED_PRIVATE_KEY,
++											KEY_ANY, BUILD_BLOB, safe_file,
++											BUILD_END);
++						chunk_clear(&safe_file);
++						if (key)
++						{
++							key->destroy(key);
++							need_secret = FALSE;
++						}
++						else if (nm_setting_vpn_get_secret(settings, "password"))
++						{
++							need_secret = FALSE;
++						}
+ 					}
+ 				}
+ 			}
+@@ -1149,6 +1291,8 @@ static gboolean do_disconnect(gpointer plugin)
+ 
+ 	/* delete any allocated interface */
+ 	delete_interface(priv);
++
++	priv->agent_requested = FALSE;
+ 	return FALSE;
+ }
+ 
+@@ -1181,6 +1325,7 @@ static void nm_strongswan_plugin_init(NMStrongswanPlugin *plugin)
+ 	priv->listener.ike_reestablish_post = _ike_reestablish_post;
+ 	charon->bus->add_listener(charon->bus, &priv->listener);
+ 	priv->xfrmi_manager = lib->get(lib, KERNEL_NETLINK_XFRMI_MANAGER);
++	priv->safe_files = g_ptr_array_new_with_free_func(g_free);
+ }
+ 
+ /**
+@@ -1190,11 +1335,17 @@ static void nm_strongswan_plugin_dispose(GObject *obj)
+ {
+ 	NMStrongswanPlugin *plugin;
+ 	NMStrongswanPluginPrivate *priv;
++	int i;
+ 
+ 	plugin = NM_STRONGSWAN_PLUGIN(obj);
+ 	priv = NM_STRONGSWAN_PLUGIN_GET_PRIVATE(plugin);
+ 	delete_interface(priv);
+ 	free(priv->name);
++	for (i = 0; i < priv->safe_files->len; i++)
++	{
++		unlink((const char *)priv->safe_files->pdata[i]);
++	}
++	g_ptr_array_unref(priv->safe_files);
+ 	G_OBJECT_CLASS (nm_strongswan_plugin_parent_class)->dispose (obj);
+ }
+ 
+diff --git a/src/libstrongswan/credentials/builder.c b/src/libstrongswan/credentials/builder.c
+index 27ae83c..76bcd39 100644
+--- a/src/libstrongswan/credentials/builder.c
++++ b/src/libstrongswan/credentials/builder.c
+@@ -20,6 +20,7 @@
+ ENUM(builder_part_names, BUILD_FROM_FILE, BUILD_END,
+ 	"BUILD_FROM_FILE",
+ 	"BUILD_AGENT_SOCKET",
++	"BUILD_AGENT_USER",
+ 	"BUILD_BLOB",
+ 	"BUILD_BLOB_ASN1_DER",
+ 	"BUILD_BLOB_PEM",
+diff --git a/src/libstrongswan/credentials/builder.h b/src/libstrongswan/credentials/builder.h
+index e95265e..7e2a239 100644
+--- a/src/libstrongswan/credentials/builder.h
++++ b/src/libstrongswan/credentials/builder.h
+@@ -49,6 +49,8 @@ enum builder_part_t {
+ 	BUILD_FROM_FILE,
+ 	/** unix socket of a ssh/pgp agent, char* */
+ 	BUILD_AGENT_SOCKET,
++	/** user to access a ssh/pgp agent socket, char* */
++	BUILD_AGENT_USER,
+ 	/** An arbitrary blob of data, chunk_t */
+ 	BUILD_BLOB,
+ 	/** DER encoded ASN.1 blob, chunk_t */
+diff --git a/src/libstrongswan/plugins/agent/agent_plugin.c b/src/libstrongswan/plugins/agent/agent_plugin.c
+index 9e39d51..2b4028b 100644
+--- a/src/libstrongswan/plugins/agent/agent_plugin.c
++++ b/src/libstrongswan/plugins/agent/agent_plugin.c
+@@ -70,6 +70,13 @@ plugin_t *agent_plugin_create()
+ 		DBG1(DBG_DMN, "agent plugin requires CAP_DAC_OVERRIDE capability");
+ 		return NULL;
+ 	}
++	/* required to switch user/group to access ssh-agent socket */
++	if (!lib->caps->keep(lib->caps, CAP_SETUID) ||
++		!lib->caps->keep(lib->caps, CAP_SETGID))
++	{
++		DBG1(DBG_DMN, "agent plugin requires CAP_SETUID/CAP_SETGID capability");
++		return NULL;
++	}
+ 
+ 	INIT(this,
+ 		.public = {
+diff --git a/src/libstrongswan/plugins/agent/agent_private_key.c b/src/libstrongswan/plugins/agent/agent_private_key.c
+index 0c1c988..7308055 100644
+--- a/src/libstrongswan/plugins/agent/agent_private_key.c
++++ b/src/libstrongswan/plugins/agent/agent_private_key.c
+@@ -22,7 +22,10 @@
+ #include <sys/types.h>
+ #include <sys/socket.h>
+ #include <sys/un.h>
++#include <sys/wait.h>
+ #include <arpa/inet.h>
++#include <pwd.h>
++#include <grp.h>
+ #include <errno.h>
+ 
+ #include <library.h>
+@@ -50,6 +53,11 @@ struct private_agent_private_key_t {
+ 	 */
+ 	char *path;
+ 
++	/**
++	 * Optional user to connect to socket as
++	 */
++	char *user;
++
+ 	/**
+ 	 * public key encoded in SSH format
+ 	 */
+@@ -142,12 +150,24 @@ static chunk_t read_string(chunk_t *blob)
+ }
+ 
+ /**
+- * open socket connection to the ssh-agent
++ * Connect a UNIX socket to the given path.
+  */
+-static int open_connection(char *path)
++static bool connect_socket(int fd, char *path)
+ {
+ 	struct sockaddr_un addr;
+-	int s;
++
++	addr.sun_family = AF_UNIX;
++	addr.sun_path[UNIX_PATH_MAX - 1] = '\0';
++	strncpy(addr.sun_path, path, UNIX_PATH_MAX - 1);
++	return connect(fd, (struct sockaddr*)&addr, SUN_LEN(&addr)) == 0;
++}
++
++/**
++ * Open socket connection to the ssh-agent, optionally as a given user.
++ */
++static int open_connection(char *path, char *user)
++{
++	int s, pid, status;
+ 
+ 	s = socket(AF_UNIX, SOCK_STREAM, 0);
+ 	if (s == -1)
+@@ -157,14 +177,63 @@ static int open_connection(char *path)
+ 		return -1;
+ 	}
+ 
+-	addr.sun_family = AF_UNIX;
+-	addr.sun_path[UNIX_PATH_MAX - 1] = '\0';
+-	strncpy(addr.sun_path, path, UNIX_PATH_MAX - 1);
+-
+-	if (connect(s, (struct sockaddr*)&addr, SUN_LEN(&addr)) != 0)
++	if (user)
++	{
++		pid = fork();
++		switch (pid)
++		{
++			case -1:
++				DBG1(DBG_LIB, "forking failed after opening ssh-agent "
++					 "socket: %s", strerror(errno));
++				close(s);
++				return -1;
++			case 0:
++			{
++				/* child, do everything manually to avoid interacting with
++				 * mutexes etc. that are potentially locked in the parent */
++				struct passwd *pwp;
++
++				pwp = getpwnam(user);
++				if (pwp)
++				{
++					if (initgroups(user, pwp->pw_gid) == 0)
++					{
++						if (setgid(pwp->pw_gid) == 0 &&
++							setuid(pwp->pw_uid) == 0)
++						{
++							if (connect_socket(s, path))
++							{
++								exit(EXIT_SUCCESS);
++							}
++						}
++					}
++				}
++				exit(EXIT_FAILURE);
++				/* not reached */
++			}
++			default:
++				/* parent */
++				if (waitpid(pid, &status, 0) == -1 ||
++					!WIFEXITED(status))
++				{
++					DBG1(DBG_LIB, "sub-process to connect to ssh-agent didn't "
++						 "terminate normally");
++					close(s);
++					return -1;
++				}
++				if (WEXITSTATUS(status) != 0)
++				{
++					DBG1(DBG_LIB, "connecting to ssh-agent in sub-process "
++						 "failed: %d", WEXITSTATUS(status));
++					close(s);
++					return -1;
++				}
++		}
++	}
++	else if (!connect_socket(s, path))
+ 	{
+ 		DBG1(DBG_LIB, "connecting to ssh-agent socket '%s' failed: %s",
+-			 addr.sun_path, strerror(errno));
++			 path, strerror(errno));
+ 		close(s);
+ 		return -1;
+ 	}
+@@ -181,7 +250,7 @@ static bool read_key(private_agent_private_key_t *this, public_key_t *pubkey)
+ 	chunk_t blob, key;
+ 	bool success = FALSE;
+ 
+-	socket = open_connection(this->path);
++	socket = open_connection(this->path, this->user);
+ 	if (socket < 0)
+ 	{
+ 		return FALSE;
+@@ -293,7 +362,7 @@ METHOD(private_key_t, sign, bool,
+ 		return FALSE;
+ 	}
+ 
+-	socket = open_connection(this->path);
++	socket = open_connection(this->path, this->user);
+ 	if (socket < 0)
+ 	{
+ 		return FALSE;
+@@ -512,6 +581,7 @@ METHOD(private_key_t, destroy, void,
+ 		chunk_free(&this->key);
+ 		DESTROY_IF(this->pubkey);
+ 		free(this->path);
++		free(this->user);
+ 		free(this);
+ 	}
+ }
+@@ -523,7 +593,7 @@ agent_private_key_t *agent_private_key_open(key_type_t type, va_list args)
+ {
+ 	private_agent_private_key_t *this;
+ 	public_key_t *pubkey = NULL;
+-	char *path = NULL;
++	char *path = NULL, *user = NULL;
+ 
+ 	while (TRUE)
+ 	{
+@@ -532,6 +602,9 @@ agent_private_key_t *agent_private_key_open(key_type_t type, va_list args)
+ 			case BUILD_AGENT_SOCKET:
+ 				path = va_arg(args, char*);
+ 				continue;
++			case BUILD_AGENT_USER:
++				user = va_arg(args, char*);
++				continue;
+ 			case BUILD_PUBLIC_KEY:
+ 				pubkey = va_arg(args, public_key_t*);
+ 				continue;
+@@ -566,6 +639,7 @@ agent_private_key_t *agent_private_key_open(key_type_t type, va_list args)
+ 			},
+ 		},
+ 		.path = strdup(path),
++		.user = strdupnull(user),
+ 		.ref = 1,
+ 	);
+ 
+diff --git a/src/libstrongswan/utils/capabilities.h b/src/libstrongswan/utils/capabilities.h
+index 681fbb8..9ecde47 100644
+--- a/src/libstrongswan/utils/capabilities.h
++++ b/src/libstrongswan/utils/capabilities.h
+@@ -50,6 +50,12 @@ typedef struct capabilities_t capabilities_t;
+ #ifndef CAP_SETPCAP
+ # define CAP_SETPCAP 8
+ #endif
++#ifndef CAP_SETUID
++# define CAP_SETUID 7
++#endif
++#ifndef CAP_SETGID
++# define CAP_SETGID 6
++#endif
+ 
+ /**
+  * POSIX capability dropping abstraction layer.

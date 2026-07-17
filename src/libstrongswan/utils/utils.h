@@ -120,7 +120,7 @@ void utils_deinit();
 #endif
 
 /**
- * Address santizer support
+ * Address sanitizer support
  */
 #if __has_feature(address_sanitizer) || \
 	(defined(__GNUC__) && defined(__SANITIZE_ADDRESS__))
@@ -217,7 +217,7 @@ void utils_deinit();
 /**
  * Ignore result of functions tagged with warn_unused_result attributes
  */
-#define ignore_result(call) { if(call){}; }
+#define ignore_result(call) do { if(call){} } while(0)
 
 #if !defined(HAVE_SIGWAITINFO) && !defined(WIN32)
 /**
@@ -236,6 +236,12 @@ int sigwaitinfo(const sigset_t *set, void *info);
  * Portable function to wait for SIGINT/SIGTERM (or equivalent).
  */
 void wait_sigint();
+
+/**
+ * Portable function to send a SIGINT/SIGTERM (or equivalent) to the current
+ * process to exit the above function.
+ */
+void send_sigint();
 
 #ifndef HAVE_CLOSEFROM
 /**

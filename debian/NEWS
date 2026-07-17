@@ -1,3 +1,30 @@
+strongswan (6.0.0-1) unstable; urgency=medium
+
+  With 6.0.0-1, the default strongSwan configuration (reflected by the
+  strongswan metapackage) will use the swanctl(8) command (through the VICI
+  plugin) from the strongswan-swanctl package, instead of the ipsec(8) command
+  (through the stroke plugin) from the strongswan-starter package. Existing
+  installs shouldn't be affected (unless orphan packages are removed using for
+  example apt-get autoremove).
+  .
+  Users are advised to migrate their previous configuration in
+  `/etc/ipsec.conf` to `/etc/swanctl/conf.d` using documentation from
+  swanctl.conf(5). A migration page exists upstream at
+  https://wiki.strongswan.org/projects/strongswan/wiki/Fromipsecconf as well.
+  .
+  There have been changes in various plugins, make sure the proper packages
+  are installed:
+  - bliss and ntru plugins have been removed upstream
+  - openssl plugin has been moved to libstrongswan
+  - sshkey plugin has been moved to libstrongswan-standard-plugins
+  - aes, gmp, hmac, md5, mgf1, pkcs12, rc2, sha1, sha2 plugins have been moved
+  to libstrongswan-extra-plugins but their functionalities are now handled by
+  the openssl plugin in the libstrongswan package
+  - pgp, kdf, xcbc, fips-prf plugins have been moved to
+  libstrongswan-extra-plugins
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Wed, 19 Feb 2025 16:03:01 +0100
+
 strongswan (5.8.0-1) unstable; urgency=medium
 
   With 5.8.0, systemd service files for strongSwan have been renamed.
