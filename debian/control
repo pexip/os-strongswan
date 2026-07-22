@@ -87,7 +87,6 @@ Description: strongSwan utility and crypto library
 Package: libstrongswan-standard-plugins
 Architecture: any
 Depends: libstrongswan (= ${binary:Version}),
-         libssl3 (>= 3.0.8-0pexip4),
          ${misc:Depends},
          ${shlibs:Depends}
 Breaks: libstrongswan (<< 6.0.0-1~)
@@ -215,7 +214,7 @@ Architecture: any
 Pre-Depends: ${misc:Pre-Depends}
 Depends: adduser,
          libstrongswan (= ${binary:Version}),
-	 lsb-base (>= 3.0-6),
+         lsb-base (>= 3.0-6),
          ${misc:Depends},
          ${shlibs:Depends}
 Conflicts: libreswan

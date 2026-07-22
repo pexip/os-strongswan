@@ -16,7 +16,6 @@ dont-load-kernel-libipsec-plugin-by-default.patch
 0016-gmp-Avoid-crash-and-timing-leaks-in-PKCS-1-v1.5-decr.patch
 0017-identification-Fix-double-free-when-cloning-empty-ID.patch
 
-pexip/01-ipsec-stop-with-old-pidfile.patch
 pexip/02-x509-tbs.patch
 pexip/03-kdf-salt.patch
 pexip/04-disable-Werror.patch
