@@ -1,3 +1,32 @@
+strongswan (6.0.1-6+deb13u7+pexip25u1) pexip-trixie; urgency=medium
+
+  * New upstream release with security fixes
+
+ -- Steve McIntyre <steve.mcintyre@pexip.com>  Fri, 11 Sep 2026 17:25:23 +0100
+
+strongswan (6.0.1-6+deb13u7) trixie-security; urgency=medium
+
+  * d/patches: add fix for undefined memory access when verifying PKCS#7
+    containers (CVE-2026-78123)
+  * d/patches: add patch to fix memory leaks after enumerating certificates in
+    PKCS#7 containers (CVE-2026-78124)
+  * d/patches: fix NULL-pointer dereference in EAP-AKA (CVE-2026-78126)
+  * d/patches: avoid memory leak in IKE message logging (CVE-2026-78127)
+  * d/patches: fix potential DoS by validating PKCS#5 parsed parameters
+    (CVE-2026-78129)
+  * d/patches: fix NULL-pointer dereference in x509 code (CVE-2026-78130)
+  * d/patches: fix memory leak when parsing x509 attribute certificates
+    (CVE-2026-78131)
+  * d/patches: fix infinite loop when parsing x509 attribute certificates
+    (CVE-2026-78132)
+  * d/patches: fix use-after-free in IKEv2 rekeying (CVE-2026-78133)
+  * d/patches: fix several issues with binding identities to the IKE SA
+    (CVE-2026-78134)
+  * d/patches: properly reject CREATE_CHILD_SA requests on unestablished
+    IKE_SA (CVE-2026-78135)
+
+ -- Yves-Alexis Perez <corsac@debian.org>  Tue, 01 Sep 2026 13:29:28 +0200
+
 strongswan (6.0.1-6+deb13u6+pexip25u2) pexip-trixie; urgency=medium
 
   * Remove obsolete maintscripts/upgrade changes

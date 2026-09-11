@@ -15,6 +15,17 @@ dont-load-kernel-libipsec-plugin-by-default.patch
 0015-constraints-Case-insensitive-matching-and-reject-exc.patch
 0016-gmp-Avoid-crash-and-timing-leaks-in-PKCS-1-v1.5-decr.patch
 0017-identification-Fix-double-free-when-cloning-empty-ID.patch
+0018-openssl-Fix-undefined-memory-access-when-verifying-P.patch
+0019-openssl-Fix-memory-leaks-after-enumerating-certifica.patch
+0020-eap-aka-Only-accept-AKA-Synchronization-Failure-if-e.patch
+0021-message-Avoid-memory-leak-if-string-buffer-for-messa.patch
+0022-pkcs5-Validate-parsed-parameters-to-avoid-DoS-attack.patch
+0023-x509-Avoid-NULL-pointer-dereference-if-issuerName-is.patch
+0024-x509-Fix-memory-leaks-when-parsing-attribute-certifi.patch
+0025-x509-Prevent-infinite-loop-when-parsing-ietfAttrSynt.patch
+0026-ikev2-Prevent-use-after-free-during-collision-after-.patch
+0027-eap-ttls-peap-Return-auth-cfg-with-details-on-TLS-an.patch
+0028-ikev2-Properly-reject-CREATE_CHILD_SA-requests-on-un.patch
 
 pexip/02-x509-tbs.patch
 pexip/03-kdf-salt.patch
